@@ -1,0 +1,76 @@
+---
+description: Guidelines for AI agent collaboration
+globs: ["tasks/**/*", "specs/**/*"]
+---
+
+# AI Agent Collaboration Guidelines
+
+## Task Management System
+
+This project uses a structured task system in `tasks/` for tracking work:
+
+### Task File Format (`tasks/TASK-XXX.md`)
+
+```markdown
+# TASK-XXX: Task Title
+
+## Status
+[ ] Not Started / [~] In Progress / [x] Complete
+
+## Priority
+P0 (Critical) / P1 (High) / P2 (Medium) / P3 (Low)
+
+## Description
+What needs to be done and why.
+
+## Acceptance Criteria
+- [ ] Criterion 1
+- [ ] Criterion 2
+
+## Implementation Notes
+Technical details, design decisions.
+
+## Dependencies
+- TASK-YYY (blocking)
+- TASK-ZZZ (related)
+
+## Verification
+How to verify this task is complete.
+```
+
+## Specification-Driven Development
+
+Before implementing any feature:
+
+1. **Check `specs/`** for existing specification
+2. **If no spec exists**, create one first
+3. **Follow the spec** during implementation
+4. **Update the spec** if design changes
+
+## Agent Handoff Protocol
+
+When pausing or completing work:
+
+1. **Update task status** in `tasks/`
+2. **Document current state** in task notes
+3. **List any blockers** or open questions
+4. **Commit all changes** with descriptive message
+
+## Context Preservation
+
+To help future agents understand context:
+
+1. **Use descriptive commit messages**
+2. **Document "why" in code comments**
+3. **Keep specs updated**
+4. **Log decisions in task files**
+
+## Verification Before Completion
+
+Before marking any task complete:
+
+```bash
+make verify  # Runs lint + tests + build check
+```
+
+All checks must pass.

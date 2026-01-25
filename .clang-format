@@ -1,0 +1,62 @@
+# LLVM style with minor adjustments
+BasedOnStyle: LLVM
+Language: Cpp
+Standard: c++17
+
+# Indentation
+IndentWidth: 2
+TabWidth: 2
+UseTab: Never
+AccessModifierOffset: -2
+NamespaceIndentation: None
+
+# Line length
+ColumnLimit: 80
+
+# Braces
+BreakBeforeBraces: Attach
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+
+# Alignment
+AlignAfterOpenBracket: Align
+AlignConsecutiveAssignments: false
+AlignConsecutiveDeclarations: false
+AlignOperands: true
+AlignTrailingComments: true
+
+# Other
+AllowAllParametersOfDeclarationOnNextLine: true
+BinPackArguments: true
+BinPackParameters: true
+BreakConstructorInitializersBeforeComma: false
+ConstructorInitializerAllOnOneLineOrOnePerLine: true
+Cpp11BracedListStyle: true
+DerivePointerAlignment: false
+PointerAlignment: Right
+SpaceAfterCStyleCast: false
+SpaceBeforeAssignmentOperators: true
+SpaceBeforeParens: ControlStatements
+SpaceInEmptyParentheses: false
+SpacesInAngles: false
+SpacesInCStyleCastParentheses: false
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+
+# Include ordering
+SortIncludes: true
+IncludeBlocks: Regroup
+IncludeCategories:
+  # MLIR includes
+  - Regex: '^"mlir/'
+    Priority: 3
+  # LLVM includes
+  - Regex: '^"llvm/'
+    Priority: 4
+  # Project includes
+  - Regex: '^"AIKernels/'
+    Priority: 1
+  # Other includes
+  - Regex: '.*'
+    Priority: 5

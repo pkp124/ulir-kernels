@@ -1,0 +1,16 @@
+# Development dependencies
+pytest>=7.0
+ruff>=0.1.0
+cmake-format>=0.6
+
+# MLIR testing
+lit>=18.0
+filecheck>=0.0.24
+
+# Documentation
+mkdocs>=1.5
+mkdocs-material>=9.0
+
+# Python bindings (optional)
+pybind11>=2.11
+numpy>=1.24

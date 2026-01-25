@@ -1,0 +1,83 @@
+---
+description: MLIR-specific development rules
+globs: ["src/**/*.td", "src/**/*.cpp", "src/**/*.h"]
+---
+
+# MLIR Development Guidelines
+
+## TableGen Files (.td)
+
+When working with TableGen files:
+
+1. **Dialect Definition Order**:
+   - Dialect definition first
+   - Type definitions
+   - Attribute definitions
+   - Operation definitions
+
+2. **Operation Naming**:
+   - Use `Dialect_OpNameOp` pattern (e.g., `Kernel_MatmulOp`)
+   - Operations should be verbs or noun phrases
+
+3. **Required Elements for Operations**:
+   ```tablegen
+   def Kernel_ExampleOp : Kernel_Op<"example", [traits]> {
+     let summary = "One-line description";
+     let description = [{
+       Detailed multi-line description with examples.
+     }];
+     let arguments = (ins ...);
+     let results = (outs ...);
+     let assemblyFormat = "...";  // or hasCustomAssemblyFormat
+     let hasVerifier = 1;         // if verification needed
+   }
+   ```
+
+## MLIR Passes
+
+When implementing passes:
+
+1. **File Structure**:
+   - Declare in `include/Passes.td`
+   - Implement in `lib/Passes/PassName.cpp`
+   - Register in `lib/Passes/PassRegistration.cpp`
+
+2. **Pass Naming**: `{Verb}{Target}Pass` (e.g., `TileMatmulPass`, `LowerToRVVPass`)
+
+3. **Required Pass Elements**:
+   ```cpp
+   struct MyPass : public impl::MyPassBase<MyPass> {
+     void runOnOperation() override;
+   };
+   ```
+
+## Common Patterns
+
+### Pattern Rewriting
+```cpp
+struct MyPattern : public OpRewritePattern<SourceOp> {
+  using OpRewritePattern<SourceOp>::OpRewritePattern;
+  
+  LogicalResult matchAndRewrite(SourceOp op,
+                                PatternRewriter &rewriter) const override {
+    // Implementation
+  }
+};
+```
+
+### Dialect Conversion
+```cpp
+class MyTypeConverter : public TypeConverter {
+public:
+  MyTypeConverter() {
+    addConversion([](Type type) { return type; });
+    // Add type conversions
+  }
+};
+```
+
+## Testing MLIR Code
+
+- Use FileCheck for lit tests
+- Test both positive cases and error cases
+- Test round-trip parsing: parse → print → parse

@@ -1,0 +1,58 @@
+---
+description: Core project rules for MLIR Kernel Generation
+globs: ["**/*"]
+alwaysApply: true
+---
+
+# MLIR Kernel Generation Project
+
+## Project Overview
+
+This project generates optimized AI accelerator kernels using the MLIR compiler infrastructure. The output is a library of kernels targeting multiple architectures, starting with RISC-V RVV.
+
+## Key Principles
+
+1. **Correctness First**: All kernels must be mathematically correct before optimization
+2. **Layered Abstraction**: High-level ops → Tiled ops → Vector ops → Target-specific ops
+3. **Testability**: Every kernel must have unit tests and integration tests
+4. **Documentation**: Every public API must be documented
+
+## Architecture Overview
+
+```
+High-Level Kernel Ops (kernel dialect)
+        ↓
+Tiling & Transformation Passes
+        ↓
+Vector Dialect (architecture-agnostic)
+        ↓
+Target-Specific Lowering (RVV, SVE, etc.)
+        ↓
+LLVM IR → Assembly
+```
+
+## Directory Structure
+
+- `src/dialects/` - MLIR dialect definitions (TableGen + C++)
+- `src/passes/` - Transformation and lowering passes
+- `src/targets/` - Target-specific code generation
+- `src/runtime/` - Runtime library for kernel invocation
+- `specs/` - Specification documents (read these first!)
+- `docs/` - User and developer documentation
+- `tests/` - Unit, integration, and lit tests
+- `tasks/` - Task tracking for development
+
+## Development Workflow
+
+1. **Before implementing**: Read the relevant spec in `specs/`
+2. **Check existing code**: Search for similar implementations
+3. **Write tests first**: Create tests before implementation
+4. **Implement incrementally**: Small, tested commits
+5. **Verify**: Run `make verify` before committing
+
+## Code Style
+
+- C++: Follow LLVM coding standards
+- Python: Follow PEP 8 with type hints
+- Use descriptive names over comments
+- Document "why" not "what"

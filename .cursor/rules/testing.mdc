@@ -1,0 +1,78 @@
+---
+description: Testing guidelines and requirements
+globs: ["tests/**/*", "**/*_test.py", "**/*_test.cpp"]
+---
+
+# Testing Guidelines
+
+## Test Categories
+
+### 1. Unit Tests (`tests/unit/`)
+- Test individual functions and classes
+- Fast execution (< 1 second each)
+- No external dependencies
+
+### 2. Integration Tests (`tests/integration/`)
+- Test complete pipelines
+- May use external tools (mlir-opt, etc.)
+- Test cross-component interactions
+
+### 3. Lit Tests (`tests/lit/`)
+- MLIR FileCheck-based tests
+- Test dialect parsing, printing, verification
+- Test pass transformations
+
+## Test Requirements
+
+1. **Every new kernel operation** must have:
+   - Parsing/printing round-trip test
+   - Verifier test (valid and invalid inputs)
+   - Lowering test to vector dialect
+   - Target-specific codegen test
+
+2. **Every new pass** must have:
+   - Before/after transformation test
+   - Edge case tests
+   - Error handling tests
+
+## Test Naming Conventions
+
+```
+tests/
+├── unit/
+│   ├── dialect/
+│   │   └── test_kernel_ops.py
+│   └── passes/
+│       └── test_tiling.py
+├── integration/
+│   └── test_matmul_pipeline.py
+└── lit/
+    ├── Dialect/
+    │   └── Kernel/
+    │       ├── matmul.mlir
+    │       └── invalid.mlir
+    └── Transforms/
+        └── tile-matmul.mlir
+```
+
+## Running Tests
+
+```bash
+make test          # Run all tests
+make test-unit     # Run unit tests only
+make test-lit      # Run lit tests only
+make test-integration  # Run integration tests
+```
+
+## Writing Lit Tests
+
+```mlir
+// RUN: aikernel-opt %s --pass-name | FileCheck %s
+
+// CHECK-LABEL: func @test_case
+func.func @test_case() {
+  // CHECK: expected.output
+  %0 = kernel.matmul ...
+  return
+}
+```

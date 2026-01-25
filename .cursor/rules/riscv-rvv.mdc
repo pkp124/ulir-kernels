@@ -1,0 +1,75 @@
+---
+description: RISC-V RVV target-specific guidelines
+globs: ["src/targets/riscv/**/*", "specs/targets/riscv*.md"]
+---
+
+# RISC-V RVV Development Guidelines
+
+## Overview
+
+RISC-V Vector Extension (RVV) is the first target architecture for this project. RVV is a scalable vector ISA, meaning vector length is not fixed at compile time.
+
+## Key RVV Concepts
+
+### Vector Length Agnostic (VLA) Programming
+- Use `vsetvl` to set vector length dynamically
+- Code should work with any VLEN (128-bit to 16384-bit)
+- Use LMUL (length multiplier) to group registers
+
+### Register Groups
+- LMUL = 1: 32 vector registers
+- LMUL = 2: 16 register groups (v0-v2, v2-v4, ...)
+- LMUL = 4: 8 register groups
+- LMUL = 8: 4 register groups
+
+### Element Types
+- SEW (Selected Element Width): 8, 16, 32, 64 bits
+- Mixed-width operations for dot products
+
+## Lowering Strategy
+
+1. **Kernel Dialect → Linalg/Vector**
+   - Tile operations for vector register capacity
+   - Insert explicit reductions
+
+2. **Vector → RVV Intrinsics**
+   - Map vector.load/store to vle/vse
+   - Map vector.fma to vfmacc
+   - Handle masking and tail elements
+
+3. **RVV Intrinsics → LLVM IR**
+   - Use LLVM's RISC-V vector intrinsics
+   - Set proper vtype configuration
+
+## Common Kernel Patterns
+
+### Matrix Multiplication (GEMM)
+```
+for each M_tile:
+  for each N_tile:
+    acc = zero vector
+    for each K_tile:
+      a = load A[m, k:k+vl]
+      for n in N_tile:
+        b = broadcast B[k, n]
+        acc[n] = vfmacc(acc[n], a, b)
+    store acc to C[m, n_tile]
+```
+
+### Activation Functions
+- Use vector floating-point operations
+- GELU approximation: vfmul, vfadd sequences
+- ReLU: vfmax with zero vector
+
+## Testing RVV Code
+
+1. Use QEMU with RVV support for functional testing
+2. Use Spike (RISC-V ISA simulator) for cycle-accurate analysis
+3. Test with multiple VLEN values (128, 256, 512)
+
+## Performance Considerations
+
+- Minimize `vsetvl` instructions
+- Maximize LMUL for compute-bound kernels
+- Use vector masking for irregular bounds
+- Consider bank conflicts in memory access patterns
