@@ -1,147 +1,120 @@
 # KernelSmith Task Backlog
 
-This file tracks all tasks and their current status. The Manager Agent maintains this file and prioritizes milestone-aligned work.
-
-## Current Milestone
-
-**M2: Core Dialect** - Working kernel dialect with basic operations
-
-See [ROADMAP.md](../ROADMAP.md) for full milestone details.
+Manager Agent maintains this file. **Milestone completion is the priority.**
 
 ---
 
-## Status Legend
+## Current Milestone: M1
 
-| Symbol | Status |
-|--------|--------|
-| ⬜ | Backlog (not started) |
-| 📋 | Specifying |
-| 📐 | Designing |
-| 🔍 | Under Review |
-| 🔨 | Implementing |
-| ✅ | Complete |
-| ⏸️ | Blocked |
+### Goal
+**One kernel (matmul) running on RISC-V RVV simulator with 3 size variants.**
+
+### Success Criteria (10 total)
+- [ ] ks.matmul parses, prints, verifies
+- [ ] Lowering pipeline produces valid LLVM IR
+- [ ] Generated RISC-V assembly is valid
+- [ ] Runs on QEMU with RVV
+- [ ] 64x64 f32 output matches reference
+- [ ] 128x128 f32 output matches reference
+- [ ] 256x256 f32 output matches reference
+- [ ] Works with VLEN=128
+- [ ] Works with VLEN=256
+- [ ] Works with VLEN=512
+
+### Progress: 0/10
+
+---
+
+## M1 Task Breakdown
+
+| ID | Task | Status | Depends | Blocks |
+|----|------|--------|---------|--------|
+| M1.1 | ks.matmul operation | ⬜ | - | M1.2 |
+| M1.2 | --ks-lower-to-linalg pass | ⬜ | M1.1 | M1.3 |
+| M1.3 | --ks-tile pass | ⬜ | M1.2 | M1.4 |
+| M1.4 | --ks-vectorize pass | ⬜ | M1.3 | M1.5 |
+| M1.5 | --ks-lower-to-rvv pass | ⬜ | M1.4 | M1.6 |
+| M1.6 | QEMU test harness | ⬜ | M1.5 | M1.7 |
+| M1.7 | Verify 64x64 matmul | ⬜ | M1.6 | M1.10 |
+| M1.8 | Verify 128x128 matmul | ⬜ | M1.6 | M1.10 |
+| M1.9 | Verify 256x256 matmul | ⬜ | M1.6 | M1.10 |
+| M1.10 | Multi-VLEN testing | ⬜ | M1.7, M1.8, M1.9 | - |
 
 ---
 
 ## Active Work
 
-| Task | Title | Phase | Milestone | Blocker |
-|------|-------|-------|-----------|---------|
-| - | - | - | - | - |
+| Task | Description | Phase | Assignee |
+|------|-------------|-------|----------|
+| - | - | - | - |
 
 ---
 
-## Milestone M2 Tasks (Current Priority)
-
-These tasks are required for M2 completion. **Work on these first.**
-
-| Task | Title | Status | Depends On | Required |
-|------|-------|--------|------------|----------|
-| TASK-002 | Kernel Dialect Core | ⬜ Backlog | TASK-001 ✅ | **Yes** |
-| TASK-003 | ks.matmul Operation | ⬜ Backlog | TASK-002 | **Yes** |
-| TASK-004 | Activation Ops | ⬜ Backlog | TASK-002 | **Yes** |
-| TASK-005 | ks.attention Operation | ⬜ Backlog | TASK-002 | **Yes** |
-
-### M2 Progress: 0/4 tasks complete
-
----
-
-## Milestone M3 Tasks (Future)
-
-Do not start until M2 is complete.
-
-| Task | Title | Status | Depends On | Required |
-|------|-------|--------|------------|----------|
-| TASK-010 | Lower to Linalg Pass | ⬜ Backlog | M2 | **Yes** |
-| TASK-011 | Tiling Pass | ⬜ Backlog | TASK-010 | **Yes** |
-| TASK-012 | Vectorization Pass | ⬜ Backlog | TASK-011 | **Yes** |
-
----
-
-## Milestone M4 Tasks (Future)
-
-Do not start until M3 is complete.
-
-| Task | Title | Status | Depends On | Required |
-|------|-------|--------|------------|----------|
-| TASK-020 | RVV Lowering Pass | ⬜ Backlog | M3 | **Yes** |
-| TASK-021 | RVV Optimization | ⬜ Backlog | TASK-020 | **Yes** |
-| TASK-022 | RVV Testing (QEMU) | ⬜ Backlog | TASK-020 | **Yes** |
-
----
-
-## Task Dependency Graph
+## Dependency Graph
 
 ```
-MILESTONE M1 ✅
-    │
-    └─→ MILESTONE M2 (Current)
-            │
-            ├─→ TASK-002 Kernel Dialect Core ⬜
-            │       │
-            │       ├─→ TASK-003 ks.matmul ⬜
-            │       ├─→ TASK-004 Activation Ops ⬜
-            │       └─→ TASK-005 ks.attention ⬜
-            │
-            └─→ MILESTONE M3 (Blocked by M2)
+M1.1 ks.matmul
+  │
+  └─→ M1.2 Lower to Linalg
+        │
+        └─→ M1.3 Tiling
+              │
+              └─→ M1.4 Vectorization
                     │
-                    ├─→ TASK-010 Lower to Linalg ⬜
-                    │       │
-                    │       └─→ TASK-011 Tiling ⬜
-                    │               │
-                    │               └─→ TASK-012 Vectorize ⬜
-                    │
-                    └─→ MILESTONE M4 (Blocked by M3)
-                            │
-                            ├─→ TASK-020 RVV Lowering ⬜
-                            ├─→ TASK-021 RVV Optimize ⬜
-                            └─→ TASK-022 RVV Testing ⬜
+                    └─→ M1.5 RVV Lowering
+                          │
+                          └─→ M1.6 QEMU Harness
+                                │
+                        ┌───────┼───────┐
+                        ▼       ▼       ▼
+                      M1.7    M1.8    M1.9
+                      64x64  128x128  256x256
+                        │       │       │
+                        └───────┼───────┘
+                                ▼
+                              M1.10
+                          Multi-VLEN Test
 ```
 
 ---
 
-## Completed Tasks
+## Next Action
 
-| Task | Title | Milestone | Completed |
-|------|-------|-----------|-----------|
-| TASK-001 | Infrastructure | M1 | 2025-01-25 |
+**Immediate Priority:** M1.1 (ks.matmul operation)
 
----
+**Why:** First task in dependency chain, blocks all other M1 work.
 
-## Blocked Tasks
-
-| Task | Blocker | Waiting For |
-|------|---------|-------------|
-| TASK-003 | TASK-002 | Dialect infrastructure |
-| TASK-004 | TASK-002 | Dialect infrastructure |
-| TASK-005 | TASK-002 | Dialect infrastructure |
-| M3 Tasks | M2 | M2 completion |
-| M4 Tasks | M3 | M3 completion |
+**Workflow:**
+1. ✅ Specification exists: `specs/kernels/matmul.md`
+2. ⬜ Create design doc: `make new-design ID=M1-1 TITLE="ks.matmul Operation"`
+3. ⬜ Design review
+4. ⬜ TDD implementation
+5. ⬜ Verification
 
 ---
 
-## Manager Decision Log
+## Blocked Work
+
+| Task | Blocked By | Notes |
+|------|------------|-------|
+| M1.2 - M1.10 | M1.1 | Waiting for matmul op |
+| M2 tasks | M1 | Do not start until M1 complete |
+
+---
+
+## Completed
+
+| Task | Completed | Milestone |
+|------|-----------|-----------|
+| Infrastructure | 2025-01-25 | (Pre-M1) |
+
+---
+
+## Manager Notes
 
 ### 2025-01-25
-- M1 complete
-- Starting M2
-- **Priority**: TASK-002 (unblocks all other M2 tasks)
-- **Recommendation**: Begin TASK-002 with design phase
-
----
-
-## Next Actions
-
-**Immediate Priority:** TASK-002 (Kernel Dialect Core)
-
-**Why:** 
-- Required for M2 milestone
-- Blocks TASK-003, TASK-004, TASK-005
-- All prerequisites met (TASK-001 ✅)
-
-**Steps:**
-1. Create design doc: `make new-design ID=002 TITLE="Kernel Dialect Core"`
-2. Design review (Reviewer agent)
-3. TDD implementation (Implementer agent)
-4. Verification (Verifier agent)
+- Roadmap updated with quantifiable milestones
+- M1 is end-to-end: matmul on QEMU with RVV
+- All 10 M1 criteria must pass
+- Starting with M1.1 (ks.matmul operation)
+- **Do not skip to M2 until M1 is fully verified**

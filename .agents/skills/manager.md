@@ -116,25 +116,37 @@ Specifying | Designing | Reviewing | Implementing | Verifying | Complete
 
 ## Milestone Tracking
 
-### Milestone Status Check
+### Current Milestone: M1
+
+**Goal:** One kernel (matmul) running on RISC-V RVV simulator with 3 size variants.
+
+**Verification:** Run `./scripts/verify-m1.sh` - all 10 criteria must pass.
+
+### Milestone Status Check Template
 
 ```markdown
 ## Current Milestone Status
 
-**Milestone:** M2 - Core Dialect
-**Progress:** X/Y tasks complete
-**Blocking Issues:** [List any blockers]
+**Milestone:** M1 - First Kernel End-to-End
+**Progress:** X/10 criteria pass
+**Verification:** ./scripts/verify-m1.sh
 
-### Required Tasks
+### M1 Tasks
 | Task | Status | Blocks |
 |------|--------|--------|
-| TASK-002 | ⬜ | TASK-003, TASK-004, TASK-005 |
-| TASK-003 | ⬜ | - |
-| TASK-004 | ⬜ | - |
-| TASK-005 | ⬜ | - |
+| M1.1 ks.matmul op | ⬜ | M1.2 |
+| M1.2 Lower to linalg | ⬜ | M1.3 |
+| M1.3 Tiling pass | ⬜ | M1.4 |
+| M1.4 Vectorize pass | ⬜ | M1.5 |
+| M1.5 RVV lowering | ⬜ | M1.6 |
+| M1.6 QEMU harness | ⬜ | M1.7-9 |
+| M1.7 64x64 verified | ⬜ | M1.10 |
+| M1.8 128x128 verified | ⬜ | M1.10 |
+| M1.9 256x256 verified | ⬜ | M1.10 |
+| M1.10 Multi-VLEN | ⬜ | - |
 
 ### Recommended Next Task
-TASK-002 (highest priority, unblocks others)
+M1.1 (first in dependency chain)
 ```
 
 ### Milestone Completion Checklist
