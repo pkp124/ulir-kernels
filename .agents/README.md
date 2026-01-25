@@ -4,12 +4,17 @@ This directory defines the agent skills, workflows, and processes for AI-assiste
 
 ## Philosophy
 
-KernelSmith uses a rigorous software engineering process with specialized agent roles:
+KernelSmith uses a rigorous software engineering process with specialized agent roles. The **Manager Agent** coordinates all work to ensure proper sequencing.
 
-1. **Architect Agent**: High-level design and system decisions
-2. **Reviewer Agent**: Critical review of designs and implementations
-3. **Implementation Agent**: TDD-based coding
-4. **Verification Agent**: Testing and quality assurance
+## Agent Roles
+
+| Agent | Role | Primary Focus |
+|-------|------|---------------|
+| **Manager** | Coordination & tracking | Workflow enforcement, task tracking |
+| **Architect** | System design | Design docs, architecture decisions |
+| **Reviewer** | Critical analysis | Design review, find issues |
+| **Implementer** | TDD coding | Write tests first, then code |
+| **Verifier** | Quality assurance | Test execution, spec compliance |
 
 ## Directory Structure
 
@@ -17,10 +22,11 @@ KernelSmith uses a rigorous software engineering process with specialized agent 
 .agents/
 ├── README.md           # This file
 ├── skills/             # Agent skill definitions
-│   ├── architect.md    # Design and architecture skills
-│   ├── reviewer.md     # Critical review skills
-│   ├── implementer.md  # TDD implementation skills
-│   └── verifier.md     # Testing and verification skills
+│   ├── manager.md      # Workflow coordination
+│   ├── architect.md    # Design and architecture
+│   ├── reviewer.md     # Critical review
+│   ├── implementer.md  # TDD implementation
+│   └── verifier.md     # Testing and verification
 └── workflows/          # Development workflows
     ├── feature.md      # New feature workflow
     ├── design-review.md # Design review process
@@ -29,54 +35,115 @@ KernelSmith uses a rigorous software engineering process with specialized agent 
 
 ## Workflow Overview
 
+The Manager Agent enforces this workflow:
+
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  1. SPECIFICATION                                                │
-│     - Check/create spec in specs/                               │
-│     - Define requirements and acceptance criteria               │
+│  MANAGER: Coordinates all phases, prevents out-of-order work   │
 └─────────────────────────────────────────────────────────────────┘
                               │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  2. DESIGN (Architect Agent)                                     │
-│     - Create design doc in docs/design/                         │
-│     - Document alternatives and trade-offs                      │
-│     - Define test strategy                                      │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  3. DESIGN REVIEW (Reviewer Agent)                               │
-│     - Critical analysis of design                               │
-│     - Check requirements coverage                               │
-│     - Identify risks and gaps                                   │
-│     - Approve or request changes                                │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  4. TDD IMPLEMENTATION (Implementation Agent)                    │
-│     - Write failing tests first                                 │
-│     - Implement to pass tests                                   │
-│     - Refactor with green tests                                 │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  5. VERIFICATION (Verification Agent)                            │
-│     - Run full test suite                                       │
-│     - Check edge cases                                          │
-│     - Verify against specification                              │
-└─────────────────────────────────────────────────────────────────┘
+        ┌─────────────────────┼─────────────────────┐
+        ▼                     ▼                     ▼
+┌───────────────┐    ┌───────────────┐    ┌───────────────┐
+│ 1. SPEC       │    │ 2. DESIGN     │    │ 3. REVIEW     │
+│ (Manager)     │ → │ (Architect)   │ → │ (Reviewer)    │
+│               │    │               │    │               │
+│ Check/create  │    │ Create design │    │ Critical      │
+│ specification │    │ document      │    │ analysis      │
+└───────────────┘    └───────────────┘    └───────────────┘
+                                                  │
+                                                  ▼
+                                          ┌───────────────┐
+                                          │ Approved?     │
+                                          └───────┬───────┘
+                                             No ↙   ↘ Yes
+                                    ┌──────────┐    │
+                                    │ Revise   │    │
+                                    └──────────┘    ▼
+                                          ┌───────────────┐
+                                          │ 4. IMPLEMENT  │
+                                          │ (Implementer) │
+                                          │               │
+                                          │ TDD: tests    │
+                                          │ first         │
+                                          └───────────────┘
+                                                  │
+                                                  ▼
+                                          ┌───────────────┐
+                                          │ 5. VERIFY     │
+                                          │ (Verifier)    │
+                                          │               │
+                                          │ Full test     │
+                                          │ suite         │
+                                          └───────────────┘
+                                                  │
+                                                  ▼
+                                          ┌───────────────┐
+                                          │ 6. COMPLETE   │
+                                          │ (Manager)     │
+                                          │               │
+                                          │ Update status │
+                                          │ Close task    │
+                                          └───────────────┘
 ```
 
-## Using Agents
+## Using the Agent System
 
-When working on a feature, explicitly switch between agent roles:
+### Starting a Session
 
-1. Start with **Architect** to create design
-2. Switch to **Reviewer** for critical analysis
-3. Use **Implementer** for TDD coding
-4. End with **Verifier** for final checks
+1. **Manager first**: Check current task status
+2. **Identify phase**: What phase is current work in?
+3. **Select agent**: Use appropriate agent for the phase
+4. **Follow workflow**: Don't skip steps
 
-Each agent has specific skills and focus areas defined in `skills/`.
+### Agent Selection
+
+| Current Phase | Agent to Use |
+|---------------|--------------|
+| Task planning | Manager |
+| Specification | Manager + Architect |
+| Design | Architect |
+| Review | Reviewer |
+| Implementation | Implementer |
+| Testing | Verifier |
+| Completion | Manager |
+
+### Switching Agents
+
+When switching between agents:
+1. Complete current agent's checklist
+2. Document handoff in task file
+3. Switch to next agent
+4. Continue from documented state
+
+## Quick Reference
+
+### Manager Commands
+
+```bash
+# Check active tasks
+ls tasks/*.md
+
+# Create new task
+make new-task ID=XXX TITLE="Task name"
+
+# View task status
+cat tasks/TASK-XXX.md
+```
+
+### Workflow Gates
+
+| Gate | Requirement |
+|------|-------------|
+| Start Design | Specification exists |
+| Start Review | Design doc complete |
+| Start Implementation | Design approved |
+| Mark Complete | All tests pass |
+
+### Red Flags
+
+- ❌ Coding without design doc
+- ❌ Writing code before tests
+- ❌ Skipping review for "small" changes
+- ❌ Not running full test suite
+- ❌ No specification for new features

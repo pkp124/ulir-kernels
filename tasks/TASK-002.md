@@ -1,85 +1,68 @@
-# TASK-002: Implement Kernel Dialect Core
+# TASK-002: Kernel Dialect Core
 
 ## Status
 [ ] Not Started
 
+## Current Phase
+Backlog
+
 ## Priority
-P0 (Critical)
+P0 (Critical) - Blocks all kernel operations
 
 ## Description
 
-Implement the core Kernel dialect with:
-- Dialect definition
-- Common types (Tile, Accumulator)
-- Operation base classes
-- Initial simple operations (relu, softmax)
-
-## Acceptance Criteria
-
-- [ ] Kernel dialect defined in TableGen
-- [ ] TileType and AccumulatorType defined
-- [ ] kernel.relu operation implemented
-- [ ] kernel.softmax operation implemented
-- [ ] Operations parse and print correctly
-- [ ] Verifiers catch invalid inputs
-- [ ] Lit tests pass
-
-## Implementation Notes
-
-### Dialect Definition
-
-```tablegen
-def Kernel_Dialect : Dialect {
-  let name = "kernel";
-  let cppNamespace = "::aikernel::kernel";
-  let dependentDialects = [
-    "mlir::arith::ArithDialect",
-    "mlir::tensor::TensorDialect",
-    ...
-  ];
-}
-```
-
-### Operation Template
-
-```tablegen
-def Kernel_ReLUOp : Kernel_Op<"relu", [Pure, SameOperandsAndResultType]> {
-  let summary = "ReLU activation";
-  let arguments = (ins AnyTensor:$input);
-  let results = (outs AnyTensor:$output);
-  let assemblyFormat = "$input attr-dict `:` type($input)";
-}
-```
-
-### Type Definitions
-
-```tablegen
-def Kernel_TileType : Kernel_Type<"Tile", "tile"> {
-  let parameters = (ins "Type":$elementType, "ArrayRef<int64_t>":$shape);
-}
-```
-
-## Test Files
-
-```
-tests/lit/Dialect/Kernel/
-├── basic.mlir          # Basic parsing/printing
-├── relu.mlir           # ReLU operation tests
-├── softmax.mlir        # Softmax operation tests
-└── invalid.mlir        # Verifier error tests
-```
+Build and verify the core kernel dialect infrastructure:
+- Verify dialect registration works
+- Verify basic operations parse and print
+- Ensure verifiers function correctly
+- Set up foundation for additional operations
 
 ## Dependencies
 
-- TASK-001: Infrastructure setup
+- [x] TASK-001: Infrastructure (Complete)
+
+## Acceptance Criteria
+
+- [ ] ks-opt builds successfully
+- [ ] ks.relu parses and prints correctly
+- [ ] ks.softmax parses and prints correctly
+- [ ] ks.matmul parses and prints correctly
+- [ ] Verifiers catch invalid inputs
+- [ ] Lit tests pass via CTest
+- [ ] Round-trip (parse → print → parse) works
+
+## Workflow Tracking
+
+### Phase Checklist
+
+- [ ] **Specification**: Check specs exist for operations
+- [ ] **Design**: Create design doc DES-002
+- [ ] **Review**: Get design approved
+- [ ] **Implement**: TDD - tests first
+- [ ] **Verify**: All tests pass
+- [ ] **Complete**: Close task
+
+## Design Document
+
+Create: `docs/design/DES-002-kernel-dialect-core.md`
+
+## Test Files
+
+- `tests/lit/Dialect/Kernel/basic.mlir`
+- `tests/lit/Dialect/Kernel/matmul.mlir`
+- `tests/lit/Dialect/Kernel/invalid.mlir` (verifier tests)
 
 ## Verification
 
 ```bash
-make test-lit TESTS=tests/lit/Dialect/Kernel/
+cmake --build build --target ks-opt
+ctest --test-dir build -R "Dialect"
 ```
 
-## Log
+## Progress Log
 
-### [Date TBD]
+### 2025-01-25
 - Task created
+- Waiting to start
+- **Next**: Create design document
+- **Assigned to**: Architect Agent

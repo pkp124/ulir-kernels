@@ -1,76 +1,101 @@
 ---
-description: Guidelines for AI agent collaboration
-globs: ["tasks/**/*", "specs/**/*"]
+description: Agent system and workflow management for KernelSmith
+globs: ["tasks/**/*", "specs/**/*", "docs/design/**/*", ".agents/**/*"]
+alwaysApply: true
 ---
 
-# AI Agent Collaboration Guidelines
+# KernelSmith Agent System
 
-## Task Management System
+## Agent Roles
 
-This project uses a structured task system in `tasks/` for tracking work:
+| Agent | Responsibility | When Active |
+|-------|---------------|-------------|
+| **Manager** | Workflow enforcement, task tracking | Always (coordinates others) |
+| **Architect** | Design documents, system decisions | Design phase |
+| **Reviewer** | Critical analysis, find issues | Review phase |
+| **Implementer** | TDD coding, write tests first | Implementation phase |
+| **Verifier** | Test execution, spec compliance | Verification phase |
 
-### Task File Format (`tasks/TASK-XXX.md`)
+## Manager Agent - Always Active
+
+The Manager Agent oversees all work. Before any action:
+
+### Check Current State
+
+1. What task is active? (Check `tasks/BACKLOG.md`)
+2. What phase is it in?
+3. Is the work appropriate for this phase?
+4. Are prerequisites met?
+
+### Workflow Enforcement
+
+**STOP if:**
+- ❌ No specification exists → Create spec first
+- ❌ No design doc for significant changes → Create design doc
+- ❌ Design not approved → Get review first
+- ❌ Writing code before tests → Write tests first
+- ❌ Skipping verification → Run full test suite
+
+### Phase Gates
+
+| To Enter Phase | Requirement |
+|----------------|-------------|
+| Design | Specification exists |
+| Review | Design doc complete |
+| Implementation | Design approved |
+| Complete | All tests pass |
+
+## Task Tracking
+
+### Update Task Status
+
+When working on a task, update its file:
 
 ```markdown
-# TASK-XXX: Task Title
-
 ## Status
-[ ] Not Started / [~] In Progress / [x] Complete
+[~] In Progress
 
-## Priority
-P0 (Critical) / P1 (High) / P2 (Medium) / P3 (Low)
+## Current Phase
+Implementing
 
-## Description
-What needs to be done and why.
-
-## Acceptance Criteria
-- [ ] Criterion 1
-- [ ] Criterion 2
-
-## Implementation Notes
-Technical details, design decisions.
-
-## Dependencies
-- TASK-YYY (blocking)
-- TASK-ZZZ (related)
-
-## Verification
-How to verify this task is complete.
+## Progress Log
+### YYYY-MM-DD
+- [Agent]: Action taken
+- Next: What to do next
 ```
 
-## Specification-Driven Development
+### Update Backlog
 
-Before implementing any feature:
+Keep `tasks/BACKLOG.md` current with:
+- Active work
+- Blocked tasks
+- Completed tasks
 
-1. **Check `specs/`** for existing specification
-2. **If no spec exists**, create one first
-3. **Follow the spec** during implementation
-4. **Update the spec** if design changes
+## Workflow Sequence
 
-## Agent Handoff Protocol
-
-When pausing or completing work:
-
-1. **Update task status** in `tasks/`
-2. **Document current state** in task notes
-3. **List any blockers** or open questions
-4. **Commit all changes** with descriptive message
-
-## Context Preservation
-
-To help future agents understand context:
-
-1. **Use descriptive commit messages**
-2. **Document "why" in code comments**
-3. **Keep specs updated**
-4. **Log decisions in task files**
-
-## Verification Before Completion
-
-Before marking any task complete:
-
-```bash
-make verify  # Runs lint + tests + build check
+```
+1. SPEC     → Manager checks/creates specification
+2. DESIGN   → Architect creates design doc
+3. REVIEW   → Reviewer critically analyzes
+4. IMPLEMENT → Implementer does TDD
+5. VERIFY   → Verifier runs all tests
+6. COMPLETE → Manager closes task
 ```
 
-All checks must pass.
+## Starting Work
+
+Always start with Manager checklist:
+
+1. [ ] Check `tasks/BACKLOG.md` for current state
+2. [ ] Identify highest priority unblocked task
+3. [ ] Verify prerequisites are met
+4. [ ] Select appropriate agent for current phase
+5. [ ] Follow that agent's workflow
+
+## Handoff Between Agents
+
+When switching agents:
+1. Document current state in task file
+2. List what was completed
+3. Specify next actions
+4. Note which agent should continue
