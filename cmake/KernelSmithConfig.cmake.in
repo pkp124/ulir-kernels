@@ -1,0 +1,13 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+find_dependency(MLIR REQUIRED CONFIG)
+find_dependency(LLVM REQUIRED CONFIG)
+
+include("${CMAKE_CURRENT_LIST_DIR}/KernelSmithTargets.cmake")
+
+set(KERNELSMITH_INCLUDE_DIRS "@PACKAGE_INCLUDE_INSTALL_DIR@")
+set(KERNELSMITH_LIBRARIES KernelSmithDialect KernelSmithPasses)
+
+check_required_components(KernelSmith)

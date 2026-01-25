@@ -1,23 +1,22 @@
-# MLIR Kernel Generation
+# KernelSmith
 
-A framework for generating optimized AI accelerator kernels using the MLIR compiler infrastructure.
+*Craft optimized AI kernels for any architecture*
 
 ## Overview
 
-This project provides a collection of high-performance kernels for AI workloads, targeting multiple architectures with a focus on:
+KernelSmith is a framework for generating high-performance AI accelerator kernels using the MLIR compiler infrastructure. It provides a collection of optimized kernels targeting multiple architectures, with a focus on:
 
 - **RISC-V RVV** (Vector Extension) - Primary target
 - Future: ARM SVE, x86 AVX-512, GPU backends
 
-The kernels are generated through a multi-level lowering process using MLIR, enabling both portability and architecture-specific optimizations.
+Kernels are crafted through a multi-level lowering process using MLIR, enabling both portability and architecture-specific optimizations.
 
 ## Features
 
 - **High-Level Kernel Operations**: Matrix multiplication, convolution, attention, activation functions
 - **Automatic Tiling**: Configurable tiling strategies for cache and register optimization
 - **Target-Specific Lowering**: Optimized code generation for each architecture
-- **Python Bindings**: Easy integration with ML frameworks
-- **Comprehensive Testing**: Unit, integration, and performance tests
+- **Comprehensive Testing**: Unit, integration, and lit tests with CTest
 
 ## Quick Start
 
@@ -28,21 +27,19 @@ The kernels are generated through a multi-level lowering process using MLIR, ena
 - Python 3.10+
 - C++17 compatible compiler
 
-### Setup
+### Build
 
 ```bash
-# Clone the repository
-git clone <repository-url>
-cd mlir-kernel-generation
+# Configure
+cmake -S . -B build \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DMLIR_DIR=/path/to/mlir/lib/cmake/mlir
 
-# Run setup script
-make setup
+# Build
+cmake --build build --parallel
 
-# Build the project
-make build
-
-# Run tests
-make test
+# Test
+ctest --test-dir build
 ```
 
 ### Basic Usage
@@ -51,18 +48,19 @@ make test
 // Define a matrix multiplication kernel
 func.func @matmul_kernel(%A: tensor<64x128xf32>, 
                          %B: tensor<128x256xf32>) -> tensor<64x256xf32> {
-  %C = kernel.matmul %A, %B : tensor<64x128xf32>, tensor<128x256xf32> 
-                               -> tensor<64x256xf32>
+  %C = ks.matmul %A, %B : tensor<64x128xf32>, tensor<128x256xf32> 
+                          -> tensor<64x256xf32>
   return %C : tensor<64x256xf32>
 }
 ```
 
 Compile to RISC-V RVV:
 ```bash
-aikernel-opt input.mlir \
-  --tile-kernels \
-  --lower-to-vector \
-  --lower-to-rvv \
+ks-opt input.mlir \
+  --ks-lower-to-linalg \
+  --ks-tile \
+  --ks-vectorize \
+  --ks-lower-to-rvv \
   --convert-to-llvm | \
 llc -march=riscv64 -mattr=+v -o output.s
 ```
@@ -71,73 +69,61 @@ llc -march=riscv64 -mattr=+v -o output.s
 
 ```
 .
-├── .cursor/rules/       # Cursor AI rules for development
+├── .cursor/rules/       # Cursor AI development rules
+├── .agents/             # Agent skills and workflows
 ├── docs/                # Documentation
 │   ├── architecture/    # Architecture design docs
-│   ├── guides/          # User and developer guides
-│   └── api/             # API reference
+│   ├── design/          # Design decisions and reviews
+│   └── guides/          # User and developer guides
 ├── specs/               # Feature specifications
 │   ├── kernels/         # Kernel operation specs
 │   └── targets/         # Target architecture specs
-├── src/                 # Source code
-│   ├── dialects/        # MLIR dialect definitions
-│   ├── passes/          # Transformation passes
-│   ├── targets/         # Target-specific lowering
-│   └── runtime/         # Runtime library
+├── include/KernelSmith/ # Public headers
+│   ├── Dialect/Kernel/  # Kernel dialect definitions
+│   ├── Passes/          # Pass declarations
+│   └── Targets/         # Target-specific headers
+├── lib/                 # Implementation
+│   ├── Dialect/         # Dialect implementations
+│   ├── Passes/          # Pass implementations
+│   └── Targets/         # Target backends
+├── tools/               # CLI tools
+│   └── ks-opt/          # KernelSmith optimizer
 ├── tests/               # Test suites
-│   ├── unit/            # Unit tests
-│   ├── integration/     # Integration tests
-│   └── lit/             # MLIR FileCheck tests
-├── examples/            # Example kernels and usage
-├── tasks/               # Development task tracking
-└── scripts/             # Development scripts
+│   ├── lit/             # MLIR FileCheck tests
+│   └── unit/            # C++ unit tests
+├── examples/            # Example kernels
+└── tasks/               # Development task tracking
 ```
 
-## Development with Cursor
+## Development Workflow
 
-This project is optimized for development with Cursor AI. The `.cursor/rules/` directory contains context rules that help the AI understand:
+KernelSmith uses a rigorous development process:
 
-- Project architecture and conventions
-- MLIR-specific patterns and best practices
-- Target-specific (RVV) development guidelines
-- Testing requirements
+1. **Specification**: Define behavior in `specs/`
+2. **Design Review**: Document decisions in `docs/design/`
+3. **TDD**: Write tests before implementation
+4. **Implementation**: Incremental, reviewed changes
+5. **Verification**: `ctest` for all tests
 
-### Key Commands
-
-```bash
-make help              # Show all available commands
-make verify            # Run full verification (lint + test + build)
-make new-kernel NAME=softmax  # Create new kernel from template
-make new-pass NAME=tile-conv  # Create new pass from template
-make new-task ID=001 TITLE="My task"  # Create new task
-```
-
-## Documentation
-
-- [Architecture Overview](docs/architecture/overview.md)
-- [Getting Started Guide](docs/guides/getting-started.md)
-- [Adding New Kernels](docs/guides/adding-kernels.md)
-- [Target Development](docs/guides/target-development.md)
-- [Contributing](CONTRIBUTING.md)
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 
 ## Supported Kernels
 
-| Kernel | Description | RVV |
-|--------|-------------|-----|
-| `matmul` | Matrix multiplication | ⏳ |
-| `batch_matmul` | Batched matrix multiplication | ⏳ |
-| `conv2d` | 2D convolution | ⏳ |
-| `attention` | Scaled dot-product attention | ⏳ |
-| `softmax` | Softmax activation | ⏳ |
-| `layer_norm` | Layer normalization | ⏳ |
-| `gelu` | GELU activation | ⏳ |
-
-Legend: ✅ Complete | ⏳ In Progress | ❌ Not Started
+| Kernel | Description | Status |
+|--------|-------------|--------|
+| `ks.matmul` | Matrix multiplication | Planned |
+| `ks.batch_matmul` | Batched matrix multiplication | Planned |
+| `ks.conv2d` | 2D convolution | Planned |
+| `ks.attention` | Scaled dot-product attention | Planned |
+| `ks.softmax` | Softmax activation | Planned |
+| `ks.layer_norm` | Layer normalization | Planned |
+| `ks.gelu` | GELU activation | Planned |
+| `ks.relu` | ReLU activation | Planned |
 
 ## License
 
-This project is licensed under the GNU Affero General Public License v3.0 - see the [LICENSE](LICENSE) file for details.
+GNU Affero General Public License v3.0 - see [LICENSE](LICENSE).
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on contributing to this project.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.

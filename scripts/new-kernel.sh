@@ -1,6 +1,6 @@
 #!/bin/bash
 # ==============================================================================
-# Create a new kernel from template
+# Create a new kernel operation from template
 # ==============================================================================
 
 set -e
@@ -17,55 +17,64 @@ UPPER_NAME=$(echo "$NAME" | tr '[:lower:]' '[:upper:]')
 LOWER_NAME=$(echo "$NAME" | tr '[:upper:]' '[:lower:]')
 CAMEL_NAME=$(echo "$NAME" | sed -r 's/(^|_)([a-z])/\U\2/g')
 
-echo "Creating kernel: $CAMEL_NAME"
+echo "Creating kernel: ks.${LOWER_NAME}"
 
 # Create specification file
 SPEC_FILE="specs/kernels/${LOWER_NAME}.md"
 if [ ! -f "$SPEC_FILE" ]; then
+    mkdir -p "$(dirname "$SPEC_FILE")"
     cat > "$SPEC_FILE" << EOF
 # ${CAMEL_NAME} Kernel Specification
 
 ## Overview
 
-Brief description of the ${CAMEL_NAME} kernel.
+Brief description of the ks.${LOWER_NAME} kernel.
+
+## Operation Definition
+
+\`\`\`mlir
+%output = ks.${LOWER_NAME} %input : tensor<...> -> tensor<...>
+\`\`\`
 
 ## Mathematical Definition
 
 \`\`\`
-output = ${LOWER_NAME}(inputs...)
+output = ${LOWER_NAME}(input)
 \`\`\`
 
 ## Input/Output Specification
 
 ### Inputs
-- \`input\`: Description (tensor type, shape constraints)
+| Name | Type | Description |
+|------|------|-------------|
+| input | tensor | Input tensor |
 
 ### Outputs
-- \`output\`: Description (tensor type, shape constraints)
+| Name | Type | Description |
+|------|------|-------------|
+| output | tensor | Output tensor |
 
 ### Attributes
-- \`attr1\`: Description (type, default value)
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
 
-## Tiling Strategy
+## Verification Rules
 
-Describe how this kernel should be tiled for efficient execution.
+1. Input must be a ranked tensor
+2. Output shape matches input shape (if applicable)
 
-## Lowering Path
+## Lowering Strategy
 
-1. kernel.${LOWER_NAME} → linalg operations
-2. linalg → vector operations
-3. vector → target-specific (RVV, etc.)
+1. ks.${LOWER_NAME} → linalg/arith operations
+2. Vectorization
+3. Target-specific lowering
 
 ## Test Cases
 
 1. Basic functionality
-2. Edge cases (empty inputs, single elements)
-3. Numerical accuracy
-4. Performance benchmarks
-
-## References
-
-- Paper/documentation links
+2. Different shapes
+3. Different element types
+4. Edge cases
 EOF
     echo "Created: $SPEC_FILE"
 fi
@@ -75,23 +84,23 @@ TEST_FILE="tests/lit/Dialect/Kernel/${LOWER_NAME}.mlir"
 mkdir -p "$(dirname "$TEST_FILE")"
 if [ ! -f "$TEST_FILE" ]; then
     cat > "$TEST_FILE" << EOF
-// RUN: aikernel-opt %s | FileCheck %s
+// RUN: ks-opt %s | FileCheck %s
 
 // CHECK-LABEL: func @test_${LOWER_NAME}_basic
 func.func @test_${LOWER_NAME}_basic(%arg0: tensor<32x32xf32>) -> tensor<32x32xf32> {
-  // CHECK: kernel.${LOWER_NAME}
-  %0 = kernel.${LOWER_NAME} %arg0 : tensor<32x32xf32> -> tensor<32x32xf32>
+  // CHECK: ks.${LOWER_NAME}
+  %0 = ks.${LOWER_NAME} %arg0 : tensor<32x32xf32> -> tensor<32x32xf32>
   return %0 : tensor<32x32xf32>
 }
 EOF
     echo "Created: $TEST_FILE"
 fi
 
-# Create task for implementation
+# Create task
 TASK_FILE="tasks/KERNEL-${UPPER_NAME}.md"
 if [ ! -f "$TASK_FILE" ]; then
     cat > "$TASK_FILE" << EOF
-# KERNEL-${UPPER_NAME}: Implement ${CAMEL_NAME} Kernel
+# KERNEL-${UPPER_NAME}: Implement ks.${LOWER_NAME} Operation
 
 ## Status
 [ ] Not Started
@@ -101,44 +110,39 @@ P2 (Medium)
 
 ## Description
 
-Implement the ${CAMEL_NAME} kernel operation including:
-- TableGen operation definition
-- Verifier
-- Lowering to linalg/vector
-- Target-specific lowering (RVV)
+Implement the ks.${LOWER_NAME} kernel operation.
 
 ## Acceptance Criteria
 
 - [ ] Operation defined in KernelOps.td
-- [ ] Verifier implemented and tested
-- [ ] Parsing/printing works correctly
-- [ ] Lowering pass to linalg implemented
-- [ ] Unit tests passing
+- [ ] Verifier implemented
+- [ ] Parse/print round-trip works
 - [ ] Lit tests passing
+- [ ] Lowering to linalg implemented
 - [ ] Documentation updated
 
 ## Specification
 
 See: specs/kernels/${LOWER_NAME}.md
 
-## Dependencies
+## Design Document
 
-- TASK-001: Kernel dialect infrastructure
+Create: docs/design/DES-XXX-${LOWER_NAME}.md
 
 ## Verification
 
 \`\`\`bash
-make test-lit TESTS=tests/lit/Dialect/Kernel/${LOWER_NAME}.mlir
+ctest --test-dir build -R "${LOWER_NAME}"
 \`\`\`
 EOF
     echo "Created: $TASK_FILE"
 fi
 
 echo ""
-echo "Kernel scaffolding created!"
+echo "Kernel scaffolding created for ks.${LOWER_NAME}"
 echo ""
 echo "Next steps:"
-echo "  1. Review and update spec: $SPEC_FILE"
-echo "  2. Add operation to src/dialects/kernel/KernelOps.td"
-echo "  3. Implement verifier and lowering"
-echo "  4. Run tests: make test-lit"
+echo "  1. Review and complete spec: $SPEC_FILE"
+echo "  2. Create design doc: make new-design ID=XXX TITLE=\"${CAMEL_NAME} Operation\""
+echo "  3. Get design approved"
+echo "  4. Implement using TDD"

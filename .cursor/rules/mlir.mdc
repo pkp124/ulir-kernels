@@ -1,83 +1,85 @@
 ---
-description: MLIR-specific development rules
-globs: ["src/**/*.td", "src/**/*.cpp", "src/**/*.h"]
+description: MLIR-specific development rules for KernelSmith
+globs: ["include/**/*.td", "lib/**/*.cpp", "include/**/*.h"]
 ---
 
 # MLIR Development Guidelines
 
 ## TableGen Files (.td)
 
-When working with TableGen files:
+### Operation Definition Template
 
-1. **Dialect Definition Order**:
-   - Dialect definition first
-   - Type definitions
-   - Attribute definitions
-   - Operation definitions
-
-2. **Operation Naming**:
-   - Use `Dialect_OpNameOp` pattern (e.g., `Kernel_MatmulOp`)
-   - Operations should be verbs or noun phrases
-
-3. **Required Elements for Operations**:
-   ```tablegen
-   def Kernel_ExampleOp : Kernel_Op<"example", [traits]> {
-     let summary = "One-line description";
-     let description = [{
-       Detailed multi-line description with examples.
-     }];
-     let arguments = (ins ...);
-     let results = (outs ...);
-     let assemblyFormat = "...";  // or hasCustomAssemblyFormat
-     let hasVerifier = 1;         // if verification needed
-   }
-   ```
-
-## MLIR Passes
-
-When implementing passes:
-
-1. **File Structure**:
-   - Declare in `include/Passes.td`
-   - Implement in `lib/Passes/PassName.cpp`
-   - Register in `lib/Passes/PassRegistration.cpp`
-
-2. **Pass Naming**: `{Verb}{Target}Pass` (e.g., `TileMatmulPass`, `LowerToRVVPass`)
-
-3. **Required Pass Elements**:
-   ```cpp
-   struct MyPass : public impl::MyPassBase<MyPass> {
-     void runOnOperation() override;
-   };
-   ```
-
-## Common Patterns
-
-### Pattern Rewriting
-```cpp
-struct MyPattern : public OpRewritePattern<SourceOp> {
-  using OpRewritePattern<SourceOp>::OpRewritePattern;
+```tablegen
+def KS_ExampleOp : KS_Op<"example", [Pure]> {
+  let summary = "One-line description";
+  let description = [{
+    Detailed description with example:
+    ```mlir
+    %out = ks.example %in : tensor<32xf32>
+    ```
+  }];
   
-  LogicalResult matchAndRewrite(SourceOp op,
-                                PatternRewriter &rewriter) const override {
+  let arguments = (ins AnyTensor:$input);
+  let results = (outs AnyTensor:$output);
+  let assemblyFormat = "$input attr-dict `:` type($input)";
+  let hasVerifier = 1;
+}
+```
+
+### Naming Conventions
+
+- Dialect: `KS_Dialect` (in `kernelsmith::ks` namespace)
+- Operations: `KS_VerbNounOp` (e.g., `KS_MatmulOp`)
+- Types: `KS_TypeNameType` (e.g., `KS_TileType`)
+- Passes: `KS{Action}Pass` (e.g., `KSTileKernelsPass`)
+
+## Pass Implementation
+
+### File Structure
+
+```cpp
+// In lib/Passes/TileKernels.cpp
+
+#include "KernelSmith/Passes/Passes.h"
+
+namespace kernelsmith {
+
+#define GEN_PASS_DEF_KSTILEKERNELS
+#include "KernelSmith/Passes/Passes.h.inc"
+
+struct KSTileKernelsPass 
+    : public impl::KSTileKernelsBase<KSTileKernelsPass> {
+  void runOnOperation() override {
     // Implementation
   }
 };
+
+} // namespace kernelsmith
 ```
 
-### Dialect Conversion
-```cpp
-class MyTypeConverter : public TypeConverter {
-public:
-  MyTypeConverter() {
-    addConversion([](Type type) { return type; });
-    // Add type conversions
-  }
-};
-```
+### Pass Naming
+
+- TableGen: `KSTileKernels`
+- CLI flag: `--ks-tile-kernels`
+- C++ class: `KSTileKernelsPass`
 
 ## Testing MLIR Code
 
-- Use FileCheck for lit tests
-- Test both positive cases and error cases
-- Test round-trip parsing: parse → print → parse
+### Lit Test Template
+
+```mlir
+// RUN: ks-opt %s | FileCheck %s
+
+// CHECK-LABEL: func @test_example
+func.func @test_example(%arg0: tensor<32xf32>) -> tensor<32xf32> {
+  // CHECK: ks.relu
+  %0 = ks.relu %arg0 : tensor<32xf32>
+  return %0 : tensor<32xf32>
+}
+```
+
+### Test Categories
+
+1. **Parse/Print**: Round-trip tests
+2. **Verifier**: Valid and invalid inputs
+3. **Transformation**: Before/after pass application

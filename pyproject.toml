@@ -1,7 +1,7 @@
 [project]
-name = "aikernel"
+name = "kernelsmith"
 version = "0.1.0"
-description = "MLIR-based AI Accelerator Kernel Generation"
+description = "Craft optimized AI kernels for any architecture"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "AGPL-3.0"}
@@ -14,7 +14,6 @@ dependencies = [
 dev = [
     "pytest>=7.0",
     "ruff>=0.1.0",
-    "cmake-format>=0.6",
     "lit>=18.0",
     "filecheck>=0.0.24",
 ]
@@ -32,24 +31,13 @@ line-length = 100
 target-version = "py310"
 
 [tool.ruff.lint]
-select = [
-    "E",   # pycodestyle errors
-    "W",   # pycodestyle warnings
-    "F",   # Pyflakes
-    "I",   # isort
-    "B",   # flake8-bugbear
-    "C4",  # flake8-comprehensions
-    "UP",  # pyupgrade
-]
-ignore = [
-    "E501",  # line too long (handled by formatter)
-]
+select = ["E", "W", "F", "I", "B", "C4", "UP"]
+ignore = ["E501"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["aikernel"]
+known-first-party = ["kernelsmith"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
-python_functions = ["test_*"]
 addopts = "-v --tb=short"

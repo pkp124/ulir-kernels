@@ -1,78 +1,78 @@
 ---
-description: Testing guidelines and requirements
-globs: ["tests/**/*", "**/*_test.py", "**/*_test.cpp"]
+description: Testing guidelines for KernelSmith
+globs: ["tests/**/*"]
 ---
 
 # Testing Guidelines
 
+## Test-Driven Development
+
+KernelSmith follows TDD:
+
+1. **Write failing test** that defines expected behavior
+2. **Implement minimum code** to pass the test
+3. **Refactor** while keeping tests green
+4. **Add edge cases** to improve coverage
+
 ## Test Categories
 
-### 1. Unit Tests (`tests/unit/`)
-- Test individual functions and classes
-- Fast execution (< 1 second each)
-- No external dependencies
+### Lit Tests (`tests/lit/`)
 
-### 2. Integration Tests (`tests/integration/`)
-- Test complete pipelines
-- May use external tools (mlir-opt, etc.)
-- Test cross-component interactions
+MLIR FileCheck-based tests for:
+- Parsing and printing operations
+- Verifier error messages
+- Pass transformations
 
-### 3. Lit Tests (`tests/lit/`)
-- MLIR FileCheck-based tests
-- Test dialect parsing, printing, verification
-- Test pass transformations
+```mlir
+// RUN: ks-opt %s | ks-opt | FileCheck %s
+// RUN: ks-opt %s --ks-lower-to-linalg | FileCheck %s --check-prefix=LINALG
+```
 
-## Test Requirements
+### Unit Tests (`tests/unit/`)
 
-1. **Every new kernel operation** must have:
-   - Parsing/printing round-trip test
-   - Verifier test (valid and invalid inputs)
-   - Lowering test to vector dialect
-   - Target-specific codegen test
+C++ tests using Google Test for:
+- Type and attribute construction
+- Utility functions
+- Complex verification logic
 
-2. **Every new pass** must have:
-   - Before/after transformation test
-   - Edge case tests
-   - Error handling tests
+## CTest Integration
 
-## Test Naming Conventions
+All tests are registered with CTest:
+
+```bash
+ctest --test-dir build                    # All tests
+ctest --test-dir build -R "lit"           # Lit tests only
+ctest --test-dir build -R "unit"          # Unit tests only
+ctest --test-dir build -R "matmul"        # Filter by name
+ctest --test-dir build --output-on-failure
+```
+
+## Test File Organization
 
 ```
 tests/
-├── unit/
-│   ├── dialect/
-│   │   └── test_kernel_ops.py
-│   └── passes/
-│       └── test_tiling.py
-├── integration/
-│   └── test_matmul_pipeline.py
-└── lit/
-    ├── Dialect/
-    │   └── Kernel/
-    │       ├── matmul.mlir
-    │       └── invalid.mlir
-    └── Transforms/
-        └── tile-matmul.mlir
+├── CMakeLists.txt
+├── lit/
+│   ├── lit.cfg.py
+│   ├── lit.site.cfg.py.in
+│   ├── Dialect/Kernel/
+│   │   ├── matmul.mlir
+│   │   ├── relu.mlir
+│   │   └── invalid.mlir
+│   ├── Passes/
+│   │   └── lower-to-linalg.mlir
+│   └── Targets/RISCV/
+│       └── lower-to-rvv.mlir
+└── unit/
+    ├── CMakeLists.txt
+    └── Dialect/
+        └── KernelOpsTest.cpp
 ```
 
-## Running Tests
+## Test Requirements
 
-```bash
-make test          # Run all tests
-make test-unit     # Run unit tests only
-make test-lit      # Run lit tests only
-make test-integration  # Run integration tests
-```
-
-## Writing Lit Tests
-
-```mlir
-// RUN: aikernel-opt %s --pass-name | FileCheck %s
-
-// CHECK-LABEL: func @test_case
-func.func @test_case() {
-  // CHECK: expected.output
-  %0 = kernel.matmul ...
-  return
-}
-```
+| Change | Required Tests |
+|--------|---------------|
+| New operation | Parse/print, verifier, lowering |
+| New pass | Transformation, edge cases |
+| Bug fix | Regression test |

@@ -1,34 +1,53 @@
-# Contributing to MLIR Kernel Generation
+# Contributing to KernelSmith
 
-Thank you for your interest in contributing! This document provides guidelines and workflows for contributing to the project.
+Thank you for your interest in contributing! This document provides guidelines and workflows for contributing to KernelSmith.
 
-## Development Setup
+## Development Philosophy
 
-1. **Fork and clone** the repository
-2. **Run setup**: `make setup`
-3. **Create a branch**: `git checkout -b feature/your-feature`
+KernelSmith follows a rigorous software engineering process:
+
+1. **Specification-Driven**: Define behavior before implementing
+2. **Design Reviews**: All significant changes require design review
+3. **Test-Driven Development**: Write tests before implementation
+4. **Documentation**: Document decisions and rationale
 
 ## Development Workflow
 
-### 1. Specification First
+### 1. Specification Phase
 
-Before implementing a feature:
+Before implementing any feature:
 
-1. Check if a specification exists in `specs/`
-2. If not, create one using the templates
-3. Get feedback on the spec before implementing
+1. Check `specs/` for existing specification
+2. If none exists, create one following the template
+3. Get specification reviewed and approved
 
-### 2. Test-Driven Development
+### 2. Design Phase
 
-1. Write tests first (or use `make new-kernel` to scaffold)
-2. Implement until tests pass
-3. Add edge case tests
+For non-trivial changes:
 
-### 3. Incremental Commits
+1. Create a design document in `docs/design/`
+2. Document alternatives considered
+3. Request design review
+4. Address feedback before implementing
 
-- Make small, focused commits
-- Each commit should pass `make verify`
-- Use descriptive commit messages
+### 3. Test-Driven Development
+
+1. Write failing tests first
+2. Implement minimal code to pass tests
+3. Refactor while keeping tests green
+4. Add edge case tests
+
+### 4. Implementation
+
+1. Make small, focused commits
+2. Each commit should pass all tests
+3. Use descriptive commit messages
+
+### 5. Review and Merge
+
+1. Ensure all tests pass: `ctest --test-dir build`
+2. Update documentation if needed
+3. Create PR with clear description
 
 ## Commit Message Format
 
@@ -43,141 +62,67 @@ Before implementing a feature:
 ### Types
 - `feat`: New feature
 - `fix`: Bug fix
-- `docs`: Documentation only
-- `refactor`: Code change that neither fixes a bug nor adds a feature
-- `test`: Adding missing tests
-- `chore`: Changes to build process or auxiliary tools
+- `docs`: Documentation
+- `refactor`: Code refactoring
+- `test`: Adding tests
+- `chore`: Build/tooling changes
 
-### Examples
-
-```
-feat(kernel): add scaled dot-product attention operation
-
-Implements kernel.scaled_dot_product_attention with support for
-optional attention mask. Includes verifier and basic lowering
-to linalg operations.
-
-Closes #123
-```
+### Example
 
 ```
-fix(rvv): correct vector length calculation in matmul
+feat(dialect): add ks.matmul operation
 
-The previous implementation didn't account for LMUL when
-calculating the effective vector length, causing incorrect
-results with LMUL > 1.
+Implements the matmul operation with:
+- Shape verification for 2D tensors
+- Inner dimension compatibility check
+- Canonicalization patterns
+
+Design: docs/design/DES-001-matmul.md
+Spec: specs/kernels/matmul.md
 ```
 
 ## Code Style
 
 ### C++ (LLVM Style)
-
-- Follow [LLVM Coding Standards](https://llvm.org/docs/CodingStandards.html)
-- Use `clang-format` with the provided `.clang-format`
-- Run `make format-cpp` before committing
-
-### Python (PEP 8 + Type Hints)
-
-- Use type hints for all function signatures
-- Use `ruff` for linting and formatting
-- Run `make format-python` before committing
+- Follow LLVM Coding Standards
+- Use `clang-format` with provided config
+- Run `cmake --build build --target format`
 
 ### TableGen
-
 - One operation per logical group
-- Include summary and description for all operations
+- Include summary and description
 - Use consistent naming: `Dialect_VerbNounOp`
-
-## Adding New Kernels
-
-Use the scaffolding script:
-
-```bash
-make new-kernel NAME=my_kernel
-```
-
-This creates:
-- `specs/kernels/my_kernel.md` - Specification
-- `tests/lit/Dialect/Kernel/my_kernel.mlir` - Test file
-- `tasks/KERNEL-MY_KERNEL.md` - Task tracking
-
-Then:
-1. Complete the specification
-2. Add operation to `src/dialects/kernel/KernelOps.td`
-3. Implement verifier
-4. Implement lowering passes
-5. Run tests: `make test-lit`
-
-## Adding New Passes
-
-Use the scaffolding script:
-
-```bash
-make new-pass NAME=tile-convolution
-```
-
-This creates:
-- `src/passes/TileConvolution.cpp` - Pass implementation
-- `tests/lit/Transforms/tile-convolution.mlir` - Test file
-
-Then:
-1. Add pass declaration to `src/passes/Passes.td`
-2. Implement patterns in the `.cpp` file
-3. Register the pass
-4. Run tests
 
 ## Testing Requirements
 
-All contributions must include appropriate tests:
-
 | Change Type | Required Tests |
 |-------------|----------------|
-| New kernel operation | Lit test (parsing, verifier), unit test |
-| New pass | Lit test (transformation), edge cases |
-| Bug fix | Regression test that would have caught the bug |
-| Performance change | Benchmark comparison |
+| New operation | Lit tests (parse, verify), unit tests |
+| New pass | Lit tests (transformation), edge cases |
+| Bug fix | Regression test |
 
 ### Running Tests
 
 ```bash
-make test           # All tests
-make test-unit      # Unit tests only
-make test-lit       # MLIR lit tests only
-make verify         # Full verification
+ctest --test-dir build                    # All tests
+ctest --test-dir build -R "Dialect"       # Dialect tests
+ctest --test-dir build --output-on-failure
 ```
 
-## Pull Request Process
+## Design Review Process
 
-1. **Ensure all tests pass**: `make verify`
-2. **Update documentation** if needed
-3. **Create PR** with clear description
-4. **Link related issues** in the PR description
-5. **Respond to feedback** promptly
-
-### PR Checklist
-
-- [ ] Tests pass (`make verify`)
-- [ ] Code follows style guidelines
-- [ ] Documentation updated
-- [ ] Commit messages follow format
-- [ ] Specification updated (if applicable)
-
-## Task Tracking
-
-For larger features, create a task file:
-
-```bash
-make new-task ID=001 TITLE="Implement RVV matmul lowering"
-```
-
-Update the task file as you progress to help with handoffs between development sessions.
+1. Create design document from template
+2. Tag with `[DESIGN-REVIEW]` in PR
+3. Reviewers check:
+   - Requirements coverage
+   - Alternative analysis
+   - Risk assessment
+   - Test strategy
+4. Address all feedback
+5. Get explicit approval before implementing
 
 ## Getting Help
 
-- Check existing documentation in `docs/`
-- Look at similar implementations in the codebase
-- Create an issue for questions or discussions
-
-## Code of Conduct
-
-Be respectful and constructive. Focus on the code, not the person.
+- Check documentation in `docs/`
+- Look at similar implementations
+- Create an issue for questions
