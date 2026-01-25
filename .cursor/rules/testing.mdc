@@ -1,0 +1,78 @@
+---
+description: Testing guidelines for KernelSmith
+globs: ["tests/**/*"]
+---
+
+# Testing Guidelines
+
+## Test-Driven Development
+
+KernelSmith follows TDD:
+
+1. **Write failing test** that defines expected behavior
+2. **Implement minimum code** to pass the test
+3. **Refactor** while keeping tests green
+4. **Add edge cases** to improve coverage
+
+## Test Categories
+
+### Lit Tests (`tests/lit/`)
+
+MLIR FileCheck-based tests for:
+- Parsing and printing operations
+- Verifier error messages
+- Pass transformations
+
+```mlir
+// RUN: ks-opt %s | ks-opt | FileCheck %s
+// RUN: ks-opt %s --ks-lower-to-linalg | FileCheck %s --check-prefix=LINALG
+```
+
+### Unit Tests (`tests/unit/`)
+
+C++ tests using Google Test for:
+- Type and attribute construction
+- Utility functions
+- Complex verification logic
+
+## CTest Integration
+
+All tests are registered with CTest:
+
+```bash
+ctest --test-dir build                    # All tests
+ctest --test-dir build -R "lit"           # Lit tests only
+ctest --test-dir build -R "unit"          # Unit tests only
+ctest --test-dir build -R "matmul"        # Filter by name
+ctest --test-dir build --output-on-failure
+```
+
+## Test File Organization
+
+```
+tests/
+├── CMakeLists.txt
+├── lit/
+│   ├── lit.cfg.py
+│   ├── lit.site.cfg.py.in
+│   ├── Dialect/Kernel/
+│   │   ├── matmul.mlir
+│   │   ├── relu.mlir
+│   │   └── invalid.mlir
+│   ├── Passes/
+│   │   └── lower-to-linalg.mlir
+│   └── Targets/RISCV/
+│       └── lower-to-rvv.mlir
+└── unit/
+    ├── CMakeLists.txt
+    └── Dialect/
+        └── KernelOpsTest.cpp
+```
+
+## Test Requirements
+
+| Change | Required Tests |
+|--------|---------------|
+| New operation | Parse/print, verifier, lowering |
+| New pass | Transformation, edge cases |
+| Bug fix | Regression test |

@@ -1,0 +1,63 @@
+---
+description: Core project rules for KernelSmith
+globs: ["**/*"]
+alwaysApply: true
+---
+
+# KernelSmith Project
+
+## Project Overview
+
+KernelSmith crafts optimized AI accelerator kernels using the MLIR compiler infrastructure. The output is a library of kernels targeting multiple architectures, starting with RISC-V RVV.
+
+## Project Identity
+
+- **Name**: KernelSmith
+- **Namespace**: `kernelsmith`
+- **Dialect Prefix**: `ks`
+- **CLI Tool**: `ks-opt`
+
+## Key Principles
+
+1. **Specification First**: Define behavior before implementing
+2. **Design Reviews**: Document and review significant decisions
+3. **Test-Driven Development**: Write tests before implementation
+4. **Layered Abstraction**: ks ops → linalg → vector → target
+
+## Architecture
+
+```
+ks.matmul (high-level)
+    ↓ --ks-lower-to-linalg
+linalg.matmul
+    ↓ --ks-tile
+scf.for (tiled loops)
+    ↓ --ks-vectorize
+vector.load/fma/store
+    ↓ --ks-lower-to-rvv
+LLVM IR (RVV intrinsics)
+```
+
+## Directory Structure
+
+- `include/KernelSmith/` - Public headers and TableGen
+- `lib/` - Implementation
+- `tools/ks-opt/` - CLI optimizer
+- `tests/` - CTest-integrated tests
+- `specs/` - Feature specifications
+- `docs/design/` - Design decisions
+- `.agents/` - Agent skills and workflows
+
+## Development Workflow
+
+1. **Check specs**: Read `specs/` for requirements
+2. **Design review**: Create doc in `docs/design/` for significant changes
+3. **Write tests first**: TDD approach
+4. **Implement**: Small, focused commits
+5. **Verify**: `make test` before committing
+
+## Code Style
+
+- C++: LLVM coding standards
+- Dialect prefix: `ks.` for all operations
+- Pass prefix: `--ks-` for all passes

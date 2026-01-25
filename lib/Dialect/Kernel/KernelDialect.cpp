@@ -1,0 +1,34 @@
+//===----------------------------------------------------------------------===//
+// KernelSmith Kernel Dialect Implementation
+//===----------------------------------------------------------------------===//
+
+#include "KernelSmith/Dialect/Kernel/KernelDialect.h"
+
+#include "mlir/IR/Builders.h"
+#include "mlir/IR/DialectImplementation.h"
+#include "llvm/ADT/TypeSwitch.h"
+
+using namespace mlir;
+using namespace kernelsmith::ks;
+
+//===----------------------------------------------------------------------===//
+// Dialect
+//===----------------------------------------------------------------------===//
+
+#include "KernelSmith/Dialect/Kernel/KernelDialect.cpp.inc"
+
+void KSDialect::initialize() {
+  registerTypes();
+  
+  addOperations<
+#define GET_OP_LIST
+#include "KernelSmith/Dialect/Kernel/KernelOps.cpp.inc"
+  >();
+}
+
+void KSDialect::registerTypes() {
+  addTypes<
+#define GET_TYPEDEF_LIST
+#include "KernelSmith/Dialect/Kernel/KernelTypes.cpp.inc"
+  >();
+}

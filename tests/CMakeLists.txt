@@ -1,0 +1,43 @@
+# KernelSmith Tests (CTest)
+
+# Configure lit site config
+configure_file(
+  ${CMAKE_CURRENT_SOURCE_DIR}/lit/lit.site.cfg.py.in
+  ${CMAKE_CURRENT_BINARY_DIR}/lit/lit.site.cfg.py
+  @ONLY
+)
+
+# Add lit tests target
+if(LIT_COMMAND)
+  add_custom_target(check-kernelsmith-lit
+    COMMAND ${LIT_COMMAND} ${CMAKE_CURRENT_SOURCE_DIR}/lit
+      --config-prefix=lit.site
+      -v
+      --param ks_tools_dir=${LLVM_RUNTIME_OUTPUT_INTDIR}
+      --param ks_src_dir=${CMAKE_CURRENT_SOURCE_DIR}
+      --param ks_build_dir=${CMAKE_CURRENT_BINARY_DIR}
+    DEPENDS ks-opt
+    COMMENT "Running KernelSmith lit tests"
+  )
+  
+  # Register lit tests with CTest
+  add_test(NAME kernelsmith-lit
+    COMMAND ${LIT_COMMAND} ${CMAKE_CURRENT_SOURCE_DIR}/lit
+      --config-prefix=lit.site
+      -v
+      --param ks_tools_dir=${LLVM_RUNTIME_OUTPUT_INTDIR}
+      --param ks_src_dir=${CMAKE_CURRENT_SOURCE_DIR}
+      --param ks_build_dir=${CMAKE_CURRENT_BINARY_DIR}
+  )
+endif()
+
+# Unit tests subdirectory
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/unit/CMakeLists.txt)
+  add_subdirectory(unit)
+endif()
+
+# Combined target for all tests
+add_custom_target(check-kernelsmith
+  DEPENDS check-kernelsmith-lit
+  COMMENT "Running all KernelSmith tests"
+)

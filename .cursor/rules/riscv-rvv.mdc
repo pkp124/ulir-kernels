@@ -1,0 +1,67 @@
+---
+description: RISC-V RVV target guidelines for KernelSmith
+globs: ["**/RISCV/**", "**/rvv**", "specs/targets/riscv*.md"]
+---
+
+# RISC-V RVV Target Guidelines
+
+## Overview
+
+RISC-V Vector Extension (RVV) is the primary target for KernelSmith. RVV is a scalable vector ISA where vector length is runtime-determined.
+
+## Key Concepts
+
+### Vector Length Agnostic (VLA)
+
+- VLEN ranges from 128 to 16384 bits
+- Code must work regardless of VLEN
+- Use `vsetvl` to set/query vector length
+
+### Configuration
+
+| Parameter | Description |
+|-----------|-------------|
+| VLEN | Vector register width (bits) |
+| SEW | Selected Element Width (8/16/32/64) |
+| LMUL | Length Multiplier (1/8 to 8) |
+| VLMAX | Max elements = VLEN × LMUL / SEW |
+
+## Lowering Patterns
+
+### Memory Operations
+
+```
+vector.load  → vle{SEW}.v
+vector.store → vse{SEW}.v
+```
+
+### Arithmetic
+
+```
+arith.addf → vfadd.vv
+arith.mulf → vfmul.vv
+vector.fma → vfmacc.vv
+```
+
+### Reductions
+
+```
+vector.reduction<add> → vfredusum.vs
+vector.reduction<max> → vfredmax.vs
+```
+
+## Performance Guidelines
+
+1. **Minimize vsetvl**: Set once, reuse in loops
+2. **Use LMUL > 1**: For compute-bound kernels
+3. **Overlap load/compute**: Pipeline memory access
+4. **Handle tails**: Use masking for non-VL-multiple sizes
+
+## Testing
+
+Test with multiple VLEN values:
+```bash
+qemu-riscv64 -cpu rv64,v=true,vlen=128 ./test
+qemu-riscv64 -cpu rv64,v=true,vlen=256 ./test
+qemu-riscv64 -cpu rv64,v=true,vlen=512 ./test
+```
