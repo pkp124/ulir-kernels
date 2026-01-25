@@ -6,57 +6,65 @@ alwaysApply: true
 
 # KernelSmith Agent System
 
+## Manager Agent - Primary Directive
+
+**Milestone completion takes priority over all other work.**
+
+Before any work:
+1. Check current milestone in `ROADMAP.md`
+2. Check task status in `tasks/BACKLOG.md`
+3. Only work on milestone-required tasks
+4. Do NOT start next milestone until current is complete
+
+## Current State
+
+Check these files at session start:
+- `ROADMAP.md` - Current milestone and goals
+- `tasks/BACKLOG.md` - Task status and priorities
+
 ## Agent Roles
 
-| Agent | Responsibility | When Active |
-|-------|---------------|-------------|
-| **Manager** | Workflow enforcement, task tracking | Always (coordinates others) |
-| **Architect** | Design documents, system decisions | Design phase |
-| **Reviewer** | Critical analysis, find issues | Review phase |
-| **Implementer** | TDD coding, write tests first | Implementation phase |
-| **Verifier** | Test execution, spec compliance | Verification phase |
+| Agent | Responsibility |
+|-------|---------------|
+| **Manager** | Milestone tracking, workflow enforcement |
+| **Architect** | Design documents, architecture |
+| **Reviewer** | Critical analysis, find issues |
+| **Implementer** | TDD coding |
+| **Verifier** | Testing, spec compliance |
 
-## Manager Agent - Always Active
+## Prioritization Rules
 
-The Manager Agent oversees all work. Before any action:
+```
+1. Milestone-required tasks > Other tasks
+2. Blocking tasks > Non-blocking tasks
+3. Current milestone > Future milestones
+4. Never skip workflow phases
+```
 
-### Check Current State
-
-1. What task is active? (Check `tasks/BACKLOG.md`)
-2. What phase is it in?
-3. Is the work appropriate for this phase?
-4. Are prerequisites met?
-
-### Workflow Enforcement
+## Workflow Enforcement
 
 **STOP if:**
-- ❌ No specification exists → Create spec first
-- ❌ No design doc for significant changes → Create design doc
-- ❌ Design not approved → Get review first
-- ❌ Writing code before tests → Write tests first
-- ❌ Skipping verification → Run full test suite
+- ❌ Working on non-milestone task without justification
+- ❌ No specification exists
+- ❌ No design doc for significant changes
+- ❌ Design not approved
+- ❌ Writing code before tests
 
-### Phase Gates
+## Phase Gates
 
-| To Enter Phase | Requirement |
-|----------------|-------------|
+| To Enter | Requirement |
+|----------|-------------|
 | Design | Specification exists |
 | Review | Design doc complete |
 | Implementation | Design approved |
 | Complete | All tests pass |
 
-## Task Tracking
+## Task Updates
 
-### Update Task Status
-
-When working on a task, update its file:
-
+When working, update task file with:
 ```markdown
-## Status
-[~] In Progress
-
 ## Current Phase
-Implementing
+[Phase name]
 
 ## Progress Log
 ### YYYY-MM-DD
@@ -64,38 +72,11 @@ Implementing
 - Next: What to do next
 ```
 
-### Update Backlog
-
-Keep `tasks/BACKLOG.md` current with:
-- Active work
-- Blocked tasks
-- Completed tasks
-
-## Workflow Sequence
-
-```
-1. SPEC     → Manager checks/creates specification
-2. DESIGN   → Architect creates design doc
-3. REVIEW   → Reviewer critically analyzes
-4. IMPLEMENT → Implementer does TDD
-5. VERIFY   → Verifier runs all tests
-6. COMPLETE → Manager closes task
-```
-
 ## Starting Work
 
-Always start with Manager checklist:
-
-1. [ ] Check `tasks/BACKLOG.md` for current state
-2. [ ] Identify highest priority unblocked task
-3. [ ] Verify prerequisites are met
-4. [ ] Select appropriate agent for current phase
-5. [ ] Follow that agent's workflow
-
-## Handoff Between Agents
-
-When switching agents:
-1. Document current state in task file
-2. List what was completed
-3. Specify next actions
-4. Note which agent should continue
+Manager checklist:
+1. [ ] What is current milestone?
+2. [ ] What are milestone-required tasks?
+3. [ ] Which task is highest priority (unblocked)?
+4. [ ] What phase is that task in?
+5. [ ] Which agent should work on it?

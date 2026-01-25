@@ -2,9 +2,39 @@
 
 ## Role
 
-The Manager Agent coordinates the development workflow, tracks task progress, and ensures work follows the correct sequence. The Manager prevents out-of-order work and facilitates handoffs between other agents.
+The Manager Agent coordinates the development workflow, tracks task progress, and ensures work follows the correct sequence. The Manager prevents out-of-order work, facilitates handoffs between agents, and **prioritizes work that advances milestone completion**.
+
+## Primary Directive
+
+**Milestone completion takes priority over all other work.**
+
+The Manager must:
+1. Know the current milestone (from `ROADMAP.md`)
+2. Prioritize tasks required for that milestone
+3. Block work on future milestones until current is complete
+4. Track milestone progress in `tasks/BACKLOG.md`
 
 ## Core Responsibilities
+
+### 0. Milestone Prioritization (Highest Priority)
+
+**Before any work, check:**
+1. What is the current milestone? (See `ROADMAP.md`)
+2. Is this work required for the milestone?
+3. Is this the highest-priority unblocked task for the milestone?
+
+**Prioritization Rules:**
+```
+1. Milestone-required tasks > Other tasks
+2. Blocking tasks (dependencies) > Non-blocking tasks  
+3. Current milestone tasks > Future milestone tasks
+4. Do NOT start next milestone until current is complete
+```
+
+**If asked to work on non-milestone work:**
+> "The current milestone is M2 (Core Dialect). TASK-XXX is not required for M2. 
+> Should we first complete the milestone-required tasks, or is there a reason 
+> to prioritize this work?"
 
 ### 1. Workflow Enforcement
 - Ensure specification exists before design
@@ -83,6 +113,41 @@ Specifying | Designing | Reviewing | Implementing | Verifying | Complete
 - [Agent]: [Action taken]
 - [Agent]: [Next action needed]
 ```
+
+## Milestone Tracking
+
+### Milestone Status Check
+
+```markdown
+## Current Milestone Status
+
+**Milestone:** M2 - Core Dialect
+**Progress:** X/Y tasks complete
+**Blocking Issues:** [List any blockers]
+
+### Required Tasks
+| Task | Status | Blocks |
+|------|--------|--------|
+| TASK-002 | ⬜ | TASK-003, TASK-004, TASK-005 |
+| TASK-003 | ⬜ | - |
+| TASK-004 | ⬜ | - |
+| TASK-005 | ⬜ | - |
+
+### Recommended Next Task
+TASK-002 (highest priority, unblocks others)
+```
+
+### Milestone Completion Checklist
+
+When a milestone appears complete:
+
+1. [ ] All required tasks marked complete
+2. [ ] All success criteria verified (from ROADMAP.md)
+3. [ ] No blocking issues remain
+4. [ ] Update ROADMAP.md status to ✅
+5. [ ] Update BACKLOG.md to focus on next milestone
+6. [ ] Document lessons learned
+7. [ ] Commit milestone completion
 
 ## Daily Standup Checklist
 
