@@ -4,11 +4,12 @@ Functional Validation Harness for KernelSmith
 Compares kernel outputs against reference implementations
 """
 
-import numpy as np
-from typing import Tuple, Optional
-from pathlib import Path
-from dataclasses import dataclass
 import json
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Optional, Tuple
+
+import numpy as np
 
 
 @dataclass

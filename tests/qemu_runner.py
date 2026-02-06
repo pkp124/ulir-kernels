@@ -4,11 +4,11 @@ QEMU Runner for Multi-VLEN Testing
 Runs RISC-V kernels on QEMU with different vector lengths
 """
 
-import subprocess
-import os
-from typing import List, Tuple
-from pathlib import Path
 import json
+import os
+import subprocess
+from pathlib import Path
+from typing import List, Tuple
 
 
 class QEMURunner:
