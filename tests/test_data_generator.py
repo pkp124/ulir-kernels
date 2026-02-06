@@ -4,12 +4,14 @@ Test Data Generator for KernelSmith
 Generates test tensors for functional validation of kernels
 """
 
-import numpy as np
-import struct
+import json
 import os
+import struct
 from dataclasses import dataclass
-from typing import Tuple, List, Optional
 from pathlib import Path
+from typing import List, Optional, Tuple
+
+import numpy as np
 
 
 @dataclass
