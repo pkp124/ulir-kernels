@@ -6,8 +6,6 @@ Compares kernel outputs against reference implementations
 
 import json
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Optional, Tuple
 
 import numpy as np
 
@@ -15,6 +13,7 @@ import numpy as np
 @dataclass
 class ValidationResult:
     """Result of validating a kernel against reference"""
+
     kernel_name: str
     passed: bool
     max_error: float
@@ -40,16 +39,16 @@ class FunctionalValidator:
         self.results = []
 
     def compare_tensors(
-        self, computed: np.ndarray, reference: np.ndarray, tolerance: Optional[float] = None
-    ) -> Tuple[bool, float, float]:
+        self, computed: np.ndarray, reference: np.ndarray, tolerance: float | None = None
+    ) -> tuple[bool, float, float, float]:
         """
         Compare two tensors
 
         Returns:
-            Tuple of (passed, max_error, mean_error)
+            Tuple of (passed, max_error, mean_error, max_rel_error)
         """
         if computed.shape != reference.shape:
-            return False, float("inf"), float("inf")
+            return False, float("inf"), float("inf"), float("inf")
 
         if computed.dtype != reference.dtype:
             computed = computed.astype(reference.dtype)
@@ -97,8 +96,12 @@ class FunctionalValidator:
         return result
 
     def validate_conv2d(
-        self, computed_output: np.ndarray, input_tensor: np.ndarray, kernel: np.ndarray,
-        stride: Tuple[int, int] = (1, 1), padding: Tuple[int, int] = (0, 0)
+        self,
+        computed_output: np.ndarray,
+        input_tensor: np.ndarray,
+        kernel: np.ndarray,
+        stride: tuple[int, int] = (1, 1),
+        padding: tuple[int, int] = (0, 0),
     ) -> ValidationResult:
         """
         Validate Conv2D kernel
@@ -107,9 +110,10 @@ class FunctionalValidator:
         """
         try:
             from scipy.signal import convolve
+
             # This is a simplified reference - actual conv2d is more complex
             # For real validation, use a well-tested library like torch or tf
-            reference_output = convolve(input_tensor, kernel, mode='same')
+            reference_output = convolve(input_tensor, kernel, mode="same")
         except ImportError:
             # Fallback: just check output shape and dtype
             reference_output = computed_output.copy()
@@ -135,8 +139,12 @@ class FunctionalValidator:
         return result
 
     def validate_attention(
-        self, computed_output: np.ndarray, Q: np.ndarray, K: np.ndarray, V: np.ndarray,
-        scale: Optional[float] = None
+        self,
+        computed_output: np.ndarray,
+        Q: np.ndarray,
+        K: np.ndarray,
+        V: np.ndarray,
+        scale: float | None = None,
     ) -> ValidationResult:
         """
         Validate Scaled Dot-Product Attention
@@ -187,9 +195,11 @@ class FunctionalValidator:
             reference = np.maximum(input_tensor, 0)
         elif activation.lower() == "gelu":
             # Approximate GELU
-            reference = 0.5 * input_tensor * (1 + np.tanh(
-                np.sqrt(2 / np.pi) * (input_tensor + 0.044715 * input_tensor ** 3)
-            ))
+            reference = (
+                0.5
+                * input_tensor
+                * (1 + np.tanh(np.sqrt(2 / np.pi) * (input_tensor + 0.044715 * input_tensor**3)))
+            )
         elif activation.lower() == "silu":
             reference = input_tensor / (1 + np.exp(-input_tensor))
         else:
@@ -231,7 +241,7 @@ class FunctionalValidator:
             "results": [
                 {
                     "kernel": r.kernel_name,
-                    "passed": r.passed,
+                    "passed": bool(r.passed),
                     "max_error": float(r.max_error),
                     "mean_error": float(r.mean_error),
                 }
@@ -246,7 +256,7 @@ class FunctionalValidator:
             "results": [
                 {
                     "kernel": r.kernel_name,
-                    "passed": r.passed,
+                    "passed": bool(r.passed),
                     "max_error": float(r.max_error),
                     "mean_error": float(r.mean_error),
                     "rel_error": float(r.rel_error),
