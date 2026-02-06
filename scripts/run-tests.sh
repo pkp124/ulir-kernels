@@ -1,0 +1,168 @@
+#!/bin/bash
+# KernelSmith Test Runner
+# Runs tests in different categories with support for multi-VLEN testing
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+BUILD_DIR="${PROJECT_ROOT}/build"
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Test categories
+TEST_LIT=false
+TEST_UNIT=false
+TEST_INTEGRATION=false
+TEST_ALL=false
+VERBOSE=false
+QEMU_VLEN=""
+
+print_usage() {
+    cat << EOF
+Usage: $0 [OPTIONS]
+
+Test Categories:
+  --lit              Run MLIR lit tests (parsing, lowering verification)
+  --unit             Run C++ unit tests
+  --integration      Run integration tests
+  --all              Run all tests (default if no category specified)
+
+Options:
+  --verbose, -v      Verbose output
+  --qemu-vlen BITS   Run with QEMU using specific VLEN (128, 256, 512)
+  --help, -h         Show this help message
+
+Examples:
+  $0 --lit                           # Run lit tests
+  $0 --all --verbose                 # Run all tests verbosely
+  $0 --integration --qemu-vlen 256   # Run integration tests on QEMU with VLEN=256
+EOF
+}
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --lit)
+            TEST_LIT=true
+            shift
+            ;;
+        --unit)
+            TEST_UNIT=true
+            shift
+            ;;
+        --integration)
+            TEST_INTEGRATION=true
+            shift
+            ;;
+        --all)
+            TEST_ALL=true
+            shift
+            ;;
+        --verbose|-v)
+            VERBOSE=true
+            shift
+            ;;
+        --qemu-vlen)
+            QEMU_VLEN="$2"
+            shift 2
+            ;;
+        --help|-h)
+            print_usage
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            print_usage
+            exit 1
+            ;;
+    esac
+done
+
+# Default to --all if no category specified
+if [ "$TEST_LIT" = false ] && [ "$TEST_UNIT" = false ] && [ "$TEST_INTEGRATION" = false ] && [ "$TEST_ALL" = false ]; then
+    TEST_ALL=true
+fi
+
+# Check if build directory exists
+if [ ! -d "$BUILD_DIR" ]; then
+    echo -e "${RED}Error: Build directory not found at $BUILD_DIR${NC}"
+    echo "Please run: make build"
+    exit 1
+fi
+
+cd "$BUILD_DIR"
+
+# Function to run tests
+run_lit_tests() {
+    echo -e "${YELLOW}=== Running LIT Tests ===${NC}"
+    if command -v lit &> /dev/null; then
+        if [ "$VERBOSE" = true ]; then
+            cmake --build . --target check-kernelsmith-lit -- -v
+        else
+            cmake --build . --target check-kernelsmith-lit
+        fi
+    else
+        echo -e "${RED}Error: lit not found. Install with: pip install lit${NC}"
+        return 1
+    fi
+}
+
+run_unit_tests() {
+    echo -e "${YELLOW}=== Running Unit Tests ===${NC}"
+    if [ "$VERBOSE" = true ]; then
+        ctest --output-on-failure -V -R "kernelsmith-unit"
+    else
+        ctest --output-on-failure -R "kernelsmith-unit"
+    fi
+}
+
+run_integration_tests() {
+    echo -e "${YELLOW}=== Running Integration Tests ===${NC}"
+
+    if [ -z "$QEMU_VLEN" ]; then
+        # Host tests
+        if [ "$VERBOSE" = true ]; then
+            ctest --output-on-failure -V -R "kernelsmith-integration"
+        else
+            ctest --output-on-failure -R "kernelsmith-integration"
+        fi
+    else
+        # QEMU tests with specific VLEN
+        if ! command -v qemu-riscv64 &> /dev/null; then
+            echo -e "${RED}Error: qemu-riscv64 not found. Install with: apt install qemu-user${NC}"
+            return 1
+        fi
+
+        echo "Running on QEMU with VLEN=${QEMU_VLEN}"
+        # Integration tests will set QEMU_VLEN environment variable
+        QEMU_VLEN="$QEMU_VLEN" ctest --output-on-failure -R "kernelsmith-integration"
+    fi
+}
+
+# Run tests based on flags
+FAILED=0
+
+if [ "$TEST_ALL" = true ]; then
+    run_lit_tests || FAILED=$((FAILED + 1))
+    run_unit_tests || FAILED=$((FAILED + 1))
+    run_integration_tests || FAILED=$((FAILED + 1))
+else
+    [ "$TEST_LIT" = true ] && run_lit_tests || FAILED=$((FAILED + 1))
+    [ "$TEST_UNIT" = true ] && run_unit_tests || FAILED=$((FAILED + 1))
+    [ "$TEST_INTEGRATION" = true ] && run_integration_tests || FAILED=$((FAILED + 1))
+fi
+
+# Summary
+echo ""
+if [ $FAILED -eq 0 ]; then
+    echo -e "${GREEN}✓ All tests passed!${NC}"
+    exit 0
+else
+    echo -e "${RED}✗ Some tests failed${NC}"
+    exit 1
+fi

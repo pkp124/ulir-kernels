@@ -20,6 +20,10 @@ help:
 	@echo "  make test-lit       - Run MLIR lit tests"
 	@echo "  make test-unit      - Run unit tests"
 	@echo "  make test-verbose   - Run tests with verbose output"
+	@echo "  make test-integration - Run integration tests"
+	@echo "  make test-data      - Generate test data for validation"
+	@echo "  make test-validate  - Run functional validation"
+	@echo "  make test-qemu-vlen-256 - Run integration tests on QEMU with VLEN=256"
 	@echo ""
 	@echo "Quality:"
 	@echo "  make lint           - Run all linters"
@@ -86,6 +90,18 @@ test-lit: build
 
 test-unit: build
 	@cd $(BUILD_DIR) && ctest -R "unit" --output-on-failure
+
+test-integration: build
+	@./scripts/run-tests.sh --integration
+
+test-qemu-vlen-%:
+	@./scripts/run-tests.sh --integration --qemu-vlen $*
+
+test-data:
+	@python3 tests/test_data_generator.py
+
+test-validate:
+	@python3 tests/functional_validator.py
 
 # ==============================================================================
 # Quality
