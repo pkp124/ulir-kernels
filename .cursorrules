@@ -1,0 +1,95 @@
+# KernelSmith - Cursor AI Rules
+
+You are working on KernelSmith, an MLIR compiler framework that generates optimized AI accelerator kernels for RISC-V RVV. This is a serious compiler infrastructure project — precision, correctness, and adherence to MLIR/LLVM conventions matter more than speed.
+
+## Critical Rules
+
+1. **Never implement without reading the spec first.** Check `specs/` for the relevant kernel or target specification before writing any code.
+2. **Never skip tests.** Every new operation needs lit tests (parse/print + verifier + transformation). Every pass needs before/after FileCheck tests. Use TDD: write the failing test first.
+3. **Always run `make verify` before suggesting a commit.** This runs lint + all tests.
+4. **Check design docs** in `docs/design/` before making architectural decisions. If no design doc exists for a significant change, create one using `make new-design`.
+
+## Project Quick Facts
+
+- **Build**: CMake 3.20+, LLVM/MLIR 18+. Use `make build` / `make test`.
+- **Dialect prefix**: `ks.` (e.g., `ks.matmul`, `ks.relu`)
+- **Pass CLI prefix**: `--ks-` (e.g., `--ks-lower-to-linalg`, `--ks-tile`)
+- **C++ namespace**: `kernelsmith::ks`
+- **C++ style**: LLVM coding standards, 2-space indent, 80 col, `.clang-format` at root
+- **Python style**: ruff, 100 col, config in `pyproject.toml`
+- **Commit format**: `<type>(<scope>): <subject>` — types: feat, fix, docs, refactor, test, chore
+
+## Lowering Pipeline
+
+```
+ks ops → linalg → tiled scf.for → vector ops → RVV LLVM IR
+```
+
+Each arrow is a separate MLIR pass. When implementing lowering, target one level at a time.
+
+## File Locations
+
+| What you need | Where to find it |
+|---|---|
+| Op definitions (TableGen) | `include/KernelSmith/Dialect/Kernel/*.td` |
+| Op implementations | `lib/Dialect/Kernel/*.cpp` |
+| Pass implementations | `lib/Passes/*.cpp` |
+| Lit tests | `tests/lit/Dialect/Kernel/*.mlir`, `tests/lit/Passes/*.mlir` |
+| Unit tests | `tests/unit/` |
+| Kernel specs | `specs/kernels/` |
+| Target specs | `specs/targets/` |
+| Design decisions | `docs/design/DES-XXX-*.md` |
+| Dev plan | `RISC-V_RVV_KERNEL_LIBRARY_PLAN.md` |
+
+## MLIR Conventions
+
+### Operation Definition (TableGen)
+```tablegen
+def KS_VerbNounOp : KS_Op<"verb_noun", [traits]> {
+  let summary = "brief";
+  let description = [{ detailed }];
+  let arguments = (ins ...);
+  let results = (outs ...);
+  let assemblyFormat = "...";
+  let hasVerifier = 1;
+}
+```
+
+### Pass Definition
+- Class: `KS{Action}Pass` (e.g., `KSTileKernelsPass`)
+- CLI: `--ks-tile-kernels`
+- File: `lib/Passes/TileKernels.cpp`
+
+### Lit Test Pattern
+```mlir
+// RUN: ks-opt %s --ks-some-pass | FileCheck %s
+// CHECK-LABEL: func @test_name
+// CHECK: expected.output
+// CHECK-NOT: removed.op
+```
+
+## RISC-V RVV Context
+
+- Vector Length Agnostic: code must work for any VLEN (128-16384 bits)
+- Key concepts: SEW (element width), LMUL (register grouping), VLMAX
+- Memory: `vle/vse` instructions. Arithmetic: `vfadd.vv`, `vfmul.vv`, `vfmacc.vv`
+- Reductions: `vfredusum.vs`, `vfredmax.vs`
+- Minimize `vsetvl` instructions; handle tail elements with masking
+
+## Development Workflow
+
+1. Read spec in `specs/`
+2. Check/create design doc in `docs/design/` for non-trivial work
+3. Write failing test (RED)
+4. Implement minimum to pass (GREEN)
+5. Refactor (keep tests green)
+6. Run `make verify`
+7. Commit with descriptive message
+
+## What NOT to Do
+
+- Don't add operations without TableGen + lit tests
+- Don't bypass the lowering pipeline (ks → linalg → vector → target)
+- Don't hardcode VLEN — all code must be vector-length agnostic
+- Don't modify the architecture without a design review document
+- Don't use `AIKernels/` in include paths (legacy name; use `KernelSmith/`)

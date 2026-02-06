@@ -55,7 +55,7 @@ IncludeCategories:
   - Regex: '^"llvm/'
     Priority: 4
   # Project includes
-  - Regex: '^"AIKernels/'
+  - Regex: '^"KernelSmith/'
     Priority: 1
   # Other includes
   - Regex: '.*'
