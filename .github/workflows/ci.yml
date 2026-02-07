@@ -44,8 +44,8 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install lit and FileCheck
-        run: pip install lit filecheck
+      - name: Install dev dependencies
+        run: pip install -e ".[dev]"
 
       - name: Configure
         run: |

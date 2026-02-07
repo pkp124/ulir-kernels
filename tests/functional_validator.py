@@ -15,6 +15,7 @@ import numpy as np
 @dataclass
 class ValidationResult:
     """Result of validating a kernel against reference"""
+
     kernel_name: str
     passed: bool
     max_error: float
@@ -97,8 +98,12 @@ class FunctionalValidator:
         return result
 
     def validate_conv2d(
-        self, computed_output: np.ndarray, input_tensor: np.ndarray, kernel: np.ndarray,
-        stride: Tuple[int, int] = (1, 1), padding: Tuple[int, int] = (0, 0)
+        self,
+        computed_output: np.ndarray,
+        input_tensor: np.ndarray,
+        kernel: np.ndarray,
+        stride: Tuple[int, int] = (1, 1),
+        padding: Tuple[int, int] = (0, 0),
     ) -> ValidationResult:
         """
         Validate Conv2D kernel
@@ -107,9 +112,10 @@ class FunctionalValidator:
         """
         try:
             from scipy.signal import convolve
+
             # This is a simplified reference - actual conv2d is more complex
             # For real validation, use a well-tested library like torch or tf
-            reference_output = convolve(input_tensor, kernel, mode='same')
+            reference_output = convolve(input_tensor, kernel, mode="same")
         except ImportError:
             # Fallback: just check output shape and dtype
             reference_output = computed_output.copy()
@@ -135,8 +141,12 @@ class FunctionalValidator:
         return result
 
     def validate_attention(
-        self, computed_output: np.ndarray, Q: np.ndarray, K: np.ndarray, V: np.ndarray,
-        scale: Optional[float] = None
+        self,
+        computed_output: np.ndarray,
+        Q: np.ndarray,
+        K: np.ndarray,
+        V: np.ndarray,
+        scale: Optional[float] = None,
     ) -> ValidationResult:
         """
         Validate Scaled Dot-Product Attention
@@ -187,9 +197,11 @@ class FunctionalValidator:
             reference = np.maximum(input_tensor, 0)
         elif activation.lower() == "gelu":
             # Approximate GELU
-            reference = 0.5 * input_tensor * (1 + np.tanh(
-                np.sqrt(2 / np.pi) * (input_tensor + 0.044715 * input_tensor ** 3)
-            ))
+            reference = (
+                0.5
+                * input_tensor
+                * (1 + np.tanh(np.sqrt(2 / np.pi) * (input_tensor + 0.044715 * input_tensor**3)))
+            )
         elif activation.lower() == "silu":
             reference = input_tensor / (1 + np.exp(-input_tensor))
         else:

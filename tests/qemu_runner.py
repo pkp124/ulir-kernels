@@ -26,11 +26,11 @@ class QEMURunner:
         try:
             subprocess.run([self.qemu_binary, "-version"], capture_output=True, check=True)
         except (FileNotFoundError, subprocess.CalledProcessError):
-            raise RuntimeError(
-                f"{self.qemu_binary} not found. Install with: apt install qemu-user"
-            )
+            raise RuntimeError(f"{self.qemu_binary} not found. Install with: apt install qemu-user")
 
-    def run_with_vlen(self, binary_path: str, vlen: int, args: List[str] = None) -> Tuple[int, str, str]:
+    def run_with_vlen(
+        self, binary_path: str, vlen: int, args: List[str] = None
+    ) -> Tuple[int, str, str]:
         """
         Run a RISC-V binary on QEMU with specific VLEN
 
@@ -47,7 +47,8 @@ class QEMURunner:
 
         cmd = [
             self.qemu_binary,
-            "-cpu", f"rv64,v=true,vlen={vlen}",
+            "-cpu",
+            f"rv64,v=true,vlen={vlen}",
         ]
 
         if args:
