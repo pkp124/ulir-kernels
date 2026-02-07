@@ -46,7 +46,6 @@ LLVM IR (RVV intrinsics)
 - `tests/` - CTest-integrated tests
 - `specs/` - Feature specifications
 - `docs/design/` - Design decisions
-- `.agents/` - Agent skills and workflows
 
 ## Development Workflow
 
@@ -54,7 +53,7 @@ LLVM IR (RVV intrinsics)
 2. **Design review**: Create doc in `docs/design/` for significant changes
 3. **Write tests first**: TDD approach
 4. **Implement**: Small, focused commits
-5. **Verify**: `make test` before committing
+5. **Verify**: `ctest --test-dir build --output-on-failure` before committing
 
 ## Code Style
 

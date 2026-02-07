@@ -6,12 +6,12 @@ You are working on KernelSmith, an MLIR compiler framework that generates optimi
 
 1. **Never implement without reading the spec first.** Check `specs/` for the relevant kernel or target specification before writing any code.
 2. **Never skip tests.** Every new operation needs lit tests (parse/print + verifier + transformation). Every pass needs before/after FileCheck tests. Use TDD: write the failing test first.
-3. **Always run `make verify` before suggesting a commit.** This runs lint + all tests.
-4. **Check design docs** in `docs/design/` before making architectural decisions. If no design doc exists for a significant change, create one using `make new-design`.
+3. **Always run `ctest --test-dir build --output-on-failure` before suggesting a commit.**
+4. **Check design docs** in `docs/design/` before making architectural decisions. If no design doc exists for a significant change, create one using `./scripts/new-design.sh`.
 
 ## Project Quick Facts
 
-- **Build**: CMake 3.20+, LLVM/MLIR 18+. Use `make build` / `make test`.
+- **Build**: CMake 3.20+, LLVM/MLIR 18+. Use `cmake --build build` / `ctest --test-dir build`.
 - **Dialect prefix**: `ks.` (e.g., `ks.matmul`, `ks.relu`)
 - **Pass CLI prefix**: `--ks-` (e.g., `--ks-lower-to-linalg`, `--ks-tile`)
 - **C++ namespace**: `kernelsmith::ks`
@@ -25,7 +25,7 @@ You are working on KernelSmith, an MLIR compiler framework that generates optimi
 ks ops → linalg → tiled scf.for → vector ops → RVV LLVM IR
 ```
 
-Each arrow is a separate MLIR pass. When implementing lowering, target one level at a time.
+Each arrow is a separate MLIR pass. **None of these passes exist yet** — the codebase currently only supports parsing and printing KS ops. When implementing lowering, target one level at a time.
 
 ## File Locations
 
@@ -83,7 +83,7 @@ def KS_VerbNounOp : KS_Op<"verb_noun", [traits]> {
 3. Write failing test (RED)
 4. Implement minimum to pass (GREEN)
 5. Refactor (keep tests green)
-6. Run `make verify`
+6. Run `ctest --test-dir build --output-on-failure`
 7. Commit with descriptive message
 
 ## What NOT to Do
