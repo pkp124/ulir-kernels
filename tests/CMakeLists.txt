@@ -38,6 +38,9 @@ endif()
 
 # Combined target for all tests
 add_custom_target(check-kernelsmith
-  DEPENDS check-kernelsmith-lit
   COMMENT "Running all KernelSmith tests"
 )
+add_dependencies(check-kernelsmith check-kernelsmith-lit)
+if(TARGET kernelsmith-unit-tests)
+  add_dependencies(check-kernelsmith kernelsmith-unit-tests)
+endif()

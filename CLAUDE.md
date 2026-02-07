@@ -13,38 +13,34 @@ KernelSmith is an MLIR-based compiler framework that generates optimized AI acce
 
 ```bash
 # Build
-make configure       # CMake configure (generates compile_commands.json)
-make build           # Build everything
-make build-debug     # Debug build
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DMLIR_DIR=/path/to/mlir/lib/cmake/mlir
+cmake --build build --parallel
 
-# Test
-make test            # All tests via CTest
-make test-lit        # MLIR lit/FileCheck tests only
-make test-unit       # C++ unit tests only
-make test-validate   # Python functional validation
+# Test (runs lit + unit tests via CTest)
+ctest --test-dir build --output-on-failure
 
 # Quality
-make lint            # Run ruff (Python) + clang-tidy (C++)
-make format          # Auto-format all code
-make verify          # lint + test combined
+ruff check .                    # Python lint
+ruff format --check .           # Python format check
+clang-format -i lib/**/*.cpp    # C++ format
 
 # Development helpers
-make new-kernel NAME=<name>    # Scaffold a new kernel op
-make new-pass NAME=<name>      # Scaffold a new pass
-make new-design ID=<n> TITLE="<title>"  # Create design doc
+./scripts/new-kernel.sh <name>              # Scaffold a new kernel op
+./scripts/new-pass.sh <name>                # Scaffold a new pass
+./scripts/new-design.sh <id> "<title>"      # Create design doc
 ```
 
 ## Architecture & Lowering Pipeline
 
 ```
-ks.matmul (high-level KernelSmith ops)
-    | --ks-lower-to-linalg
+ks.matmul (high-level KernelSmith ops)     [IMPLEMENTED - parse/verify]
+    | --ks-lower-to-linalg                 [NOT IMPLEMENTED]
 linalg.matmul (standard MLIR linalg)
-    | --ks-tile
+    | --ks-tile                            [NOT IMPLEMENTED]
 scf.for (tiled loops)
-    | --ks-vectorize
+    | --ks-vectorize                       [NOT IMPLEMENTED]
 vector.load / vector.fma / vector.store
-    | --ks-lower-to-rvv
+    | --ks-lower-to-rvv                    [NOT IMPLEMENTED]
 LLVM IR with RVV intrinsics
 ```
 
@@ -53,17 +49,14 @@ LLVM IR with RVV intrinsics
 | Path | Purpose |
 |------|---------|
 | `include/KernelSmith/Dialect/Kernel/` | TableGen (.td) and headers for the ks dialect |
-| `include/KernelSmith/Passes/` | Pass declarations |
 | `lib/Dialect/Kernel/` | Dialect, ops, types implementation (.cpp) |
-| `lib/Passes/` | Pass implementations |
+| `lib/Passes/` | Pass implementations (stub — no passes yet) |
 | `tools/ks-opt/` | CLI optimizer entry point |
 | `tests/lit/` | MLIR FileCheck tests (.mlir) |
-| `tests/unit/` | C++ unit tests (Google Test) + Python pytest |
-| `tests/integration/` | Full-pipeline integration tests |
+| `tests/unit/` | C++ unit tests (Google Test) |
 | `specs/` | Feature specifications (read before implementing) |
 | `docs/design/` | Design decision docs (DES-XXX format) |
 | `tasks/` | Task tracking files (TASK-XXX format) |
-| `.agents/` | Agent skill/workflow definitions |
 
 ## Code Conventions
 
@@ -102,12 +95,20 @@ def KS_ExampleOp : KS_Op<"example", [Pure]> {
 1. **Read the spec** in `specs/` before implementing any kernel or pass
 2. **Check design docs** in `docs/design/` for existing decisions
 3. **TDD**: Write a failing lit/unit test first, then implement
-4. **Small commits**: Each commit should pass `make verify`
+4. **Small commits**: Each commit should pass `ctest --test-dir build`
 5. **Commit format**: `<type>(<scope>): <subject>` (e.g., `feat(dialect): add ks.relu operation`)
 
 ### Commit Types
 
 `feat` | `fix` | `docs` | `refactor` | `test` | `chore`
+
+### Review Checklist
+
+Before merging any change, verify:
+- Verifiers reject all invalid inputs (negative lit tests exist)
+- Lowering path is complete for any new op (ks -> linalg -> target)
+- Each op has lit tests for: parse/print round-trip, verifier errors, transformations
+- Dialect layering is correct (no circular dependencies between passes)
 
 ## Testing Patterns
 
@@ -150,15 +151,24 @@ func.func @test_error(%arg0: tensor<64xf32>, %arg1: tensor<128x256xf32>) {
 - Test with multiple VLENs via QEMU: `tests/qemu_runner.py`
 - Minimize `vsetvl` instructions; use LMUL > 1 for compute-bound kernels
 
-## Current Development Phase
+## Current Status
 
-The project is executing an 8-phase plan (see `RISC-V_RVV_KERNEL_LIBRARY_PLAN.md`):
-- Phase 1 (test infrastructure): Complete
-- Phase 2 (vector ops lowering): In progress
-- Phase 3-5 (matmul, conv2d, attention kernels): Planned
-- Phase 6-8 (optimization, packaging, IREE integration): Future
+### Implemented
+- KS dialect with 13 operations (matmul, batch_matmul, conv2d, attention, relu, gelu, silu, softmax, layer_norm, rms_norm, reduce_sum, reduce_max)
+- Verifiers for 5 ops (matmul, batch_matmul, conv2d, attention, layer_norm)
+- TileType custom type
+- `ks-opt` CLI tool (parse/print only — no transformation passes)
+- Lit tests: parse/print round-trip, verifier negative tests
+- C++ unit test: dialect loading
+- Python test infrastructure (test_data_generator, functional_validator, qemu_runner)
 
-See `DEVELOPMENT_SUMMARY.md` for detailed progress.
+### Not Yet Implemented
+- All lowering passes (ks -> linalg -> scf -> vector -> RVV)
+- Canonicalization patterns (MatmulOp stub exists but is empty)
+- Verifiers for remaining 8 ops (relu, gelu, silu, softmax, rms_norm, reduce_sum, reduce_max, batch_matmul result)
+- Any transformation or optimization
+
+See `ROADMAP.md` for next milestones.
 
 ## Key Specifications
 
@@ -171,7 +181,8 @@ Before implementing kernels, always read the relevant spec:
 ## Common Pitfalls
 
 - Do NOT add ops without corresponding lit tests (parse + verify + transform)
+- Do NOT describe unimplemented features as existing in docs or CLAUDE.md
 - The `.clang-format` project include regex references `AIKernels/` (legacy name); for new includes use `KernelSmith/`
-- Always run `make verify` before committing
-- Design docs are required for non-trivial changes; use `make new-design`
+- Always run `ctest --test-dir build` before committing
+- Design docs are required for non-trivial changes; use `./scripts/new-design.sh`
 - QEMU tests need specific setup; see `docs/guides/testing-guide.md`

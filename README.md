@@ -54,45 +54,28 @@ func.func @matmul_kernel(%A: tensor<64x128xf32>,
 }
 ```
 
-Compile to RISC-V RVV:
+Parse and print (lowering passes are not yet implemented):
 ```bash
-ks-opt input.mlir \
-  --ks-lower-to-linalg \
-  --ks-tile \
-  --ks-vectorize \
-  --ks-lower-to-rvv \
-  --convert-to-llvm | \
-llc -march=riscv64 -mattr=+v -o output.s
+ks-opt input.mlir
 ```
 
 ## Project Structure
 
 ```
 .
-├── .cursor/rules/       # Cursor AI development rules
-├── .agents/             # Agent skills and workflows
-├── docs/                # Documentation
-│   ├── architecture/    # Architecture design docs
-│   ├── design/          # Design decisions and reviews
-│   └── guides/          # User and developer guides
-├── specs/               # Feature specifications
-│   ├── kernels/         # Kernel operation specs
-│   └── targets/         # Target architecture specs
-├── include/KernelSmith/ # Public headers
-│   ├── Dialect/Kernel/  # Kernel dialect definitions
-│   ├── Passes/          # Pass declarations
-│   └── Targets/         # Target-specific headers
+├── include/KernelSmith/ # Public headers and TableGen
+│   └── Dialect/Kernel/  # Kernel dialect definitions (.td, .h)
 ├── lib/                 # Implementation
-│   ├── Dialect/         # Dialect implementations
-│   ├── Passes/          # Pass implementations
-│   └── Targets/         # Target backends
-├── tools/               # CLI tools
-│   └── ks-opt/          # KernelSmith optimizer
-├── tests/               # Test suites
-│   ├── lit/             # MLIR FileCheck tests
-│   └── unit/            # C++ unit tests
-├── examples/            # Example kernels
-└── tasks/               # Development task tracking
+│   ├── Dialect/Kernel/  # Dialect, ops, types (.cpp)
+│   └── Passes/          # Pass implementations (stub)
+├── tools/ks-opt/        # CLI optimizer entry point
+├── tests/
+│   ├── lit/             # MLIR FileCheck tests (.mlir)
+│   └── unit/            # C++ unit tests (Google Test)
+├── specs/               # Feature specifications
+├── docs/design/         # Design decisions (DES-XXX format)
+├── tasks/               # Development task tracking
+└── examples/            # Example kernels
 ```
 
 ## Development Workflow
@@ -105,25 +88,25 @@ KernelSmith uses a rigorous development process:
 4. **Implementation**: Incremental, reviewed changes
 5. **Verification**: `ctest` for all tests
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
+See [CLAUDE.md](CLAUDE.md) for development guidelines.
 
 ## Supported Kernels
 
-| Kernel | Description | Status |
-|--------|-------------|--------|
-| `ks.matmul` | Matrix multiplication | Planned |
-| `ks.batch_matmul` | Batched matrix multiplication | Planned |
-| `ks.conv2d` | 2D convolution | Planned |
-| `ks.attention` | Scaled dot-product attention | Planned |
-| `ks.softmax` | Softmax activation | Planned |
-| `ks.layer_norm` | Layer normalization | Planned |
-| `ks.gelu` | GELU activation | Planned |
-| `ks.relu` | ReLU activation | Planned |
+| Kernel | Parse/Print | Verifier | Lowering |
+|--------|:-----------:|:--------:|:--------:|
+| `ks.matmul` | Yes | Yes | Not yet |
+| `ks.batch_matmul` | Yes | Yes | Not yet |
+| `ks.conv2d` | Yes | Yes | Not yet |
+| `ks.attention` | Yes | Yes | Not yet |
+| `ks.softmax` | Yes | - | Not yet |
+| `ks.layer_norm` | Yes | Yes | Not yet |
+| `ks.rms_norm` | Yes | - | Not yet |
+| `ks.gelu` | Yes | - | Not yet |
+| `ks.relu` | Yes | - | Not yet |
+| `ks.silu` | Yes | - | Not yet |
+| `ks.reduce_sum` | Yes | - | Not yet |
+| `ks.reduce_max` | Yes | - | Not yet |
 
 ## License
 
 GNU Affero General Public License v3.0 - see [LICENSE](LICENSE).
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
