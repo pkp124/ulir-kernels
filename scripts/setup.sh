@@ -1,98 +1,79 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # ==============================================================================
-# KernelSmith Project Setup Script
+# KernelSmith — development environment setup (Python virtual env)
+# Run from repository root: ./scripts/setup.sh
 # ==============================================================================
 
 set -e
 
-echo "============================================"
-echo "KernelSmith Project Setup"
-echo "============================================"
-echo ""
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+VENV_DIR="${REPO_ROOT}/.venv"
+PYTHON="${PYTHON:-python3}"
 
-# Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-check_command() {
-    if command -v "$1" &> /dev/null; then
-        echo -e "${GREEN}✓${NC} $1 found"
-        return 0
-    else
-        echo -e "${RED}✗${NC} $1 not found"
-        return 1
-    fi
-}
-
-echo "Checking dependencies..."
+echo "============================================"
+echo "KernelSmith — dev environment setup"
+echo "============================================"
 echo ""
 
-# Check required tools
-MISSING=0
+cd "$REPO_ROOT"
 
-check_command cmake || MISSING=1
-check_command ninja || check_command make
-check_command python3 || MISSING=1
-check_command clang++ || check_command g++ || MISSING=1
+if [ ! -f "pyproject.toml" ]; then
+  echo -e "${RED}Error: pyproject.toml not found. Run this script from the repo root.${NC}"
+  exit 1
+fi
 
+if ! command -v "$PYTHON" &>/dev/null; then
+  echo -e "${RED}Error: $PYTHON not found. Install Python 3.10+ or set PYTHON.${NC}"
+  exit 1
+fi
+
+echo "Python: $($PYTHON --version)"
 echo ""
 
-# Check LLVM/MLIR
-echo "Checking LLVM/MLIR installation..."
-
-if command -v llvm-config &> /dev/null; then
-    LLVM_VERSION=$(llvm-config --version)
-    echo -e "${GREEN}✓${NC} LLVM found: version $LLVM_VERSION"
-    
-    LLVM_PREFIX=$(llvm-config --prefix)
-    if [ -d "$LLVM_PREFIX/lib/cmake/mlir" ]; then
-        echo -e "${GREEN}✓${NC} MLIR found at $LLVM_PREFIX"
-        export MLIR_DIR="$LLVM_PREFIX/lib/cmake/mlir"
-    else
-        echo -e "${YELLOW}!${NC} MLIR not found in LLVM installation"
-    fi
+# Create virtual environment
+if [ ! -d "$VENV_DIR" ]; then
+  echo "Creating virtual environment at $VENV_DIR ..."
+  "$PYTHON" -m venv "$VENV_DIR"
+  echo -e "${GREEN}✓${NC} Created venv"
 else
-    echo -e "${YELLOW}!${NC} LLVM not found in PATH"
-    echo "  Install LLVM 18+ with MLIR, or set MLIR_DIR"
+  echo -e "${GREEN}✓${NC} Using existing venv at $VENV_DIR"
 fi
 
-echo ""
+# Activate and install
+# shellcheck source=/dev/null
+source "$VENV_DIR/bin/activate"
 
-# Python environment
-echo "Setting up Python environment..."
-
-if [ ! -d "venv" ]; then
-    python3 -m venv venv
-    echo -e "${GREEN}✓${NC} Created Python virtual environment"
-fi
-
-source venv/bin/activate
-
+echo "Upgrading pip ..."
 pip install --quiet --upgrade pip
-pip install --quiet -r requirements.txt 2>/dev/null || {
-    pip install --quiet pytest ruff lit filecheck
-}
 
-echo -e "${GREEN}✓${NC} Python dependencies installed"
+echo "Installing project with dev dependencies (ruff, pytest, lit, filecheck) ..."
+pip install --quiet -e ".[dev]"
 
+echo -e "${GREEN}✓${NC} Python dev environment ready"
 echo ""
 
-# Create compile_commands.json symlink
+# Optional: compile_commands.json for IDE
 if [ -f "build/compile_commands.json" ]; then
-    ln -sf build/compile_commands.json compile_commands.json
-    echo -e "${GREEN}✓${NC} Linked compile_commands.json"
+  ln -sf build/compile_commands.json compile_commands.json 2>/dev/null || true
+  echo -e "${GREEN}✓${NC} Linked compile_commands.json"
 fi
 
 echo ""
 echo "============================================"
-echo "Setup complete!"
+echo "Setup complete"
 echo "============================================"
 echo ""
-echo "Next steps:"
-echo "  1. Activate Python environment: source venv/bin/activate"
-echo "  2. Configure build: make configure"
-echo "  3. Build: make build"
-echo "  4. Test: make test"
+echo "Activate the environment:"
+echo "  source venv/bin/activate"
+echo ""
+echo "Then run:"
+echo "  ruff check .          # lint"
+echo "  ruff format --check . # format check"
+echo "  pytest               # Python tests"
+echo "  ctest --test-dir build --output-on-failure   # C++/lit tests (after build)"
 echo ""

@@ -17,6 +17,7 @@ import numpy as np
 @dataclass
 class TensorConfig:
     """Configuration for generating test tensors"""
+
     shape: Tuple[int, ...]
     dtype: np.dtype
     seed: int = 42
@@ -121,20 +122,34 @@ class TestDataGenerator:
         return cases
 
     # Attention test cases
-    def generate_attention_tests(self) -> List[Tuple[str, np.ndarray, np.ndarray, np.ndarray, Optional[np.ndarray]]]:
+    def generate_attention_tests(
+        self,
+    ) -> List[Tuple[str, np.ndarray, np.ndarray, np.ndarray, Optional[np.ndarray]]]:
         """Generate Attention (SDPA) test cases"""
         cases = []
 
         # Small: seq_len=8, embed_dim=64
-        Q_small = self.generate_tensor(TensorConfig((1, 8, 64), np.float32, seed=15, range_min=-0.1, range_max=0.1))
-        K_small = self.generate_tensor(TensorConfig((1, 8, 64), np.float32, seed=16, range_min=-0.1, range_max=0.1))
-        V_small = self.generate_tensor(TensorConfig((1, 8, 64), np.float32, seed=17, range_min=-0.1, range_max=0.1))
+        Q_small = self.generate_tensor(
+            TensorConfig((1, 8, 64), np.float32, seed=15, range_min=-0.1, range_max=0.1)
+        )
+        K_small = self.generate_tensor(
+            TensorConfig((1, 8, 64), np.float32, seed=16, range_min=-0.1, range_max=0.1)
+        )
+        V_small = self.generate_tensor(
+            TensorConfig((1, 8, 64), np.float32, seed=17, range_min=-0.1, range_max=0.1)
+        )
         cases.append(("attention_small", Q_small, K_small, V_small, None))
 
         # Medium: seq_len=64, embed_dim=128
-        Q_med = self.generate_tensor(TensorConfig((1, 64, 128), np.float32, seed=18, range_min=-0.1, range_max=0.1))
-        K_med = self.generate_tensor(TensorConfig((1, 64, 128), np.float32, seed=19, range_min=-0.1, range_max=0.1))
-        V_med = self.generate_tensor(TensorConfig((1, 64, 128), np.float32, seed=20, range_min=-0.1, range_max=0.1))
+        Q_med = self.generate_tensor(
+            TensorConfig((1, 64, 128), np.float32, seed=18, range_min=-0.1, range_max=0.1)
+        )
+        K_med = self.generate_tensor(
+            TensorConfig((1, 64, 128), np.float32, seed=19, range_min=-0.1, range_max=0.1)
+        )
+        V_med = self.generate_tensor(
+            TensorConfig((1, 64, 128), np.float32, seed=20, range_min=-0.1, range_max=0.1)
+        )
         cases.append(("attention_medium", Q_med, K_med, V_med, None))
 
         return cases
