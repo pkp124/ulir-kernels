@@ -1,18 +1,27 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # KernelSmith — development environment setup
+# Installs all dependencies and builds the project.
 # Run from repository root: ./scripts/setup.sh
+#
+# Supports: macOS (Homebrew) and Ubuntu/Debian (apt)
 # ==============================================================================
 
 set -e
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENV_DIR="${REPO_ROOT}/.venv"
+BUILD_DIR="${REPO_ROOT}/build"
 PYTHON="${PYTHON:-python3}"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
 NC='\033[0m'
+
+info()  { echo -e "${GREEN}✓${NC} $*"; }
+warn()  { echo -e "${YELLOW}!${NC} $*"; }
+fail()  { echo -e "${RED}✗ $*${NC}"; exit 1; }
 
 echo "============================================"
 echo "KernelSmith — dev environment setup"
@@ -21,57 +30,179 @@ echo ""
 
 cd "$REPO_ROOT"
 
-if [ ! -f "pyproject.toml" ]; then
-  echo -e "${RED}Error: pyproject.toml not found. Run this script from the repo root.${NC}"
-  exit 1
+[ -f "pyproject.toml" ] || fail "pyproject.toml not found. Run from repo root."
+
+# ==============================================================================
+# 1. System dependencies (LLVM/MLIR 18, cmake, ninja)
+# ==============================================================================
+
+echo "--- System dependencies ---"
+
+OS="$(uname -s)"
+
+install_macos() {
+  if ! command -v brew &>/dev/null; then
+    fail "Homebrew not found. Install from https://brew.sh"
+  fi
+
+  local pkgs=()
+
+  # cmake
+  if ! command -v cmake &>/dev/null; then
+    pkgs+=(cmake)
+  else
+    info "cmake $(cmake --version | head -1 | awk '{print $3}')"
+  fi
+
+  # ninja
+  if ! command -v ninja &>/dev/null; then
+    pkgs+=(ninja)
+  else
+    info "ninja $(ninja --version)"
+  fi
+
+  # llvm@18 (includes MLIR)
+  if ! brew ls --versions llvm@18 &>/dev/null; then
+    pkgs+=(llvm@18)
+  else
+    info "llvm@18 (Homebrew)"
+  fi
+
+  if [ ${#pkgs[@]} -gt 0 ]; then
+    echo "Installing: ${pkgs[*]} ..."
+    brew install "${pkgs[@]}"
+    info "Installed ${pkgs[*]}"
+  fi
+
+  # Resolve LLVM paths (Homebrew keg-only)
+  LLVM_PREFIX="$(brew --prefix llvm@18)"
+  LLVM_DIR="${LLVM_PREFIX}/lib/cmake/llvm"
+  MLIR_DIR="${LLVM_PREFIX}/lib/cmake/mlir"
+}
+
+install_linux() {
+  local pkgs=()
+
+  # cmake
+  if ! command -v cmake &>/dev/null; then
+    pkgs+=(cmake)
+  else
+    info "cmake $(cmake --version | head -1 | awk '{print $3}')"
+  fi
+
+  # ninja
+  if ! command -v ninja &>/dev/null; then
+    pkgs+=(ninja-build)
+  else
+    info "ninja $(ninja --version)"
+  fi
+
+  # LLVM/MLIR 18
+  if ! dpkg -s mlir-18-tools &>/dev/null 2>&1; then
+    echo "Adding LLVM 18 apt repository ..."
+    wget -qO- https://apt.llvm.org/llvm.sh | sudo bash -s -- 18
+    pkgs+=(mlir-18-tools libmlir-18-dev libgtest-dev)
+  else
+    info "mlir-18-tools (apt)"
+  fi
+
+  if [ ${#pkgs[@]} -gt 0 ]; then
+    echo "Installing: ${pkgs[*]} ..."
+    sudo apt-get update -qq
+    sudo apt-get install -y -qq "${pkgs[@]}"
+    info "Installed ${pkgs[*]}"
+  fi
+
+  LLVM_DIR="/usr/lib/llvm-18/lib/cmake/llvm"
+  MLIR_DIR="/usr/lib/llvm-18/lib/cmake/mlir"
+}
+
+case "$OS" in
+  Darwin) install_macos ;;
+  Linux)  install_linux ;;
+  *)      fail "Unsupported OS: $OS. Only macOS and Linux are supported." ;;
+esac
+
+# Verify MLIR is findable
+if [ ! -d "$MLIR_DIR" ]; then
+  fail "MLIR cmake config not found at $MLIR_DIR"
 fi
+info "MLIR: $MLIR_DIR"
+echo ""
+
+# ==============================================================================
+# 2. Python virtual environment
+# ==============================================================================
+
+echo "--- Python environment ---"
 
 if ! command -v "$PYTHON" &>/dev/null; then
-  echo -e "${RED}Error: $PYTHON not found. Install Python 3.10+ or set PYTHON.${NC}"
-  exit 1
+  fail "$PYTHON not found. Install Python 3.10+ or set PYTHON env var."
 fi
 
 echo "Python: $($PYTHON --version)"
-echo ""
 
-# Create virtual environment
 if [ ! -d "$VENV_DIR" ]; then
   echo "Creating virtual environment at $VENV_DIR ..."
   "$PYTHON" -m venv "$VENV_DIR"
-  echo -e "${GREEN}✓${NC} Created venv"
+  info "Created venv"
 else
-  echo -e "${GREEN}✓${NC} Using existing venv at $VENV_DIR"
+  info "Using existing venv at $VENV_DIR"
 fi
 
-# Activate and install
 # shellcheck source=/dev/null
 source "$VENV_DIR/bin/activate"
 
-echo "Upgrading pip ..."
 pip install --quiet --upgrade pip
-
-echo "Installing project with dev dependencies (ruff, pytest, lit, filecheck) ..."
 pip install --quiet -e ".[dev]"
 
-echo -e "${GREEN}✓${NC} Python dev environment ready"
+info "Python dev environment ready"
 echo ""
 
-# Optional: compile_commands.json for IDE
-if [ -f "build/compile_commands.json" ]; then
-  ln -sf build/compile_commands.json compile_commands.json 2>/dev/null || true
-  echo -e "${GREEN}✓${NC} Linked compile_commands.json"
+# ==============================================================================
+# 3. CMake configure & build
+# ==============================================================================
+
+echo "--- Build ---"
+
+cmake -S "$REPO_ROOT" -B "$BUILD_DIR" \
+  -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DLLVM_DIR="$LLVM_DIR" \
+  -DMLIR_DIR="$MLIR_DIR"
+
+cmake --build "$BUILD_DIR" --parallel
+
+info "Build complete"
+echo ""
+
+# Link compile_commands.json for IDE support
+if [ -f "$BUILD_DIR/compile_commands.json" ]; then
+  ln -sf "$BUILD_DIR/compile_commands.json" "$REPO_ROOT/compile_commands.json" 2>/dev/null || true
+  info "Linked compile_commands.json"
 fi
 
+# ==============================================================================
+# 4. Run tests
+# ==============================================================================
+
+echo "--- Tests ---"
+
+ctest --test-dir "$BUILD_DIR" --output-on-failure
+
+info "All tests passed"
 echo ""
+
+# ==============================================================================
+# Done
+# ==============================================================================
+
 echo "============================================"
-echo "Setup complete"
+echo "Setup complete — build and tests passed"
 echo "============================================"
 echo ""
-echo "Activate the environment:"
+echo "To rebuild after changes:"
 echo "  source .venv/bin/activate"
-echo ""
-echo "Build and test:"
-echo "  cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DMLIR_DIR=/path/to/mlir/lib/cmake/mlir"
 echo "  cmake --build build --parallel"
 echo "  ctest --test-dir build --output-on-failure"
 echo ""

@@ -12,11 +12,12 @@ KernelSmith is an MLIR-based compiler framework that generates optimized AI acce
 ## Quick Reference Commands
 
 ```bash
-# Build
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DMLIR_DIR=/path/to/mlir/lib/cmake/mlir
-cmake --build build --parallel
+# Full setup (installs LLVM/MLIR 18, cmake, ninja, Python deps, builds, tests)
+./scripts/setup.sh
 
-# Test (runs lit + unit tests via CTest)
+# Rebuild after changes
+source .venv/bin/activate
+cmake --build build --parallel
 ctest --test-dir build --output-on-failure
 
 # Quality
