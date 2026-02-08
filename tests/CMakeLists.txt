@@ -10,24 +10,18 @@ configure_file(
 # Add lit tests target
 if(LIT_COMMAND)
   add_custom_target(check-kernelsmith-lit
-    COMMAND ${LIT_COMMAND} ${CMAKE_CURRENT_SOURCE_DIR}/lit
-      --config-prefix=lit.site
+    COMMAND ${LIT_COMMAND} ${CMAKE_CURRENT_BINARY_DIR}/lit
       -v
       --param ks_tools_dir=${LLVM_RUNTIME_OUTPUT_INTDIR}
-      --param ks_src_dir=${CMAKE_CURRENT_SOURCE_DIR}
-      --param ks_build_dir=${CMAKE_CURRENT_BINARY_DIR}
     DEPENDS ks-opt
     COMMENT "Running KernelSmith lit tests"
   )
-  
+
   # Register lit tests with CTest
   add_test(NAME kernelsmith-lit
-    COMMAND ${LIT_COMMAND} ${CMAKE_CURRENT_SOURCE_DIR}/lit
-      --config-prefix=lit.site
+    COMMAND ${LIT_COMMAND} ${CMAKE_CURRENT_BINARY_DIR}/lit
       -v
       --param ks_tools_dir=${LLVM_RUNTIME_OUTPUT_INTDIR}
-      --param ks_src_dir=${CMAKE_CURRENT_SOURCE_DIR}
-      --param ks_build_dir=${CMAKE_CURRENT_BINARY_DIR}
   )
 endif()
 
