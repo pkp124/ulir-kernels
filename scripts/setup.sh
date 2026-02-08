@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# KernelSmith — development environment setup (Python virtual env)
+# KernelSmith — development environment setup
 # Run from repository root: ./scripts/setup.sh
 # ==============================================================================
 
@@ -12,7 +12,6 @@ PYTHON="${PYTHON:-python3}"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
 NC='\033[0m'
 
 echo "============================================"
@@ -69,11 +68,10 @@ echo "Setup complete"
 echo "============================================"
 echo ""
 echo "Activate the environment:"
-echo "  source venv/bin/activate"
+echo "  source .venv/bin/activate"
 echo ""
-echo "Then run:"
-echo "  ruff check .          # lint"
-echo "  ruff format --check . # format check"
-echo "  pytest               # Python tests"
-echo "  ctest --test-dir build --output-on-failure   # C++/lit tests (after build)"
+echo "Build and test:"
+echo "  cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DMLIR_DIR=/path/to/mlir/lib/cmake/mlir"
+echo "  cmake --build build --parallel"
+echo "  ctest --test-dir build --output-on-failure"
 echo ""
