@@ -4,12 +4,8 @@ Test Data Generator for KernelSmith
 Generates test tensors for functional validation of kernels
 """
 
-import json
-import os
-import struct
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Tuple
 
 import numpy as np
 
@@ -18,7 +14,7 @@ import numpy as np
 class TensorConfig:
     """Configuration for generating test tensors"""
 
-    shape: Tuple[int, ...]
+    shape: tuple[int, ...]
     dtype: np.dtype
     seed: int = 42
     range_min: float = -1.0
@@ -67,7 +63,7 @@ class TestDataGenerator:
         return str(filepath)
 
     # MatMul test cases
-    def generate_matmul_tests(self) -> List[Tuple[str, np.ndarray, np.ndarray, np.ndarray]]:
+    def generate_matmul_tests(self) -> list[tuple[str, np.ndarray, np.ndarray, np.ndarray]]:
         """Generate MatMul test cases with reference results"""
         cases = []
 
@@ -104,7 +100,7 @@ class TestDataGenerator:
         return cases
 
     # Conv2D test cases
-    def generate_conv2d_tests(self) -> List[Tuple[str, np.ndarray, np.ndarray, np.ndarray]]:
+    def generate_conv2d_tests(self) -> list[tuple[str, np.ndarray, np.ndarray, np.ndarray]]:
         """Generate Conv2D test cases (NHWC format)"""
         # Note: Reference implementation handled separately due to complexity
         cases = []
@@ -124,7 +120,7 @@ class TestDataGenerator:
     # Attention test cases
     def generate_attention_tests(
         self,
-    ) -> List[Tuple[str, np.ndarray, np.ndarray, np.ndarray, Optional[np.ndarray]]]:
+    ) -> list[tuple[str, np.ndarray, np.ndarray, np.ndarray, np.ndarray | None]]:
         """Generate Attention (SDPA) test cases"""
         cases = []
 

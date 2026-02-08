@@ -6,8 +6,6 @@ Compares kernel outputs against reference implementations
 
 import json
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Optional, Tuple
 
 import numpy as np
 
@@ -41,8 +39,8 @@ class FunctionalValidator:
         self.results = []
 
     def compare_tensors(
-        self, computed: np.ndarray, reference: np.ndarray, tolerance: Optional[float] = None
-    ) -> Tuple[bool, float, float]:
+        self, computed: np.ndarray, reference: np.ndarray, tolerance: float | None = None
+    ) -> tuple[bool, float, float]:
         """
         Compare two tensors
 
@@ -102,8 +100,8 @@ class FunctionalValidator:
         computed_output: np.ndarray,
         input_tensor: np.ndarray,
         kernel: np.ndarray,
-        stride: Tuple[int, int] = (1, 1),
-        padding: Tuple[int, int] = (0, 0),
+        stride: tuple[int, int] = (1, 1),
+        padding: tuple[int, int] = (0, 0),
     ) -> ValidationResult:
         """
         Validate Conv2D kernel
@@ -146,7 +144,7 @@ class FunctionalValidator:
         Q: np.ndarray,
         K: np.ndarray,
         V: np.ndarray,
-        scale: Optional[float] = None,
+        scale: float | None = None,
     ) -> ValidationResult:
         """
         Validate Scaled Dot-Product Attention

@@ -1,6 +1,7 @@
 """Lit configuration for KernelSmith tests."""
 
 import os
+
 import lit.formats
 import lit.util
 

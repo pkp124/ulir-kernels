@@ -4,11 +4,8 @@ QEMU Runner for Multi-VLEN Testing
 Runs RISC-V kernels on QEMU with different vector lengths
 """
 
-import json
-import os
 import subprocess
 from pathlib import Path
-from typing import List, Tuple
 
 
 class QEMURunner:
@@ -25,12 +22,14 @@ class QEMURunner:
         """Check if QEMU is available"""
         try:
             subprocess.run([self.qemu_binary, "-version"], capture_output=True, check=True)
-        except (FileNotFoundError, subprocess.CalledProcessError):
-            raise RuntimeError(f"{self.qemu_binary} not found. Install with: apt install qemu-user")
+        except (FileNotFoundError, subprocess.CalledProcessError) as err:
+            raise RuntimeError(
+                f"{self.qemu_binary} not found. Install with: apt install qemu-user"
+            ) from err
 
     def run_with_vlen(
-        self, binary_path: str, vlen: int, args: List[str] = None
-    ) -> Tuple[int, str, str]:
+        self, binary_path: str, vlen: int, args: list[str] = None
+    ) -> tuple[int, str, str]:
         """
         Run a RISC-V binary on QEMU with specific VLEN
 
@@ -63,7 +62,7 @@ class QEMURunner:
             return -1, "", f"Timeout running {binary_path}"
 
     def run_multi_vlen(
-        self, binary_path: str, vlens: List[int] = None, args: List[str] = None
+        self, binary_path: str, vlens: list[int] = None, args: list[str] = None
     ) -> dict:
         """
         Run binary on multiple VLEN configurations
@@ -133,7 +132,7 @@ class QEMURunner:
         """
         times = []
 
-        for i in range(runs):
+        for _i in range(runs):
             ret_code, stdout, stderr = self.run_with_vlen(binary_path, vlen)
             if ret_code != 0:
                 return {"error": f"Benchmark failed: {stderr}"}
