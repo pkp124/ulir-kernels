@@ -37,6 +37,11 @@ target-version = "py310"
 select = ["E", "W", "F", "I", "B", "C4", "UP"]
 ignore = ["E501"]
 
+[tool.ruff.lint.per-file-ignores]
+# lit.cfg.py uses a `config` global injected by the lit test runner at runtime
+"tests/lit/lit.cfg.py" = ["F821"]
+"tests/lit/lit.site.cfg.py.in" = ["F821"]
+
 [tool.ruff.lint.isort]
 known-first-party = ["kernelsmith"]
 
