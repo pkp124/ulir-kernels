@@ -6,7 +6,6 @@
 
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/DialectImplementation.h"
-#include "llvm/ADT/TypeSwitch.h"
 
 using namespace mlir;
 using namespace kernelsmith::ks;
@@ -19,16 +18,9 @@ using namespace kernelsmith::ks;
 
 void KSDialect::initialize() {
   registerTypes();
-  
+
   addOperations<
 #define GET_OP_LIST
 #include "KernelSmith/Dialect/Kernel/KernelOps.cpp.inc"
-  >();
-}
-
-void KSDialect::registerTypes() {
-  addTypes<
-#define GET_TYPEDEF_LIST
-#include "KernelSmith/Dialect/Kernel/KernelTypes.cpp.inc"
   >();
 }

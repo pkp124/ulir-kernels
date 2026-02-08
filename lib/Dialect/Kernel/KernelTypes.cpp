@@ -30,3 +30,14 @@ int64_t TileType::getNumElements() const {
 
 #define GET_TYPEDEF_CLASSES
 #include "KernelSmith/Dialect/Kernel/KernelTypes.cpp.inc"
+
+//===----------------------------------------------------------------------===//
+// Dialect Type Registration
+//===----------------------------------------------------------------------===//
+
+void KSDialect::registerTypes() {
+  addTypes<
+#define GET_TYPEDEF_LIST
+#include "KernelSmith/Dialect/Kernel/KernelTypes.cpp.inc"
+  >();
+}
