@@ -26,7 +26,6 @@ def KS_Dialect : Dialect {
   }];
 
   let useDefaultTypePrinterParser = 1;
-  let useDefaultAttributePrinterParser = 1;
 
   let dependentDialects = [
     "mlir::arith::ArithDialect",
