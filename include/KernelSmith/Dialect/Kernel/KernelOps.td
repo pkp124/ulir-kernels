@@ -104,7 +104,7 @@ def KS_ScaledDotProductAttentionOp : KS_Op<"attention", [Pure]> {
   let results = (outs AnyTensor:$output);
 
   let assemblyFormat = [{
-    $query `,` $key `,` $value (`,` `mask` `=` $mask^)? attr-dict 
+    $query `,` $key `,` $value (`,` `mask` `=` $mask^ `:` type($mask))? attr-dict
     `:` type($query) `,` type($key) `,` type($value) `->` type($output)
   }];
 
