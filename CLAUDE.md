@@ -55,6 +55,7 @@ LLVM IR with RVV intrinsics
 | `tools/ks-opt/` | CLI optimizer entry point |
 | `tests/lit/` | MLIR FileCheck tests (.mlir) |
 | `tests/unit/` | C++ unit tests (Google Test) |
+| `target/` | Target profile headers (one per hardware target) |
 | `specs/` | Feature specifications (read before implementing) |
 | `docs/design/` | Design decision docs (DES-XXX format) |
 | `tasks/` | Task tracking files (TASK-XXX format) |
