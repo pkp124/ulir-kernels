@@ -1,70 +1,220 @@
 # KernelSmith Roadmap
 
-## Milestone 1: Reference Kernels in CI (Current)
-
-**Goal**: At least one lowering pass running in CI with lit tests that verify the transformation.
-
-**Approach**: Start with activation ops (relu, gelu, silu) because they are element-wise, need no tiling, and have `SameOperandsAndResultType`. This validates the full pass infrastructure before tackling matmul.
-
-**Tasks**:
-1. Implement `KSLowerActivationsPass` (`--ks-lower-activations`)
-   - `ks.relu` -> `arith.maxf(input, zero)`
-   - `ks.gelu` -> `math.erf` + arith (approximate)
-   - `ks.silu` -> `math.exp` + arith (x * sigmoid(x))
-2. Create `include/KernelSmith/Passes/Passes.h` and `Passes.td` for pass registration
-3. Register pass in `lib/Passes/PassRegistration.cpp`
-4. Write lit tests: `tests/lit/Passes/lower-activations.mlir`
-5. Verify in CI: `ctest` runs, pass transforms, FileCheck validates
-
-## Milestone 2: MatMul Lowering to Linalg
-
-**Goal**: `ks.matmul` -> `linalg.matmul` + `tensor.empty`
-
-**Tasks**:
-1. Implement `KSLowerToLinalgPass` (`--ks-lower-to-linalg`) for matmul
-2. Lit test: verify `ks.matmul` is replaced with `linalg.matmul`
-3. Extend to `ks.batch_matmul` -> `linalg.batch_matmul`
-4. Extend to `ks.conv2d` -> `linalg.conv_2d_nhwc_hwio`
-
-## Milestone 3: Tiling Pass
-
-**Goal**: `linalg.matmul` with configurable tiling via `scf.for` loops.
-
-**Tasks**:
-1. Implement `KSTilePass` (`--ks-tile`) using MLIR's tiling infrastructure
-2. Support tile sizes from op attributes or pass options
-3. Lit tests with various tile configurations
-
-## Milestone 4: Vectorization
-
-**Goal**: Tiled loops -> MLIR vector operations.
-
-**Tasks**:
-1. Implement `KSVectorizePass` (`--ks-vectorize`)
-2. Generate `vector.load`, `vector.fma`, `vector.store`
-3. Lit tests verifying vector op generation
-
-## Milestone 5: RVV Lowering
-
-**Goal**: Vector ops -> LLVM IR with RISC-V RVV intrinsics.
-
-**Tasks**:
-1. Implement `KSLowerToRVVPass` (`--ks-lower-to-rvv`)
-2. Map vector ops to RVV: `vle{SEW}.v`, `vfmacc.vv`, etc.
-3. Minimize `vsetvl` instructions
-4. Handle tail elements with masking
-5. Lit tests verifying RVV intrinsic generation
-
-## Milestone 6: End-to-End Validation
-
-**Goal**: Full pipeline from `ks.matmul` to RISC-V assembly, validated against numpy reference via QEMU.
-
-**Tasks**:
-1. Integration test: `ks-opt` full pipeline -> LLVM IR -> `llc` -> assembly
-2. QEMU execution with `tests/qemu_runner.py`
-3. Numerical validation against `tests/functional_validator.py`
-4. Test across VLEN configurations (128, 256, 512, 1024)
+> **Vision**: Ship a C kernel library (`libkernelsmith.a` + headers) that provides
+> optimized, widely-used ML operations behind a stable C99 API. No runtime
+> dependencies. No MLIR knowledge required by users. Works with any toolchain,
+> any RTOS, any task execution engine.
+>
+> **Architecture reference**: [DES-006](docs/design/DES-006-kernel-library-architecture.md)
 
 ---
 
-See `RISC-V_RVV_KERNEL_LIBRARY_PLAN.md` for detailed technical reference (RVV specifics, test pyramid, QEMU setup).
+## Milestone 0: Dialect Infrastructure (Complete)
+
+**Status**: Done
+
+- KS dialect with 13 operations defined in TableGen
+- Verifiers for 5 operations (matmul, batch_matmul, conv2d, attention, layer_norm)
+- `ks-opt` CLI tool (parse/print)
+- Lit tests for parse round-trip and verifier errors
+- Build system (CMake + LLVM/MLIR 18 integration)
+
+---
+
+## Milestone 1: C API + Reference Library (Current)
+
+**Goal**: Ship a working `libkernelsmith.a` with stable C headers. Handwritten
+reference implementations. No MLIR in the critical path yet.
+
+**Why this first**: Users can start integrating against the API immediately.
+The MLIR-generated implementations replace the reference code incrementally
+in later milestones — behind the same stable interface.
+
+**Deliverables**:
+- `include/kernelsmith/ks_matmul.h` — matmul C API (f32, f16, i8 variants)
+- `include/kernelsmith/ks_activations.h` — relu, gelu, silu C API
+- `include/kernelsmith/ks_common.h` — error codes, version, target info
+- `target/generic.h` — portable C target profile (no SIMD, no packing)
+- Handwritten reference `ks_matmul_f32` (triple-loop, single-level tiling)
+- Handwritten reference `ks_relu_f32`, `ks_gelu_f32`, `ks_silu_f32`
+- `libkernelsmith.a` built with CMake
+- C test program linking against the library, validated against numpy
+- Workspace query functions (return 0 for generic profile)
+
+**Tasks**:
+1. Write public C headers following [DES-006 API design](docs/design/DES-006-kernel-library-architecture.md#2-c-api-design-matmul-focus)
+2. Write `target/generic.h` target profile
+3. Implement reference `ks_matmul_f32` (tiled triple loop, stride support)
+4. Implement reference activations (element-wise scalar C)
+5. CMake: build as static library, install headers
+6. C test: correctness vs numpy for matmul (square, rectangular, non-aligned dims)
+7. C test: correctness for activations
+
+---
+
+## Milestone 2: MLIR Lowering — Activations
+
+**Goal**: Replace handwritten activation functions with MLIR-generated code.
+Proves the pass infrastructure works end-to-end.
+
+**Deliverables**:
+- `KSLowerActivationsPass` (`--ks-lower-activations`)
+- Pass registration infrastructure (`Passes.h`, `Passes.td`)
+- Generated `.o` files replacing handwritten activations
+- Lit tests for each transformation
+- C library tests still pass (same API, MLIR-generated implementation)
+
+**Tasks**:
+1. Create pass infrastructure: `include/KernelSmith/Passes/Passes.h`, `Passes.td`
+2. Implement `--ks-lower-activations`:
+   - `ks.relu` -> `arith.maxf(input, zero)`
+   - `ks.gelu` -> `math.erf` + arith
+   - `ks.silu` -> `math.exp` + arith (`x * sigmoid(x)`)
+3. Tighten TableGen type constraints: `AnyTensor` -> `KS_FloatTensor` / `KS_NumericTensor`
+4. Pipeline: MLIR -> bufferize -> LLVM IR -> .o (for host target)
+5. Replace handwritten activation .o files with generated ones
+6. Verify: same C tests pass, same numerical results
+7. Lit tests: `tests/lit/Passes/lower-activations.mlir`
+
+---
+
+## Milestone 3: MLIR Lowering — MatMul (Generic Target)
+
+**Goal**: Replace handwritten matmul with MLIR-generated code. Single-level tiling,
+no packing, generic target profile.
+
+**Deliverables**:
+- `KSLowerToLinalgPass` (`--ks-lower-to-linalg`)
+- `KSTilePass` (`--ks-tile`) with profile-driven tile sizes
+- `KSAllocCheckPass` (`--ks-alloc-check`) — fail if any `memref.alloc` survives
+- Bufferization config: all buffers are function arguments, zero internal malloc
+- Generated matmul for generic target
+- C library tests still pass
+
+**Tasks**:
+1. Implement `--ks-lower-to-linalg` (ks.matmul -> linalg.matmul + tensor.empty)
+2. Add accumulator type attribute to ks.matmul for mixed-precision (f16->f32, i8->i32)
+3. Implement `--ks-tile` (single-level, reads tile sizes from pass options)
+4. Configure one-shot-bufferize: function-argument buffers only
+5. Implement `--ks-alloc-check` (reject stray memref.alloc as hard error)
+6. Build script: read target/generic.h, translate to pass options
+7. Pipeline: ks.matmul -> linalg -> tile -> bufferize -> LLVM IR -> .o
+8. Replace handwritten matmul with generated version
+9. Verify: same C tests pass
+10. Lit tests for each pass in isolation
+
+---
+
+## Milestone 4: Packing + Multi-Level Tiling + Vectorization (x86 AVX2)
+
+**Goal**: Performance-optimized matmul for x86 AVX2. Multi-level tiling, B packing,
+SIMD vectorization. This is where the library starts outperforming naive C.
+
+**Deliverables**:
+- `target/x86_avx2.h` target profile
+- `KSPackPass` (`--ks-pack`) — B operand packing into workspace
+- Multi-level tiling (L2 + L1/register tile)
+- `KSVectorizePass` (`--ks-vectorize`) — SIMD using profile vector width
+- Workspace query returns correct size for pack buffers
+- Benchmark: generic vs x86_avx2, demonstrating speedup
+
+**Tasks**:
+1. Implement `--ks-pack` (linalg.pack for B operand, workspace memref)
+2. Extend `--ks-tile` to multi-level (L2 outer + MR/NR register tile)
+3. Update workspace query to account for pack buffer size
+4. Implement `--ks-vectorize` (inner loops -> vector.load/fma/store)
+5. Stride tests: non-contiguous input matrices (lda != K)
+6. Tail handling tests: non-tile-aligned dimensions
+7. Benchmark against reference (numpy/OpenBLAS) on x86
+8. Lit tests for packing and multi-level tiling
+
+---
+
+## Milestone 5: Type Variants
+
+**Goal**: f16 and i8 matmul variants. Activation variants for all supported types.
+
+**Deliverables**:
+- `ks_matmul_f16`, `ks_matmul_i8` generated from same lowering passes
+- Accumulator type promotion (f16 input -> f32 accumulator -> f16 output)
+- Variant generation build script (one MLIR template, N type expansions)
+- All type variants tested for numerical correctness
+
+**Tasks**:
+1. Update TableGen: replace `AnyTensor` with type-class constraints per op
+2. Implement accumulator promotion in `--ks-lower-to-linalg`
+3. Build script: stamp out f32, f16, i8 variants from MLIR templates
+4. Test f16 vs f32 reference (within f16 tolerance)
+5. Test i8 with i32 accumulator (exact for small values)
+
+---
+
+## Milestone 6: Additional Targets
+
+**Goal**: Same C API, optimized for ARM and RISC-V.
+
+**Tasks per target**:
+1. Write target profile header (`target/<name>.h`)
+2. Set LLVM target triple and features in build script
+3. For RVV: implement `KSLowerToRVVPass` (custom RVV intrinsics, vsetvl management)
+4. For ARM NEON/SVE: LLVM autovectorization + target features (no custom pass needed)
+5. Cross-compile, test on QEMU (RVV) or natively (ARM)
+6. Numerical validation against generic target output
+
+**Target priority**:
+1. ARM NEON (ARMv8-A) — widest hardware base after x86
+2. RISC-V RVV — project's original target, requires custom lowering pass
+3. ARM SVE — scalable vectors, similar to RVV challenge
+4. x86 AVX-512 — incremental over AVX2 (wider vectors, masking)
+5. Cortex-M7 — MCU/RTOS target, no SIMD, validates freestanding story
+
+---
+
+## Milestone 7: Additional Kernels
+
+**Goal**: Expand the C API beyond matmul and activations.
+
+**Kernel priority** (by frequency in ML inference):
+1. `ks_conv2d` — 2D convolution (NHWC), im2col or direct
+2. `ks_softmax` — numerically stable (max-subtract-exp-sum-divide)
+3. `ks_layer_norm` / `ks_rms_norm` — normalization
+4. `ks_attention` — scaled dot-product attention (composes matmul + softmax)
+5. `ks_reduce_sum` / `ks_reduce_max` — reductions along axes
+6. `ks_batch_matmul` — batched matmul
+
+Each kernel follows the same pattern:
+- Add tile size parameters to target profiles
+- Write C header with workspace query
+- Implement MLIR lowering (or handwrite reference first, generate later)
+- Test against numpy
+
+---
+
+## Milestone 8: Optimization and Hardening
+
+**Goal**: Production-quality library performance and robustness.
+
+**Tasks**:
+- Double buffering pass (`--ks-double-buffer`) for memory-bound kernels
+- Software prefetch hints for x86 and ARM
+- Kernel fusion exploration (matmul + relu, matmul + bias + activation)
+- Profile-guided tile size tuning (benchmark harness + parameter sweep)
+- Fuzz testing of C API (invalid args, edge cases, large dimensions)
+- Memory sanitizer (ASAN/MSAN) CI integration
+- Documentation: API reference, integration guide, performance tuning guide
+
+---
+
+## Design Documents
+
+| ID | Title | Scope |
+|----|-------|-------|
+| [DES-006](docs/design/DES-006-kernel-library-architecture.md) | Kernel Library Architecture | C API, memory mgmt, tiling, packing, target profiles |
+| [DES-002](docs/design/DES-002-matmul-kernel.md) | MatMul Kernel (TDD) | MLIR pipeline design (partially superseded by DES-006) |
+| [DES-001](docs/design/DES-001-vector-operations-lowering.md) | Vector → RVV Lowering | RVV-specific intrinsic mapping |
+| [DES-005](docs/design/DES-005-library-packaging.md) | Library Packaging (v1) | Superseded by DES-006 |
+
+## Target Profile Specification
+
+See [specs/targets/system-description.md](specs/targets/system-description.md) for the
+target profile format, validation rules, and provided profiles.

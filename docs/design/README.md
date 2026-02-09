@@ -53,50 +53,27 @@ Examples:
 
 ## Design Documents Index
 
-| ID | Title | Status | Phase | File |
+| ID | Title | Status | Scope | File |
 |----|-------|--------|-------|------|
-| [DES-001](DES-001-vector-operations-lowering.md) | Vector Operations Lowering to RISC-V RVV | Draft | Phase 2 | `DES-001-vector-operations-lowering.md` |
-| [DES-002](DES-002-matmul-kernel.md) | MatMul Kernel Implementation (TDD Example) | Draft | Phase 3 | `DES-002-matmul-kernel.md` |
-| [DES-003](DES-003-conv2d-kernel.md) | Conv2D Kernel Implementation | Draft | Phase 4 | `DES-003-conv2d-kernel.md` |
-| [DES-004](DES-004-attention-kernel.md) | Attention Kernel Implementation | Draft | Phase 5 | `DES-004-attention-kernel.md` |
+| [DES-006](DES-006-kernel-library-architecture.md) | **Kernel Library Architecture** | Draft | C API, memory mgmt, tiling, packing, target profiles | `DES-006-kernel-library-architecture.md` |
+| [DES-001](DES-001-vector-operations-lowering.md) | Vector Operations Lowering to RISC-V RVV | Draft | RVV intrinsic mapping | `DES-001-vector-operations-lowering.md` |
+| [DES-002](DES-002-matmul-kernel.md) | MatMul Kernel (TDD Example) | Draft | MLIR pipeline (partially superseded by DES-006) | `DES-002-matmul-kernel.md` |
+| [DES-003](DES-003-conv2d-kernel.md) | Conv2D Kernel Implementation | Draft | Conv2D lowering | `DES-003-conv2d-kernel.md` |
+| [DES-004](DES-004-attention-kernel.md) | Attention Kernel Implementation | Draft | Attention lowering | `DES-004-attention-kernel.md` |
+| [DES-005](DES-005-library-packaging.md) | Library Packaging (v1) | Superseded | Replaced by DES-006 | `DES-005-library-packaging.md` |
 
-## Development Phases
+## Development Milestones
 
-The KernelSmith project is organized into phases with corresponding design documents:
+See [ROADMAP.md](../../ROADMAP.md) for the complete milestone plan.
 
-### Phase 1: Test Infrastructure ✅ (Complete)
-- Test framework setup
-- QEMU multi-VLEN configuration
-- Test data generators
-- Functional validation harness
-- Reference: `RISC-V_RVV_KERNEL_LIBRARY_PLAN.md`
+The project follows a **library-first** approach (DES-006): ship stable C headers and
+reference implementations first, then incrementally replace with MLIR-generated code.
 
-### Phase 2: Vector Operations Foundation 📋 (In Planning)
-- Lowering vector operations to RISC-V RVV
-- Type conversion system
-- Vsetvl optimization
-- Reference: `DES-001-vector-operations-lowering.md`
-
-### Phase 3: MatMul Kernel 📋 (In Planning)
-- Complete example of TDD development
-- Full lowering pipeline
-- Reference implementation
-- Reference: `DES-002-matmul-kernel.md`
-
-### Phase 4: Conv2D Kernel 📋 (In Planning)
-- 2D convolution support
-- Memory layout optimization
-- Reference: `DES-003-conv2d-kernel.md`
-
-### Phase 5: Attention Kernel 📋 (In Planning)
-- Scaled dot-product attention
-- Transformer support
-- Reference: `DES-004-attention-kernel.md`
-
-### Phase 6+: Extended Kernels & Optimization 📋 (Planned)
-- Additional operations (activations, normalizations, reductions)
-- Performance optimization
-- IREE integration
+### Current: Milestone 1 — C API + Reference Library
+- Public C headers (ks_matmul.h, ks_activations.h, ks_common.h)
+- Target profile system (target/generic.h)
+- Handwritten reference implementations
+- Reference: `DES-006-kernel-library-architecture.md`
 
 ## TDD Development Approach
 
