@@ -16,7 +16,7 @@ LABEL org.opencontainers.image.description="KernelSmith MLIR compiler framework"
 LABEL org.opencontainers.image.licenses="AGPL-3.0"
 
 ENV DEBIAN_FRONTEND=noninteractive
-ENV LLVM_VERSION=18
+ENV LLVM_VERSION=20
 
 # Base system packages (no LLVM yet)
 RUN apt-get update -qq && \
@@ -27,7 +27,7 @@ RUN apt-get update -qq && \
       libgtest-dev && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Add LLVM 18 repo (signed-by, not deprecated apt-key) then install
+# Add LLVM apt repo (signed-by, not deprecated apt-key) then install
 RUN wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | \
       gpg --batch --dearmor -o /usr/share/keyrings/llvm-archive-keyring.gpg && \
     echo "deb [signed-by=/usr/share/keyrings/llvm-archive-keyring.gpg] http://apt.llvm.org/jammy/ llvm-toolchain-jammy-${LLVM_VERSION} main" > /etc/apt/sources.list.d/llvm.list && \
