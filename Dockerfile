@@ -33,6 +33,7 @@ RUN wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | \
     echo "deb [signed-by=/usr/share/keyrings/llvm-archive-keyring.gpg] http://apt.llvm.org/jammy/ llvm-toolchain-jammy-${LLVM_VERSION} main" > /etc/apt/sources.list.d/llvm.list && \
     apt-get update -qq && \
     apt-get install -y -qq --no-install-recommends \
+      clang-${LLVM_VERSION} lld-${LLVM_VERSION} \
       mlir-${LLVM_VERSION}-tools libmlir-${LLVM_VERSION}-dev \
       llvm-${LLVM_VERSION}-dev \
       clang-format-${LLVM_VERSION} && \
@@ -40,6 +41,8 @@ RUN wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | \
 
 ENV LLVM_DIR=/usr/lib/llvm-${LLVM_VERSION}/lib/cmake/llvm
 ENV MLIR_DIR=/usr/lib/llvm-${LLVM_VERSION}/lib/cmake/mlir
+ENV CC=clang-${LLVM_VERSION}
+ENV CXX=clang++-${LLVM_VERSION}
 ENV PATH="/usr/lib/llvm-${LLVM_VERSION}/bin:${PATH}"
 
 # ---------- stage: dev (full toolchain + source) ----------
