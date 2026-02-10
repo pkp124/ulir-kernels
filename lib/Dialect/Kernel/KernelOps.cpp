@@ -18,9 +18,9 @@ using namespace kernelsmith::ks;
 //===----------------------------------------------------------------------===//
 
 LogicalResult MatmulOp::verify() {
-  auto lhsType = getLhs().getType().dyn_cast<RankedTensorType>();
-  auto rhsType = getRhs().getType().dyn_cast<RankedTensorType>();
-  auto resultType = getResult().getType().dyn_cast<RankedTensorType>();
+  auto lhsType = dyn_cast<RankedTensorType>(getLhs().getType());
+  auto rhsType = dyn_cast<RankedTensorType>(getRhs().getType());
+  auto resultType = dyn_cast<RankedTensorType>(getResult().getType());
 
   if (!lhsType || !rhsType || !resultType)
     return emitOpError("operands and result must be ranked tensors");
@@ -42,7 +42,7 @@ LogicalResult MatmulOp::verify() {
 
   int64_t lhsK = lhsType.getDimSize(1);
   int64_t rhsK = rhsType.getDimSize(0);
-  
+
   if (lhsK != ShapedType::kDynamic && rhsK != ShapedType::kDynamic &&
       lhsK != rhsK) {
     return emitOpError("inner dimensions must match: lhs has ")
@@ -62,9 +62,9 @@ void MatmulOp::getCanonicalizationPatterns(RewritePatternSet &patterns,
 //===----------------------------------------------------------------------===//
 
 LogicalResult BatchMatmulOp::verify() {
-  auto lhsType = getLhs().getType().dyn_cast<RankedTensorType>();
-  auto rhsType = getRhs().getType().dyn_cast<RankedTensorType>();
-  auto resultType = getResult().getType().dyn_cast<RankedTensorType>();
+  auto lhsType = dyn_cast<RankedTensorType>(getLhs().getType());
+  auto rhsType = dyn_cast<RankedTensorType>(getRhs().getType());
+  auto resultType = dyn_cast<RankedTensorType>(getResult().getType());
 
   if (!lhsType || !rhsType || !resultType)
     return emitOpError("operands and result must be ranked tensors");
@@ -112,8 +112,8 @@ LogicalResult BatchMatmulOp::verify() {
 //===----------------------------------------------------------------------===//
 
 LogicalResult Conv2DOp::verify() {
-  auto inputType = getInput().getType().dyn_cast<RankedTensorType>();
-  auto filterType = getFilter().getType().dyn_cast<RankedTensorType>();
+  auto inputType = dyn_cast<RankedTensorType>(getInput().getType());
+  auto filterType = dyn_cast<RankedTensorType>(getFilter().getType());
 
   if (!inputType || !filterType)
     return emitOpError("operands must be ranked tensors");
@@ -132,9 +132,9 @@ LogicalResult Conv2DOp::verify() {
 //===----------------------------------------------------------------------===//
 
 LogicalResult ScaledDotProductAttentionOp::verify() {
-  auto queryType = getQuery().getType().dyn_cast<RankedTensorType>();
-  auto keyType = getKey().getType().dyn_cast<RankedTensorType>();
-  auto valueType = getValue().getType().dyn_cast<RankedTensorType>();
+  auto queryType = dyn_cast<RankedTensorType>(getQuery().getType());
+  auto keyType = dyn_cast<RankedTensorType>(getKey().getType());
+  auto valueType = dyn_cast<RankedTensorType>(getValue().getType());
 
   if (!queryType || !keyType || !valueType)
     return emitOpError("query, key, and value must be ranked tensors");
@@ -180,8 +180,8 @@ LogicalResult ScaledDotProductAttentionOp::verify() {
 //===----------------------------------------------------------------------===//
 
 LogicalResult LayerNormOp::verify() {
-  auto inputType = getInput().getType().dyn_cast<RankedTensorType>();
-  
+  auto inputType = dyn_cast<RankedTensorType>(getInput().getType());
+
   if (!inputType)
     return emitOpError("input must be a ranked tensor");
 
@@ -193,7 +193,7 @@ LogicalResult LayerNormOp::verify() {
 //===----------------------------------------------------------------------===//
 
 LogicalResult SoftmaxOp::verify() {
-  auto inputType = getInput().getType().dyn_cast<RankedTensorType>();
+  auto inputType = dyn_cast<RankedTensorType>(getInput().getType());
 
   if (!inputType)
     return emitOpError("input must be a ranked tensor");
@@ -214,8 +214,8 @@ LogicalResult SoftmaxOp::verify() {
 //===----------------------------------------------------------------------===//
 
 LogicalResult RMSNormOp::verify() {
-  auto inputType = getInput().getType().dyn_cast<RankedTensorType>();
-  auto weightType = getWeight().getType().dyn_cast<RankedTensorType>();
+  auto inputType = dyn_cast<RankedTensorType>(getInput().getType());
+  auto weightType = dyn_cast<RankedTensorType>(getWeight().getType());
 
   if (!inputType || !weightType)
     return emitOpError("input and weight must be ranked tensors");
@@ -238,7 +238,7 @@ static LogicalResult verifyReductionAxes(Operation *op,
   llvm::SmallSet<int64_t, 4> seen;
 
   for (auto axisAttr : axes) {
-    int64_t axis = axisAttr.cast<IntegerAttr>().getInt();
+    int64_t axis = cast<IntegerAttr>(axisAttr).getInt();
 
     if (axis < -rank || axis >= rank) {
       return op->emitOpError("axis ")
@@ -256,7 +256,7 @@ static LogicalResult verifyReductionAxes(Operation *op,
 }
 
 LogicalResult ReduceSumOp::verify() {
-  auto inputType = getInput().getType().dyn_cast<RankedTensorType>();
+  auto inputType = dyn_cast<RankedTensorType>(getInput().getType());
 
   if (!inputType)
     return emitOpError("input must be a ranked tensor");
@@ -269,7 +269,7 @@ LogicalResult ReduceSumOp::verify() {
 //===----------------------------------------------------------------------===//
 
 LogicalResult ReduceMaxOp::verify() {
-  auto inputType = getInput().getType().dyn_cast<RankedTensorType>();
+  auto inputType = dyn_cast<RankedTensorType>(getInput().getType());
 
   if (!inputType)
     return emitOpError("input must be a ranked tensor");
