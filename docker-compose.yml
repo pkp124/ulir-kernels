@@ -1,0 +1,44 @@
+# ==============================================================================
+# KernelSmith — docker compose services
+#
+# Services:
+#   test   Build and run all tests (default)
+#   dev    Interactive shell with full toolchain
+#   lint   Run Python + C++ linters
+# ==============================================================================
+
+services:
+  test:
+    build:
+      context: .
+      target: test
+    volumes:
+      - build-cache:/workspace/build
+
+  dev:
+    build:
+      context: .
+      target: dev
+    stdin_open: true
+    tty: true
+    volumes:
+      - .:/workspace
+      - build-cache:/workspace/build
+
+  lint:
+    build:
+      context: .
+      target: dev
+    command: >
+      bash -c "
+        echo '--- Python lint ---' &&
+        ruff check . &&
+        ruff format --check . &&
+        echo '--- C++ format check ---' &&
+        find lib include -name '*.cpp' -o -name '*.h' | head -50 |
+          xargs clang-format-18 --dry-run --Werror 2>&1 &&
+        echo 'All checks passed.'
+      "
+
+volumes:
+  build-cache:
