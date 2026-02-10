@@ -18,21 +18,26 @@ LABEL org.opencontainers.image.licenses="AGPL-3.0"
 ENV DEBIAN_FRONTEND=noninteractive
 ENV LLVM_VERSION=18
 
-# System packages + LLVM 18 repo
+# Base system packages (no LLVM yet)
 RUN apt-get update -qq && \
     apt-get install -y -qq --no-install-recommends \
       ca-certificates wget gnupg lsb-release software-properties-common \
       cmake ninja-build git \
       python3 python3-pip python3-venv \
-      libgtest-dev \
-      clang-format-${LLVM_VERSION} && \
-    wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - && \
-    echo "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-${LLVM_VERSION} main" \
+      libgtest-dev && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Add LLVM 18 repo (signed-by, not deprecated apt-key) then install
+RUN wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | \
+      gpg --dearmor -o /usr/share/keyrings/llvm-archive-keyring.gpg && \
+    echo "deb [signed-by=/usr/share/keyrings/llvm-archive-keyring.gpg] \
+      http://apt.llvm.org/jammy/ llvm-toolchain-jammy-${LLVM_VERSION} main" \
       > /etc/apt/sources.list.d/llvm.list && \
     apt-get update -qq && \
     apt-get install -y -qq --no-install-recommends \
       mlir-${LLVM_VERSION}-tools libmlir-${LLVM_VERSION}-dev \
-      llvm-${LLVM_VERSION}-dev && \
+      llvm-${LLVM_VERSION}-dev \
+      clang-format-${LLVM_VERSION} && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 ENV LLVM_DIR=/usr/lib/llvm-${LLVM_VERSION}/lib/cmake/llvm
@@ -44,12 +49,11 @@ FROM base AS dev
 
 WORKDIR /workspace
 
-# Python deps first (layer caching)
-COPY pyproject.toml ./
+# Python venv + deps (layer caching — deps installed before source copy)
 RUN python3 -m venv /opt/venv && \
     /opt/venv/bin/pip install --quiet --upgrade pip && \
-    /opt/venv/bin/pip install --quiet -e ".[dev]" 2>/dev/null || \
-    /opt/venv/bin/pip install --quiet numpy pytest ruff lit filecheck
+    /opt/venv/bin/pip install --quiet \
+      numpy pytest ruff lit filecheck
 
 ENV PATH="/opt/venv/bin:${PATH}"
 ENV VIRTUAL_ENV=/opt/venv
