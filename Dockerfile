@@ -29,10 +29,8 @@ RUN apt-get update -qq && \
 
 # Add LLVM 18 repo (signed-by, not deprecated apt-key) then install
 RUN wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | \
-      gpg --dearmor -o /usr/share/keyrings/llvm-archive-keyring.gpg && \
-    echo "deb [signed-by=/usr/share/keyrings/llvm-archive-keyring.gpg] \
-      http://apt.llvm.org/jammy/ llvm-toolchain-jammy-${LLVM_VERSION} main" \
-      > /etc/apt/sources.list.d/llvm.list && \
+      gpg --batch --dearmor -o /usr/share/keyrings/llvm-archive-keyring.gpg && \
+    echo "deb [signed-by=/usr/share/keyrings/llvm-archive-keyring.gpg] http://apt.llvm.org/jammy/ llvm-toolchain-jammy-${LLVM_VERSION} main" > /etc/apt/sources.list.d/llvm.list && \
     apt-get update -qq && \
     apt-get install -y -qq --no-install-recommends \
       mlir-${LLVM_VERSION}-tools libmlir-${LLVM_VERSION}-dev \
