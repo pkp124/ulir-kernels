@@ -11,6 +11,10 @@
 # ---------- stage: base (system deps) ----------
 FROM ubuntu:22.04 AS base
 
+LABEL org.opencontainers.image.source="https://github.com/pkp124/ulir-kernels"
+LABEL org.opencontainers.image.description="KernelSmith MLIR compiler framework"
+LABEL org.opencontainers.image.licenses="AGPL-3.0"
+
 ENV DEBIAN_FRONTEND=noninteractive
 ENV LLVM_VERSION=18
 
