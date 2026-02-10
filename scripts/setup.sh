@@ -97,10 +97,10 @@ install_linux() {
     info "ninja $(ninja --version)"
   fi
 
-  # LLVM/MLIR 18
+  # LLVM/MLIR 20
   if ! dpkg -s mlir-20-tools &>/dev/null 2>&1; then
     echo "Adding LLVM 20 apt repository ..."
-    wget -qO- https://apt.llvm.org/llvm.sh | sudo bash -s -- 21
+    wget -qO- https://apt.llvm.org/llvm.sh | sudo bash -s -- 20
     pkgs+=(mlir-20-tools libmlir-20-dev llvm-20-dev libgtest-dev)
   else
     info "mlir-20-tools (apt)"
