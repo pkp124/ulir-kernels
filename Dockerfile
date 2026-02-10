@@ -1,0 +1,71 @@
+# ==============================================================================
+# KernelSmith — development & test container
+# Multi-stage: 'dev' for interactive work, 'test' for CI
+#
+# Usage:
+#   docker compose run test       # build + run all tests
+#   docker compose run dev        # interactive shell
+#   docker compose run lint       # ruff + clang-format checks
+# ==============================================================================
+
+# ---------- stage: base (system deps) ----------
+FROM ubuntu:22.04 AS base
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV LLVM_VERSION=18
+
+# System packages + LLVM 18 repo
+RUN apt-get update -qq && \
+    apt-get install -y -qq --no-install-recommends \
+      ca-certificates wget gnupg lsb-release software-properties-common \
+      cmake ninja-build git \
+      python3 python3-pip python3-venv \
+      libgtest-dev \
+      clang-format-${LLVM_VERSION} && \
+    wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - && \
+    echo "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-${LLVM_VERSION} main" \
+      > /etc/apt/sources.list.d/llvm.list && \
+    apt-get update -qq && \
+    apt-get install -y -qq --no-install-recommends \
+      mlir-${LLVM_VERSION}-tools libmlir-${LLVM_VERSION}-dev \
+      llvm-${LLVM_VERSION}-dev && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+ENV LLVM_DIR=/usr/lib/llvm-${LLVM_VERSION}/lib/cmake/llvm
+ENV MLIR_DIR=/usr/lib/llvm-${LLVM_VERSION}/lib/cmake/mlir
+ENV PATH="/usr/lib/llvm-${LLVM_VERSION}/bin:${PATH}"
+
+# ---------- stage: dev (full toolchain + source) ----------
+FROM base AS dev
+
+WORKDIR /workspace
+
+# Python deps first (layer caching)
+COPY pyproject.toml ./
+RUN python3 -m venv /opt/venv && \
+    /opt/venv/bin/pip install --quiet --upgrade pip && \
+    /opt/venv/bin/pip install --quiet -e ".[dev]" 2>/dev/null || \
+    /opt/venv/bin/pip install --quiet numpy pytest ruff lit filecheck
+
+ENV PATH="/opt/venv/bin:${PATH}"
+ENV VIRTUAL_ENV=/opt/venv
+
+# Copy full source
+COPY . .
+
+CMD ["/bin/bash"]
+
+# ---------- stage: build ----------
+FROM dev AS build
+
+RUN cmake -S . -B build \
+      -G Ninja \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DLLVM_DIR="${LLVM_DIR}" \
+      -DMLIR_DIR="${MLIR_DIR}" && \
+    cmake --build build --parallel
+
+# ---------- stage: test (default) ----------
+FROM build AS test
+
+CMD ["ctest", "--test-dir", "build", "--output-on-failure"]

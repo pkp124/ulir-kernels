@@ -155,6 +155,8 @@ def KS_SoftmaxOp : KS_Op<"softmax", [Pure, SameOperandsAndResultType]> {
   let results = (outs AnyTensor:$output);
 
   let assemblyFormat = "$input attr-dict `:` type($input)";
+
+  let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -196,6 +198,8 @@ def KS_RMSNormOp : KS_Op<"rms_norm", [Pure]> {
   let assemblyFormat = [{
     $input `,` $weight attr-dict `:` type($input) `,` type($weight) `->` type($output)
   }];
+
+  let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -216,6 +220,8 @@ def KS_ReduceSumOp : KS_Op<"reduce_sum", [Pure]> {
   let assemblyFormat = [{
     $input attr-dict `:` type($input) `->` type($output)
   }];
+
+  let hasVerifier = 1;
 }
 
 def KS_ReduceMaxOp : KS_Op<"reduce_max", [Pure]> {
@@ -232,6 +238,8 @@ def KS_ReduceMaxOp : KS_Op<"reduce_max", [Pure]> {
   let assemblyFormat = [{
     $input attr-dict `:` type($input) `->` type($output)
   }];
+
+  let hasVerifier = 1;
 }
 
 #endif // KERNELSMITH_DIALECT_KERNEL_KERNELOPS_TD
