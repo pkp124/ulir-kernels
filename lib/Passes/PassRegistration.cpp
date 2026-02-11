@@ -2,14 +2,13 @@
 // KernelSmith Pass Registration
 //===----------------------------------------------------------------------===//
 
-#include "mlir/Pass/Pass.h"
-#include "mlir/Pass/PassRegistry.h"
+#include "KernelSmith/Passes/Passes.h"
 
 namespace kernelsmith {
 
 void registerAllPasses() {
-  // TODO: Register passes as implemented
-  // mlir::registerPass([]() { return createKSLowerToLinalgPass(); });
+  // Auto-generated registration from Passes.td.
+  registerPasses();
 }
 
 } // namespace kernelsmith
