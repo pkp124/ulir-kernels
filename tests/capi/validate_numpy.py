@@ -8,8 +8,6 @@ compares outputs to numpy reference. Uses ctypes to call the shared lib.
 This script validates correctness, not performance.
 """
 
-import ctypes
-import os
 import sys
 from pathlib import Path
 
@@ -18,6 +16,7 @@ import numpy as np
 # --------------------------------------------------------------------------- #
 # Library loading
 # --------------------------------------------------------------------------- #
+
 
 def find_library():
     """Locate libkernelsmith.a or the test executables."""
@@ -37,6 +36,7 @@ def find_library():
 # Reference implementations
 # --------------------------------------------------------------------------- #
 
+
 def ref_matmul_f32(A, B):
     """Reference f32 matmul using numpy."""
     return A.astype(np.float64) @ B.astype(np.float64)
@@ -48,6 +48,7 @@ def ref_relu_f32(x):
 
 def ref_gelu_f32(x):
     from scipy.special import erf
+
     return 0.5 * x * (1.0 + erf(x / np.sqrt(2.0)))
 
 
@@ -59,16 +60,17 @@ def ref_silu_f32(x):
 # Test data generation
 # --------------------------------------------------------------------------- #
 
+
 def generate_matmul_cases():
     """Generate test cases with varying dimensions."""
     rng = np.random.default_rng(42)
     cases = [
-        ("square 64x64",     64,  64,  64),
-        ("rect 32x128x64",   32, 128,  64),
-        ("non-aligned 17x23x31", 17,  23,  31),
-        ("small 4x4x4",       4,   4,   4),
-        ("tall 128x16x32",  128,  16,  32),
-        ("wide 16x128x32",   16, 128,  32),
+        ("square 64x64", 64, 64, 64),
+        ("rect 32x128x64", 32, 128, 64),
+        ("non-aligned 17x23x31", 17, 23, 31),
+        ("small 4x4x4", 4, 4, 4),
+        ("tall 128x16x32", 128, 16, 32),
+        ("wide 16x128x32", 16, 128, 32),
     ]
     for label, M, N, K in cases:
         A = rng.standard_normal((M, K)).astype(np.float32)
@@ -79,14 +81,14 @@ def generate_matmul_cases():
 
 def generate_activation_cases():
     """Generate activation test values."""
-    x = np.array([-5.0, -2.0, -1.0, -0.5, 0.0, 0.5, 1.0, 2.0, 5.0],
-                 dtype=np.float32)
+    x = np.array([-5.0, -2.0, -1.0, -0.5, 0.0, 0.5, 1.0, 2.0, 5.0], dtype=np.float32)
     return x
 
 
 # --------------------------------------------------------------------------- #
 # Validation (numpy-only, no ctypes — validates test data and references)
 # --------------------------------------------------------------------------- #
+
 
 def validate_matmul_references():
     """Validate that our reference matches numpy directly."""
@@ -97,8 +99,7 @@ def validate_matmul_references():
     for label, A, B, C_ref in generate_matmul_cases():
         total += 1
         C_np = (A.astype(np.float64) @ B.astype(np.float64)).astype(np.float32)
-        max_rel_err = np.max(np.abs(C_ref - C_np) /
-                             np.maximum(np.abs(C_np), 1e-8))
+        max_rel_err = np.max(np.abs(C_ref - C_np) / np.maximum(np.abs(C_np), 1e-8))
         if max_rel_err < 1e-5:
             print(f"  PASS {label} (max_rel_err={max_rel_err:.2e})")
             passed += 1
@@ -121,10 +122,10 @@ def validate_activation_references():
     relu_out = ref_relu_f32(x)
     relu_expected = np.maximum(x, 0.0).astype(np.float32)
     if np.allclose(relu_out, relu_expected, atol=1e-6):
-        print(f"  PASS relu")
+        print("  PASS relu")
         passed += 1
     else:
-        print(f"  FAIL relu")
+        print("  FAIL relu")
 
     # GELU (compare against scipy)
     total += 1
@@ -132,24 +133,26 @@ def validate_activation_references():
         gelu_out = ref_gelu_f32(x)
         # Sanity: GELU(-5) ~ 0, GELU(5) ~ 5
         if abs(float(gelu_out[0])) < 0.01 and abs(float(gelu_out[-1]) - 5.0) < 0.01:
-            print(f"  PASS gelu (range check)")
+            print("  PASS gelu (range check)")
             passed += 1
         else:
-            print(f"  FAIL gelu (range check)")
+            print("  FAIL gelu (range check)")
     except ImportError:
-        print(f"  SKIP gelu (scipy not available)")
+        print("  SKIP gelu (scipy not available)")
         passed += 1  # Don't fail without scipy
 
     # SiLU
     total += 1
     silu_out = ref_silu_f32(x).astype(np.float32)
     # Sanity: SiLU(0) = 0, SiLU(x) ~ x for large x, SiLU(x) ~ 0 for large negative x
-    if (abs(float(silu_out[4])) < 1e-6 and  # x=0
-        abs(float(silu_out[-1]) - 5.0) < 0.1):  # x=5
-        print(f"  PASS silu (range check)")
+    if (
+        abs(float(silu_out[4])) < 1e-6  # x=0
+        and abs(float(silu_out[-1]) - 5.0) < 0.1
+    ):  # x=5
+        print("  PASS silu (range check)")
         passed += 1
     else:
-        print(f"  FAIL silu (range check)")
+        print("  FAIL silu (range check)")
 
     print(f"\n{passed}/{total} activation reference checks passed.\n")
     return passed == total
@@ -158,6 +161,7 @@ def validate_activation_references():
 # --------------------------------------------------------------------------- #
 # Write test data to disk for C test consumption
 # --------------------------------------------------------------------------- #
+
 
 def write_test_data():
     """Write binary test data files that C tests can load."""
@@ -182,6 +186,7 @@ def write_test_data():
 # --------------------------------------------------------------------------- #
 # Main
 # --------------------------------------------------------------------------- #
+
 
 def main():
     ok = True
