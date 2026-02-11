@@ -11,6 +11,12 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 
 //===----------------------------------------------------------------------===//
+// Type Constraints
+//===----------------------------------------------------------------------===//
+
+def KS_FloatTensor : TensorOf<[F16, BF16, F32, F64]>;
+
+//===----------------------------------------------------------------------===//
 // Matrix Operations
 //===----------------------------------------------------------------------===//
 
@@ -118,8 +124,8 @@ def KS_ScaledDotProductAttentionOp : KS_Op<"attention", [Pure]> {
 def KS_ReLUOp : KS_Op<"relu", [Pure, SameOperandsAndResultType]> {
   let summary = "ReLU activation: max(0, x)";
 
-  let arguments = (ins AnyTensor:$input);
-  let results = (outs AnyTensor:$output);
+  let arguments = (ins KS_FloatTensor:$input);
+  let results = (outs KS_FloatTensor:$output);
 
   let assemblyFormat = "$input attr-dict `:` type($input)";
 }
@@ -128,10 +134,10 @@ def KS_GELUOp : KS_Op<"gelu", [Pure, SameOperandsAndResultType]> {
   let summary = "GELU activation";
 
   let arguments = (ins
-    AnyTensor:$input,
+    KS_FloatTensor:$input,
     DefaultValuedAttr<BoolAttr, "true">:$approximate
   );
-  let results = (outs AnyTensor:$output);
+  let results = (outs KS_FloatTensor:$output);
 
   let assemblyFormat = "$input attr-dict `:` type($input)";
 }
@@ -139,8 +145,8 @@ def KS_GELUOp : KS_Op<"gelu", [Pure, SameOperandsAndResultType]> {
 def KS_SiLUOp : KS_Op<"silu", [Pure, SameOperandsAndResultType]> {
   let summary = "SiLU/Swish activation: x × sigmoid(x)";
 
-  let arguments = (ins AnyTensor:$input);
-  let results = (outs AnyTensor:$output);
+  let arguments = (ins KS_FloatTensor:$input);
+  let results = (outs KS_FloatTensor:$output);
 
   let assemblyFormat = "$input attr-dict `:` type($input)";
 }
@@ -149,10 +155,10 @@ def KS_SoftmaxOp : KS_Op<"softmax", [Pure, SameOperandsAndResultType]> {
   let summary = "Softmax activation";
 
   let arguments = (ins
-    AnyTensor:$input,
+    KS_FloatTensor:$input,
     DefaultValuedAttr<I64Attr, "-1">:$axis
   );
-  let results = (outs AnyTensor:$output);
+  let results = (outs KS_FloatTensor:$output);
 
   let assemblyFormat = "$input attr-dict `:` type($input)";
 
