@@ -130,6 +130,12 @@ install(DIRECTORY include/KernelSmith
   PATTERN "*.td"
 )
 
+install(DIRECTORY include/kernelsmith
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+  FILES_MATCHING
+  PATTERN "*.h"
+)
+
 install(DIRECTORY ${CMAKE_BINARY_DIR}/include/KernelSmith
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
   FILES_MATCHING

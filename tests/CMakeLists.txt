@@ -30,6 +30,11 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/unit/CMakeLists.txt)
   add_subdirectory(unit)
 endif()
 
+# C API smoke tests
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/capi/CMakeLists.txt)
+  add_subdirectory(capi)
+endif()
+
 # Combined target for all tests
 add_custom_target(check-kernelsmith
   COMMENT "Running all KernelSmith tests"
