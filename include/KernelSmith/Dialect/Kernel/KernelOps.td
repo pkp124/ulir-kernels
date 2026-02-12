@@ -25,17 +25,26 @@ def KS_MatmulOp : KS_Op<"matmul", [Pure]> {
   let description = [{
     Performs matrix multiplication of two 2D tensors.
 
+    An optional `acc_type` attribute specifies the accumulator element type
+    for mixed-precision computation (e.g., f16 inputs with f32 accumulator).
+    When set, the matmul accumulates in the wider type and the result is
+    truncated back to the output element type.
+
     Example:
     ```mlir
-    %C = ks.matmul %A, %B : tensor<64x128xf32>, tensor<128x256xf32> 
+    %C = ks.matmul %A, %B : tensor<64x128xf32>, tensor<128x256xf32>
                             -> tensor<64x256xf32>
+    // Mixed-precision: f16 inputs, f32 accumulator, f16 output
+    %D = ks.matmul %X, %Y {acc_type = f32}
+        : tensor<64x128xf16>, tensor<128x256xf16> -> tensor<64x256xf16>
     ```
   }];
 
   let arguments = (ins
     AnyTensor:$lhs,
     AnyTensor:$rhs,
-    OptionalAttr<I64ArrayAttr>:$tile_sizes
+    OptionalAttr<I64ArrayAttr>:$tile_sizes,
+    OptionalAttr<TypeAttr>:$acc_type
   );
 
   let results = (outs AnyTensor:$result);

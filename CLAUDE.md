@@ -35,9 +35,9 @@ clang-format -i lib/**/*.cpp    # C++ format
 
 ```
 ks.matmul (high-level KernelSmith ops)     [IMPLEMENTED - parse/verify]
-    | --ks-lower-to-linalg                 [NOT IMPLEMENTED]
+    | --ks-lower-to-linalg                 [IMPLEMENTED - M3]
 linalg.matmul (standard MLIR linalg)
-    | --ks-tile                            [NOT IMPLEMENTED]
+    | --ks-tile                            [IMPLEMENTED - M3]
 scf.for (tiled loops)
     | --ks-vectorize                       [NOT IMPLEMENTED]
 vector.load / vector.fma / vector.store
@@ -159,16 +159,23 @@ func.func @test_error(%arg0: tensor<64xf32>, %arg1: tensor<128x256xf32>) {
 - KS dialect with 13 operations (matmul, batch_matmul, conv2d, attention, relu, gelu, silu, softmax, layer_norm, rms_norm, reduce_sum, reduce_max)
 - Verifiers for 5 ops (matmul, batch_matmul, conv2d, attention, layer_norm)
 - TileType custom type
-- `ks-opt` CLI tool (parse/print only — no transformation passes)
-- Lit tests: parse/print round-trip, verifier negative tests
+- `ks-opt` CLI tool with pass pipeline support
+- `KSLowerActivationsPass` (`--ks-lower-activations`): relu/gelu/silu -> linalg.generic (M2)
+- `KSLowerToLinalgPass` (`--ks-lower-to-linalg`): ks.matmul -> linalg.matmul (M3)
+- `KSTilePass` (`--ks-tile`): profile-driven single-level SCF tiling (M3)
+- `KSAllocCheckPass` (`--ks-alloc-check`): reject stray memref.alloc (M3)
+- Mixed-precision accumulator type attribute on ks.matmul (`acc_type`)
+- C kernel library (`libkernelsmith.a`) with matmul and activation reference implementations
+- Lit tests: parse/print round-trip, verifier negative tests, pass transformations
 - C++ unit test: dialect loading
 - Python test infrastructure (test_data_generator, functional_validator, qemu_runner)
 
 ### Not Yet Implemented
-- All lowering passes (ks -> linalg -> scf -> vector -> RVV)
+- Vectorization pass (ks -> vector)
+- RVV lowering pass (vector -> RVV intrinsics)
+- Full pipeline to .o (bufferize -> LLVM IR -> object code)
 - Canonicalization patterns (MatmulOp stub exists but is empty)
-- Verifiers for remaining 8 ops (relu, gelu, silu, softmax, rms_norm, reduce_sum, reduce_max, batch_matmul result)
-- Any transformation or optimization
+- Multi-level tiling, packing, SIMD vectorization (M4)
 
 See `ROADMAP.md` for next milestones.
 

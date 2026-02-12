@@ -49,6 +49,32 @@ LogicalResult MatmulOp::verify() {
            << lhsK << ", rhs has " << rhsK;
   }
 
+  // Validate accumulator type if specified.
+  if (auto accTypeAttr = getAccTypeAttr()) {
+    Type accType = accTypeAttr.getValue();
+    Type inputElemType = lhsType.getElementType();
+
+    // acc_type must be float or integer.
+    if (!isa<FloatType>(accType) && !isa<IntegerType>(accType))
+      return emitOpError("acc_type must be a float or integer type, got ")
+             << accType;
+
+    // acc_type must be at least as wide as the input element type.
+    if (isa<FloatType>(accType) && isa<FloatType>(inputElemType)) {
+      if (cast<FloatType>(accType).getWidth() <
+          cast<FloatType>(inputElemType).getWidth())
+        return emitOpError("acc_type (")
+               << accType << ") must be at least as wide as input type ("
+               << inputElemType << ")";
+    } else if (isa<IntegerType>(accType) && isa<IntegerType>(inputElemType)) {
+      if (cast<IntegerType>(accType).getWidth() <
+          cast<IntegerType>(inputElemType).getWidth())
+        return emitOpError("acc_type (")
+               << accType << ") must be at least as wide as input type ("
+               << inputElemType << ")";
+    }
+  }
+
   return success();
 }
 

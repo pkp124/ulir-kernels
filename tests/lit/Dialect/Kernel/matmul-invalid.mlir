@@ -31,3 +31,11 @@ func.func @matmul_inner_dim_mismatch(%a: tensor<64x128xf32>, %b: tensor<64x256xf
   %0 = ks.matmul %a, %b : tensor<64x128xf32>, tensor<64x256xf32> -> tensor<64x256xf32>
   return
 }
+
+// -----
+
+func.func @matmul_acc_type_too_narrow(%a: tensor<64x128xf32>, %b: tensor<128x256xf32>) {
+  // expected-error @+1 {{'ks.matmul' op acc_type (f16) must be at least as wide as input type (f32)}}
+  %0 = ks.matmul %a, %b {acc_type = f16} : tensor<64x128xf32>, tensor<128x256xf32> -> tensor<64x256xf32>
+  return
+}

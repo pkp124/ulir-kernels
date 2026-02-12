@@ -3,6 +3,9 @@
 add_mlir_library(KernelSmithPasses
   PassRegistration.cpp
   LowerActivationsPass.cpp
+  LowerToLinalgPass.cpp
+  TilePass.cpp
+  AllocCheckPass.cpp
 
   ADDITIONAL_HEADER_DIRS
   ${PROJECT_SOURCE_DIR}/include/KernelSmith/Passes
@@ -17,8 +20,13 @@ add_mlir_library(KernelSmithPasses
   MLIRTransforms
   MLIRSupport
   MLIRLinalgDialect
+  MLIRLinalgTransforms
   MLIRArithDialect
   MLIRMathDialect
   MLIRTensorDialect
   MLIRFuncDialect
+  MLIRSCFDialect
+  MLIRSCFTransforms
+  MLIRMemRefDialect
+  MLIRTilingInterface
 )

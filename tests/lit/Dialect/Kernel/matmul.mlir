@@ -22,10 +22,20 @@ func.func @test_matmul_square(%A: tensor<64x64xf32>, %B: tensor<64x64xf32>)
 }
 
 // CHECK-LABEL: func @test_matmul_f16
-func.func @test_matmul_f16(%A: tensor<32x64xf16>, %B: tensor<64x128xf16>) 
+func.func @test_matmul_f16(%A: tensor<32x64xf16>, %B: tensor<64x128xf16>)
     -> tensor<32x128xf16> {
   // CHECK: ks.matmul
-  %C = ks.matmul %A, %B : tensor<32x64xf16>, tensor<64x128xf16> 
+  %C = ks.matmul %A, %B : tensor<32x64xf16>, tensor<64x128xf16>
                           -> tensor<32x128xf16>
+  return %C : tensor<32x128xf16>
+}
+
+// CHECK-LABEL: func @test_matmul_acc_type
+func.func @test_matmul_acc_type(%A: tensor<32x64xf16>, %B: tensor<64x128xf16>)
+    -> tensor<32x128xf16> {
+  // CHECK: ks.matmul
+  // CHECK-SAME: acc_type = f32
+  %C = ks.matmul %A, %B {acc_type = f32} : tensor<32x64xf16>, tensor<64x128xf16>
+                                           -> tensor<32x128xf16>
   return %C : tensor<32x128xf16>
 }

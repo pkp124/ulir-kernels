@@ -21,64 +21,34 @@
 
 ---
 
-## Milestone 1: C API + Reference Library (Current)
+## Milestone 1: C API + Reference Library (Complete)
 
-**Goal**: Ship a working `libkernelsmith.a` with stable C headers. Handwritten
-reference implementations. No MLIR in the critical path yet.
+**Status**: Done
 
-**Why this first**: Users can start integrating against the API immediately.
-The MLIR-generated implementations replace the reference code incrementally
-in later milestones — behind the same stable interface.
-
-**Deliverables**:
-- `include/kernelsmith/ks_matmul.h` — matmul C API (f32, f16, i8 variants)
+- `include/kernelsmith/ks_matmul.h` — matmul C API (f32)
 - `include/kernelsmith/ks_activations.h` — relu, gelu, silu C API
 - `include/kernelsmith/ks_common.h` — error codes, version, target info
 - `target/generic.h` — portable C target profile (no SIMD, no packing)
-- Handwritten reference `ks_matmul_f32` (triple-loop, single-level tiling)
+- Handwritten reference `ks_matmul_f32` (tiled triple-loop, stride support)
 - Handwritten reference `ks_relu_f32`, `ks_gelu_f32`, `ks_silu_f32`
 - `libkernelsmith.a` built with CMake
-- C test program linking against the library, validated against numpy
+- C test programs validated against numpy
 - Workspace query functions (return 0 for generic profile)
 
-**Tasks**:
-1. Write public C headers following [DES-006 API design](docs/design/DES-006-kernel-library-architecture.md#2-c-api-design-matmul-focus)
-2. Write `target/generic.h` target profile
-3. Implement reference `ks_matmul_f32` (tiled triple loop, stride support)
-4. Implement reference activations (element-wise scalar C)
-5. CMake: build as static library, install headers
-6. C test: correctness vs numpy for matmul (square, rectangular, non-aligned dims)
-7. C test: correctness for activations
-
 ---
 
-## Milestone 2: MLIR Lowering — Activations
+## Milestone 2: MLIR Lowering — Activations (Complete)
 
-**Goal**: Replace handwritten activation functions with MLIR-generated code.
-Proves the pass infrastructure works end-to-end.
+**Status**: Done
 
-**Deliverables**:
 - `KSLowerActivationsPass` (`--ks-lower-activations`)
 - Pass registration infrastructure (`Passes.h`, `Passes.td`)
-- Generated `.o` files replacing handwritten activations
-- Lit tests for each transformation
-- C library tests still pass (same API, MLIR-generated implementation)
-
-**Tasks**:
-1. Create pass infrastructure: `include/KernelSmith/Passes/Passes.h`, `Passes.td`
-2. Implement `--ks-lower-activations`:
-   - `ks.relu` -> `arith.maxf(input, zero)`
-   - `ks.gelu` -> `math.erf` + arith
-   - `ks.silu` -> `math.exp` + arith (`x * sigmoid(x)`)
-3. Tighten TableGen type constraints: `AnyTensor` -> `KS_FloatTensor` / `KS_NumericTensor`
-4. Pipeline: MLIR -> bufferize -> LLVM IR -> .o (for host target)
-5. Replace handwritten activation .o files with generated ones
-6. Verify: same C tests pass, same numerical results
-7. Lit tests: `tests/lit/Passes/lower-activations.mlir`
+- Activation type constraints tightened (`KS_FloatTensor`)
+- Lit tests for each transformation (`tests/lit/Passes/lower-activations.mlir`)
 
 ---
 
-## Milestone 3: MLIR Lowering — MatMul (Generic Target)
+## Milestone 3: MLIR Lowering — MatMul (Generic Target) (Current)
 
 **Goal**: Replace handwritten matmul with MLIR-generated code. Single-level tiling,
 no packing, generic target profile.
