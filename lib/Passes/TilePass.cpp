@@ -50,14 +50,14 @@ struct KSTilePass : impl::KSTilePassBase<KSTilePass> {
       auto tilingInterface =
           cast<TilingInterface>(matmulOp.getOperation());
       FailureOr<scf::SCFTilingResult> tilingResult =
-          scf::tileUsingSCFForOp(rewriter, tilingInterface, options);
+          scf::tileUsingSCF(rewriter, tilingInterface, options);
 
       if (failed(tilingResult)) {
         matmulOp.emitError("failed to tile matmul operation");
         return signalPassFailure();
       }
 
-      rewriter.replaceOp(matmulOp, tilingResult->replacements);
+      rewriter.replaceOp(matmulOp, tilingResult->mergeResult.replacements);
     }
   }
 };

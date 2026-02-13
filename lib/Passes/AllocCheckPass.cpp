@@ -9,7 +9,7 @@
 
 namespace kernelsmith {
 
-#define GEN_PASS_DEF_KSALLOCHECKPASS
+#define GEN_PASS_DEF_KSALLOCCHECKPASS
 #include "KernelSmith/Passes/Passes.h.inc"
 
 using namespace mlir;
