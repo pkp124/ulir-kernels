@@ -225,22 +225,60 @@ Already defined as ops. Add lowering paths.
 
 ---
 
-## Milestone 7: ARM NEON Target (Secondary)
+## Milestone 7: INT4 and Mixed Precision
+
+**Goal**: INT4 weights x INT8 activations — where on-device LLM inference lives.
+Combined with M5 (INT8) and M6 (edge ops), this completes the kernel library
+needed for a real-world quantized transformer demo on RISC-V RVV.
+
+**Why before ARM NEON**: The MVP is a complete quantized transformer running
+end-to-end on a RISC-V RVV platform. That requires INT4 weights (the standard
+for on-device LLMs), not a second architecture. Depth on one target with full
+quantization coverage is more compelling than breadth across two targets.
+
+**Deliverables**:
+- INT4 weight dequantization (W4A8 scheme)
+- `ks_matmul_w4a8` — INT4 weight, INT8 activation, INT32 accumulator
+- Block-wise quantization support (group size 32/64/128)
+- RVV-optimized: unpack INT4 -> INT8, then widening multiply
+- End-to-end transformer demo on RISC-V RVV (QEMU or real hardware):
+  quantized attention + matmul + layer_norm + activations + softmax
+
+**Tasks**:
+1. INT4 storage format (packed 2 values per byte, little-endian nibble order)
+2. Dequantization op: `ks.dequantize_i4` (INT4 -> INT8 with scale per block)
+3. W4A8 matmul lowering (dequant + INT8 matmul fused in inner loop)
+4. RVV: 4-bit unpack using shift/mask, then `vwmul.vv`
+5. Block-wise scale handling (one scale per group of 32-128 weights)
+6. Test against reference W4A8 matmul (numpy)
+7. Transformer demo: single decoder block running on QEMU riscv64 with RVV
+   - Quantized linear layers (W4A8 matmul)
+   - RMS norm / layer norm
+   - Attention (quantized Q/K/V projections + softmax)
+   - Validate output against f32 PyTorch reference
+
+---
+
+## Milestone 8: ARM NEON Target (Secondary)
 
 **Goal**: Same C API, optimized for ARMv8-A NEON. Covers phones, Raspberry Pi,
-Jetson, and similar SBCs — the widest deployed edge hardware base.
+Jetson, and similar SBCs — the widest deployed edge hardware base. Port the
+full kernel library (including INT8/INT4) to a second architecture.
 
-**Why after RVV**: ARM NEON has fixed 128-bit vectors, so LLVM's autovectorizer
-handles it reasonably well. No custom lowering pass is needed — target features
-and profile-driven tile sizes are sufficient. This makes it a faster port once
-the pipeline is proven on RVV.
+**Why now**: The full kernel library and quantization stack are proven on RVV.
+ARM NEON has fixed 128-bit vectors, so LLVM's autovectorizer handles it
+reasonably well. No custom lowering pass is needed — target features and
+profile-driven tile sizes are sufficient. This makes it a fast port.
 
 **Deliverables**:
 - `target/aarch64_neon.h` — ARM NEON target profile
-- NEON-optimized matmul (f32, i8) via LLVM autovectorization + profile tuning
-- NEON-optimized activations and edge ops
+- NEON-optimized matmul (f32, i8, W4A8) via LLVM autovectorization + profile tuning
+- NEON-optimized activations, edge ops, and normalization
+- INT8: leverage NEON `smull`/`smlal` (widening multiply-accumulate)
+- INT4: NEON unpack + widening multiply
 - Native or cross-compiled test suite
 - Benchmark: generic vs NEON
+- Transformer demo replayed on ARM NEON target
 
 **Tasks**:
 1. Write `target/aarch64_neon.h` target profile:
@@ -250,32 +288,9 @@ the pipeline is proven on RVV.
 2. Set LLVM target triple `aarch64-none-linux-gnu` + `+neon,+fp-armv8`
 3. Profile-driven tile sizes (no custom pass — LLVM autovectorizes)
 4. Cross-compile and test natively or on target device
-5. INT8 matmul: leverage NEON `smull`/`smlal` (widening multiply-accumulate)
+5. Port all quantized kernels (INT8 matmul, W4A8 matmul) to NEON
 6. Benchmark against generic target, compare with XNNPACK/ArmNN on same hardware
 7. Optional: `+dotprod` variant (`sdot` instruction for INT8, Cortex-A76+)
-
----
-
-## Milestone 8: INT4 and Mixed Precision
-
-**Goal**: INT4 weights x INT8 activations — where on-device LLM inference lives.
-This is the frontier for running large language models on edge devices.
-
-**Deliverables**:
-- INT4 weight dequantization (W4A8 scheme)
-- `ks_matmul_w4a8` — INT4 weight, INT8 activation, INT32 accumulator
-- Block-wise quantization support (group size 32/64/128)
-- RVV-optimized: unpack INT4 -> INT8, then widening multiply
-- ARM NEON variant
-
-**Tasks**:
-1. INT4 storage format (packed 2 values per byte, little-endian nibble order)
-2. Dequantization op: `ks.dequantize_i4` (INT4 -> INT8 with scale per block)
-3. W4A8 matmul lowering (dequant + INT8 matmul fused in inner loop)
-4. RVV: 4-bit unpack using shift/mask, then `vwmul.vv`
-5. Block-wise scale handling (one scale per group of 32-128 weights)
-6. Test against reference W4A8 matmul (numpy)
-7. ARM NEON variant
 
 ---
 
