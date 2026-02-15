@@ -60,7 +60,7 @@ Examples:
 | [DES-002](DES-002-matmul-kernel.md) | MatMul Kernel (TDD Example) | Draft | MLIR pipeline (partially superseded by DES-006) | `DES-002-matmul-kernel.md` |
 | [DES-003](DES-003-conv2d-kernel.md) | Conv2D Kernel Implementation | Draft | Conv2D lowering | `DES-003-conv2d-kernel.md` |
 | [DES-004](DES-004-attention-kernel.md) | Attention Kernel Implementation | Draft | Attention lowering | `DES-004-attention-kernel.md` |
-| [DES-005](DES-005-library-packaging.md) | Library Packaging (v1) | Superseded | Replaced by DES-006 | `DES-005-library-packaging.md` |
+| ~~DES-005~~ | ~~Library Packaging (v1)~~ | Deleted | Superseded by DES-006, removed from repo | — |
 
 ## Development Milestones
 

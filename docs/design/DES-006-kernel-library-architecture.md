@@ -138,14 +138,11 @@ Plain C header, included at build time. No JSON, no parsing, no runtime overhead
 
 ```
 target/
-  generic.h            -- Portable C, no SIMD, conservative tile sizes
-  x86_avx2.h           -- x86-64 with AVX2 + FMA
-  x86_avx512.h         -- x86-64 with AVX-512F
-  arm_neon.h           -- ARMv8-A NEON (128-bit)
-  arm_sve_256.h        -- ARM SVE with 256-bit vectors
-  riscv_rvv_256.h      -- RISC-V RVV with VLEN=256
+  generic.h            -- Portable C, no SIMD, conservative tile sizes (reference)
+  riscv_rvv_256.h      -- RISC-V RVV with VLEN=256 (primary target)
   riscv_rvv_512.h      -- RISC-V RVV with VLEN=512
-  cortex_m7.h          -- ARM Cortex-M7 (no SIMD, tiny caches)
+  aarch64_neon.h       -- ARMv8-A NEON, 128-bit (secondary target)
+  x86_avx2.h           -- x86-64 with AVX2 + FMA (future)
 ```
 
 #### How Profiles Drive Codegen
@@ -153,12 +150,13 @@ target/
 The MLIR pipeline reads profile values as pass options:
 
 ```bash
-# Build for x86 AVX2
+# Build for RISC-V RVV (primary target)
 ks-opt input.mlir \
-  --ks-tile="l2-tiles=128,256,512 l1-tiles=32,64,128 mr=6,nr=16" \
+  --ks-tile="l2-tiles=64,64,256 l1-tiles=8,32,256 mr=8,nr=32" \
   --ks-pack="pack-b=true" \
   --ks-vectorize="width=8" \
-  --convert-to-llvm="target-triple=x86_64-unknown-linux-gnu"
+  --ks-lower-to-rvv \
+  --convert-to-llvm="target-triple=riscv64-unknown-linux-gnu"
 ```
 
 A build script reads the target profile header and translates `#define` values into
@@ -654,8 +652,8 @@ accounts for this when double buffering is enabled in the profile:
 
 #### Priority
 
-**Defer to v0.2.** The performance benefit on x86 (primary demo target) is modest.
-Focus on correct tiling and packing first.
+**Defer to v0.2.** Focus on correct tiling and packing first. Double buffering
+is more impactful on RISC-V (simple cores, limited prefetch) than on x86.
 
 ---
 
@@ -786,8 +784,8 @@ Shipped artifact:
 ### Cross-Target
 
 - [ ] Build with `generic` profile: compiles, runs, correct results, workspace=0
-- [ ] Build with `x86_avx2` profile: compiles, runs, correct results
-- [ ] Build with `riscv_rvv_256` profile: compiles, runs on QEMU, correct results
+- [ ] Build with `riscv_rvv_256` profile: compiles, runs on QEMU, correct results (primary)
+- [ ] Build with `aarch64_neon` profile: compiles, runs natively or cross-compiled (secondary)
 
 ---
 
@@ -850,34 +848,38 @@ Replace the handwritten reference with MLIR-generated code for the generic targe
 - [ ] Verify: same tests pass, same numerical results
 - [ ] Lit tests for each pass in isolation
 
-### Stage 3: Packing and Multi-Level Tiling (Week 3)
+### Stage 3: Packing + Multi-Level Tiling + RVV Lowering (Week 3)
 
-Performance-critical optimizations.
+Performance-critical optimizations, targeting RISC-V RVV as primary.
 
-- [ ] Write `target/x86_avx2.h` profile
+- [ ] Write `target/riscv_rvv_256.h` profile (VLEN=256 baseline)
 - [ ] Implement `--ks-pack` pass (B operand packing into workspace)
 - [ ] Implement `--ks-tile-l1` pass (L1 tiling, MR/NR micro-kernel)
 - [ ] Update workspace query to account for pack buffers
 - [ ] Implement `--ks-vectorize` pass (SIMD using profile width)
-- [ ] Benchmark: generic vs x86_avx2 profile, show speedup
+- [ ] Implement `--ks-lower-to-rvv` pass (custom RVV intrinsics, vsetvl management)
+- [ ] Cross-compile for riscv64, test on QEMU with multiple VLEN configs
+- [ ] Benchmark: generic vs RVV profile, show speedup
 - [ ] Stride tests: non-contiguous input matrices
 
-### Stage 4: Type Variants (Week 3-4)
+### Stage 4: Quantization (Week 3-4)
 
-Generate f16 and i8 variants.
+INT8 quantized matmul — the core edge inference operation.
 
+- [ ] Add `ks.quantize` / `ks.dequantize` ops
+- [ ] Add quantization attributes to ks.matmul (scale, zero_point)
+- [ ] Implement INT8 lowering: i8 -> i32 accumulate -> requantize -> i8
+- [ ] RVV INT8 path: `vwmul.vv` (widening multiply), `vnsra.wi` (narrowing shift)
 - [ ] Tighten TableGen type constraints (replace AnyTensor)
-- [ ] Add accumulator type attribute to ks.matmul
-- [ ] Implement type promotion in `--ks-lower-to-linalg` (f16 accumulate in f32)
-- [ ] Build variant generation in CMake/build script
-- [ ] Test all three variants (f32, f16, i8)
+- [ ] Test all type variants (f32, i8)
 
-### Stage 5: Additional Targets (Week 4+)
+### Stage 5: ARM NEON Target (Week 4+)
 
-- [ ] Write `target/riscv_rvv_256.h` profile
-- [ ] Implement `--ks-lower-to-rvv` pass (custom RVV intrinsics)
-- [ ] Write `target/arm_neon.h` profile
-- [ ] Test on QEMU (RVV) and native (x86, ARM)
+Port proven RVV pipeline to ARM NEON as secondary target.
+
+- [ ] Write `target/aarch64_neon.h` profile
+- [ ] Profile-driven tile sizes (no custom pass — LLVM autovectorizes NEON)
+- [ ] Cross-compile and test natively or on target device
 
 ---
 
@@ -885,7 +887,7 @@ Generate f16 and i8 variants.
 
 - [DES-001: Vector Operations Lowering](DES-001-vector-operations-lowering.md)
 - [DES-002: MatMul Kernel (TDD)](DES-002-matmul-kernel.md) — pipeline design, partially superseded
-- [DES-005: Library Packaging](DES-005-library-packaging.md) — superseded by this document
+- ~~DES-005~~ — deleted, was superseded by this document
 - [MatMul Specification](../../specs/kernels/matmul.md)
 - [RVV Target Specification](../../specs/targets/riscv-rvv.md)
 - [ROADMAP.md](../../ROADMAP.md) — updated to reflect library-first approach

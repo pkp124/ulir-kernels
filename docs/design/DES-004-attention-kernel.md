@@ -35,6 +35,14 @@ We need to:
 - **Memory bandwidth**: Bottleneck for large sequence lengths
 - **Masking support**: Causal masking, padding masks
 
+### Edge Deployment Context
+
+Attention is central to the Milestone 7 MVP: a quantized transformer decoder
+running end-to-end on RISC-V RVV. For edge deployment:
+- Q/K/V projections use quantized matmul (W4A8 in Milestone 7, INT8 in Milestone 5)
+- Softmax accumulation must use f32 even when inputs are quantized
+- Memory constraints on edge devices may require block-wise attention for longer sequences
+
 ---
 
 ## Requirements

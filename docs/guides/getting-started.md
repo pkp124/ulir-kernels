@@ -23,7 +23,7 @@ This guide walks you through setting up the project and generating your first ke
 
 ```bash
 git clone <repository-url>
-cd mlir-kernel-generation
+cd ulir-kernels
 ```
 
 ### 2. Install LLVM/MLIR
@@ -78,7 +78,7 @@ Create `examples/first_kernel.mlir`:
 ```mlir
 // A simple ReLU activation kernel
 func.func @relu_kernel(%input: tensor<1024xf32>) -> tensor<1024xf32> {
-  %output = kernel.relu %input : tensor<1024xf32>
+  %output = ks.relu %input : tensor<1024xf32>
   return %output : tensor<1024xf32>
 }
 ```
@@ -86,8 +86,8 @@ func.func @relu_kernel(%input: tensor<1024xf32>) -> tensor<1024xf32> {
 ### 2. Lower to Vector IR
 
 ```bash
-./build/bin/aikernel-opt examples/first_kernel.mlir \
-  --lower-kernel-to-vector \
+./build/bin/ks-opt examples/first_kernel.mlir \
+  --ks-lower-activations \
   -o examples/first_kernel_vector.mlir
 ```
 
@@ -112,8 +112,8 @@ func.func @relu_kernel(%input: tensor<1024xf32>) -> tensor<1024xf32> {
 ### 3. Lower to RISC-V RVV
 
 ```bash
-./build/bin/aikernel-opt examples/first_kernel_vector.mlir \
-  --lower-vector-to-rvv \
+./build/bin/ks-opt examples/first_kernel_vector.mlir \
+  --ks-lower-to-rvv \
   --convert-to-llvm \
   -o examples/first_kernel_llvm.mlir
 ```
@@ -168,22 +168,24 @@ make new-pass NAME=optimize-something
 
 ## Using Python Bindings
 
+> **Note**: Python bindings are not yet implemented. This shows the planned API.
+
 ```python
-import aikernel
+import kernelsmith
 
 # Load an MLIR module
-module = aikernel.load("kernel.mlir")
+module = kernelsmith.load("kernel.mlir")
 
 # Apply transformations
-module = aikernel.tile(module, tile_sizes=[64, 64, 32])
-module = aikernel.vectorize(module)
-module = aikernel.lower_to_rvv(module)
+module = kernelsmith.tile(module, tile_sizes=[64, 64, 32])
+module = kernelsmith.vectorize(module)
+module = kernelsmith.lower_to_rvv(module)
 
 # Generate code
-code = aikernel.compile(module, target="riscv64+v")
+code = kernelsmith.compile(module, target="riscv64+v")
 
 # Save or execute
-aikernel.save(code, "kernel.o")
+kernelsmith.save(code, "kernel.o")
 ```
 
 ## Next Steps

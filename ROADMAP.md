@@ -331,7 +331,7 @@ These targets may be added after the core edge pipeline is proven:
 | [DES-006](docs/design/DES-006-kernel-library-architecture.md) | Kernel Library Architecture | C API, memory mgmt, tiling, packing, target profiles |
 | [DES-002](docs/design/DES-002-matmul-kernel.md) | MatMul Kernel (TDD) | MLIR pipeline design (partially superseded by DES-006) |
 | [DES-001](docs/design/DES-001-vector-operations-lowering.md) | Vector → RVV Lowering | RVV-specific intrinsic mapping |
-| [DES-005](docs/design/DES-005-library-packaging.md) | Library Packaging (v1) | Superseded by DES-006 |
+| ~~DES-005~~ | ~~Library Packaging (v1)~~ | Deleted — was superseded by DES-006 |
 
 ## Target Profile Specification
 
