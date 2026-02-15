@@ -28,6 +28,15 @@
 - **Striding and padding**: Additional complexity in bounds checking
 - **Dilation**: Sparse element access patterns
 
+### Edge Deployment Context
+
+For edge inference (MobileNet, EfficientNet), **depthwise separable convolutions**
+are more common than regular conv2d. A `ks.depthwise_conv2d` op is planned for
+Milestone 6 and is higher priority than regular conv2d for edge vision models.
+
+INT8 quantized conv2d is essential for edge deployment. Quantized variants will
+be added after the INT8 quantization foundation is established in Milestone 5.
+
 ---
 
 ## Requirements

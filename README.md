@@ -1,22 +1,24 @@
 # KernelSmith
 
-*Craft optimized AI kernels for any architecture*
+*Optimized ML inference kernels for edge, embedded, and physical AI*
 
 ## Overview
 
-KernelSmith is a framework for generating high-performance AI accelerator kernels using the MLIR compiler infrastructure. It provides a collection of optimized kernels targeting multiple architectures, with a focus on:
+KernelSmith is an MLIR-based compiler framework that generates optimized ML inference kernels for resource-constrained hardware. It ships as a C kernel library (`libkernelsmith.a` + headers) with no runtime dependencies — works with any toolchain, any RTOS.
 
-- **RISC-V RVV** (Vector Extension) - Primary target
-- Future: ARM SVE, x86 AVX-512, GPU backends
+- **RISC-V RVV** (Vector Extension) — Primary target
+- **ARM NEON** (ARMv8-A) — Secondary target
+- **Quantization** (INT8, INT4/W4A8) — Core feature
 
-Kernels are crafted through a multi-level lowering process using MLIR, enabling both portability and architecture-specific optimizations.
+The MVP target is a quantized transformer running end-to-end on RISC-V RVV.
 
 ## Features
 
-- **High-Level Kernel Operations**: Matrix multiplication, convolution, attention, activation functions
-- **Automatic Tiling**: Configurable tiling strategies for cache and register optimization
-- **Target-Specific Lowering**: Optimized code generation for each architecture
-- **Comprehensive Testing**: Unit, integration, and lit tests with CTest
+- **High-Level Kernel Operations**: Matrix multiplication, convolution, attention, activation functions, normalization
+- **Quantization-First**: INT8 and INT4 kernels with accumulator promotion for edge inference
+- **Profile-Driven Tiling**: Target profiles drive tile sizes, packing, and vectorization at build time
+- **RVV-Specific Lowering**: Custom `--ks-lower-to-rvv` pass for vector-length-agnostic code
+- **Comprehensive Testing**: Lit, unit, and numpy-validated C tests with CTest
 
 ## Quick Start
 
@@ -88,7 +90,7 @@ KernelSmith uses a rigorous development process:
 4. **Implementation**: Incremental, reviewed changes
 5. **Verification**: `ctest` for all tests
 
-See [CLAUDE.md](CLAUDE.md) for development guidelines.
+See [CLAUDE.md](CLAUDE.md) for development guidelines and [ROADMAP.md](ROADMAP.md) for the milestone plan.
 
 ## Supported Kernels
 

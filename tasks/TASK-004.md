@@ -43,7 +43,7 @@ For matmul M×K × K×N:
 
 ```mlir
 // Before
-%C = kernel.matmul %A, %B : tensor<M×K>, tensor<K×N> -> tensor<M×N>
+%C = ks.matmul %A, %B : tensor<M×K>, tensor<K×N> -> tensor<M×N>
 
 // After (tiled)
 scf.for %i = 0 to M step tile_M {

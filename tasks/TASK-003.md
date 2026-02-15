@@ -1,14 +1,14 @@
 # TASK-003: Implement Matrix Multiplication (matmul) Operation
 
 ## Status
-[ ] Not Started
+[x] Complete
 
 ## Priority
 P1 (High)
 
 ## Description
 
-Implement the `kernel.matmul` operation according to the specification in `specs/kernels/matmul.md`.
+Implement the `ks.matmul` operation according to the specification in `specs/kernels/matmul.md`.
 
 This is a foundational operation used in:
 - Fully connected layers
@@ -30,7 +30,7 @@ This is a foundational operation used in:
 ### Operation Definition
 
 ```tablegen
-def Kernel_MatmulOp : Kernel_Op<"matmul", [Pure]> {
+def KS_MatmulOp : KS_Op<"matmul", [Pure]> {
   let summary = "Matrix multiplication";
   let description = [{
     C = A × B where A is M×K and B is K×N, producing M×N output.

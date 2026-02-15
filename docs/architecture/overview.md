@@ -1,13 +1,15 @@
 # Architecture Overview
 
-This document describes the high-level architecture of the MLIR Kernel Generation project.
+This document describes the high-level architecture of KernelSmith, an MLIR-based
+compiler framework for edge AI inference kernels.
 
 ## Design Goals
 
-1. **Portability**: Write kernels once, target multiple architectures
-2. **Performance**: Generate code competitive with hand-tuned implementations
-3. **Extensibility**: Easy to add new kernels and targets
-4. **Testability**: Every component can be tested in isolation
+1. **Edge-first**: Optimized for resource-constrained hardware (RISC-V SoCs, ARM phones/SBCs)
+2. **Quantization-native**: INT8/INT4 support as a core feature
+3. **Performance**: Generated code competitive with hand-tuned implementations
+4. **Zero dependencies**: No runtime, no malloc, no OS calls — RTOS compatible
+5. **Testability**: Every component can be tested in isolation
 
 ## Compilation Pipeline
 
@@ -45,9 +47,9 @@ This document describes the high-level architecture of the MLIR Kernel Generatio
 ┌─────────────────────────────────────────────────────────────────┐
 │                     Target-Specific IR                           │
 │  ┌─────────────────────────────────────────────────────────┐    │
-│  │  RVV Intrinsics / ARM SVE / x86 AVX                      │    │
-│  │  - Target-specific vector operations                     │    │
-│  │  - Optimal instruction selection                         │    │
+│  │  RVV Intrinsics (primary) / ARM NEON (secondary)          │    │
+│  │  - RVV: custom --ks-lower-to-rvv pass                   │    │
+│  │  - NEON: LLVM autovectorization + profile tuning         │    │
 │  └─────────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────────┘
                               │
@@ -137,12 +139,13 @@ Key considerations:
 - **LMUL configuration**: Register grouping for larger vectors
 - **Masking**: Handle non-power-of-2 dimensions
 
-### 4. Runtime Library
+### 4. C Kernel Library
 
-Provides:
-- Memory allocation (aligned for vector access)
-- Kernel invocation API
-- Profiling and debugging support
+KernelSmith ships as a static C library, not a runtime:
+- `libkernelsmith.a` — precompiled kernels behind stable C99 headers
+- Caller-provided workspace buffers (no internal malloc)
+- Target profile headers drive tile sizes at build time
+- See [DES-006](../design/DES-006-kernel-library-architecture.md) for details
 
 ## Design Decisions
 
@@ -175,9 +178,10 @@ Provides:
 
 ### Adding a New Target
 
-1. Create target-specific lowering passes
-2. Map vector operations to target intrinsics
-3. Add target-specific optimizations
+1. Write target profile header (`target/<name>.h`) with cache/SIMD/tile parameters
+2. For VLA architectures (RVV, SVE): create custom lowering pass
+3. For fixed-width SIMD (NEON, AVX): LLVM autovectorization + profile tuning
+4. See `specs/targets/system-description.md` for profile format
 
 ## Performance Model
 

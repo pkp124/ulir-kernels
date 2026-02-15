@@ -1,7 +1,7 @@
 # TASK-002: Implement Kernel Dialect Core
 
 ## Status
-[ ] Not Started
+[x] Complete
 
 ## Priority
 P0 (Critical)
@@ -18,8 +18,8 @@ Implement the core Kernel dialect with:
 
 - [ ] Kernel dialect defined in TableGen
 - [ ] TileType and AccumulatorType defined
-- [ ] kernel.relu operation implemented
-- [ ] kernel.softmax operation implemented
+- [ ] ks.relu operation implemented
+- [ ] ks.softmax operation implemented
 - [ ] Operations parse and print correctly
 - [ ] Verifiers catch invalid inputs
 - [ ] Lit tests pass
@@ -29,9 +29,9 @@ Implement the core Kernel dialect with:
 ### Dialect Definition
 
 ```tablegen
-def Kernel_Dialect : Dialect {
+def KS_Dialect : Dialect {
   let name = "kernel";
-  let cppNamespace = "::aikernel::kernel";
+  let cppNamespace = "::kernelsmith::ks";
   let dependentDialects = [
     "mlir::arith::ArithDialect",
     "mlir::tensor::TensorDialect",
@@ -43,7 +43,7 @@ def Kernel_Dialect : Dialect {
 ### Operation Template
 
 ```tablegen
-def Kernel_ReLUOp : Kernel_Op<"relu", [Pure, SameOperandsAndResultType]> {
+def KS_ReluOp : KS_Op<"relu", [Pure, SameOperandsAndResultType]> {
   let summary = "ReLU activation";
   let arguments = (ins AnyTensor:$input);
   let results = (outs AnyTensor:$output);
@@ -54,7 +54,7 @@ def Kernel_ReLUOp : Kernel_Op<"relu", [Pure, SameOperandsAndResultType]> {
 ### Type Definitions
 
 ```tablegen
-def Kernel_TileType : Kernel_Type<"Tile", "tile"> {
+def KS_TileType : KS_Type<"Tile", "tile"> {
   let parameters = (ins "Type":$elementType, "ArrayRef<int64_t>":$shape);
 }
 ```
