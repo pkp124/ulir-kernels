@@ -241,8 +241,7 @@ quantization coverage is more compelling than breadth across two targets.
 - `ks_matmul_w4a8` — INT4 weight, INT8 activation, INT32 accumulator
 - Block-wise quantization support (group size 32/64/128)
 - RVV-optimized: unpack INT4 -> INT8, then widening multiply
-- End-to-end transformer demo on RISC-V RVV (QEMU or real hardware):
-  quantized attention + matmul + layer_norm + activations + softmax
+- **MVP demo**: quantized LLM inference on RISC-V RVV via QEMU
 
 **Tasks**:
 1. INT4 storage format (packed 2 values per byte, little-endian nibble order)
@@ -251,11 +250,64 @@ quantization coverage is more compelling than breadth across two targets.
 4. RVV: 4-bit unpack using shift/mask, then `vwmul.vv`
 5. Block-wise scale handling (one scale per group of 32-128 weights)
 6. Test against reference W4A8 matmul (numpy)
-7. Transformer demo: single decoder block running on QEMU riscv64 with RVV
-   - Quantized linear layers (W4A8 matmul)
-   - RMS norm / layer norm
-   - Attention (quantized Q/K/V projections + softmax)
-   - Validate output against f32 PyTorch reference
+7. MVP demo (see below)
+
+### MVP Demo: Quantized Transformer on RISC-V RVV
+
+**Approach**: Fork [llama2.c](https://github.com/karpathy/llama2.c) (Karpathy's
+~700-line C inference engine) and replace its compute calls with KernelSmith's
+C API. llama2.c provides tokenizer, model loading, KV cache management, and
+sampling — we provide the optimized kernels.
+
+**Why llama2.c**: Pure C, no dependencies, freestanding-compatible, proven with
+small models. Matches KernelSmith's "no runtime dependencies" philosophy. The
+alternative (writing a custom runtime) duplicates work for no added value at
+the MVP stage.
+
+**Demo model**: TinyStories-15M (~8MB quantized W4A8). Small enough for QEMU,
+generates coherent English text, proves the full pipeline works.
+
+**Integration points** — replace these llama2.c functions with `ks_*` calls:
+
+```
+llama2.c function     →  KernelSmith C API
+─────────────────────    ─────────────────────────────
+matmul()              →  ks_matmul_w4a8()  (INT4 weights × INT8 activations)
+rmsnorm()             →  ks_rms_norm_f32()
+softmax()             →  ks_softmax_f32()
+silu activation       →  ks_silu_f32()
+residual add          →  ks_add_f32()
+```
+
+**New artifacts** (in `examples/`):
+
+| File | Lines | Purpose |
+|------|-------|---------|
+| `examples/runner.c` | ~500 | llama2.c fork with KernelSmith kernel calls |
+| `scripts/quantize_model.py` | ~200 | Convert llama2.c .bin weights to W4A8 .ksmodel |
+| `scripts/demo_rvv.sh` | ~20 | Cross-compile + QEMU run script |
+
+**Demo invocation**:
+
+```bash
+# Quantize model (on host)
+python scripts/quantize_model.py \
+  --input tinystories-15m.bin --output tinystories-15m.ksmodel \
+  --scheme w4a8 --group-size 64
+
+# Cross-compile runner + libkernelsmith for RVV
+riscv64-unknown-linux-gnu-gcc -o ks-run examples/runner.c \
+  -Lbuild-rvv/lib -lkernelsmith -march=rv64gcv
+
+# Generate text on QEMU
+qemu-riscv64 -cpu rv64,v=true,vlen=256 \
+  ./ks-run tinystories-15m.ksmodel \
+  -p "Once upon a time" -n 128
+```
+
+**Validation**: Compare token-by-token output against the original llama2.c
+running with f32 weights on the same model. Allow tolerance for quantization
+error (expect ~95%+ token match on greedy decoding for a 15M model).
 
 ---
 
