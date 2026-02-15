@@ -2,11 +2,12 @@
 
 ## Project Identity
 
-KernelSmith is an MLIR-based compiler framework that generates optimized AI accelerator kernels targeting RISC-V Vector Extension (RVV), with future support for ARM SVE and x86 AVX-512.
+KernelSmith is an MLIR-based compiler framework that generates optimized ML inference kernels for **edge, embedded, and physical AI** devices. Primary target: RISC-V RVV. Secondary target: ARM NEON. Quantization is a core feature.
 
 - **Language**: C++17 (core), Python (tooling/tests)
 - **Compiler infra**: MLIR / LLVM 18+
 - **Namespace**: `kernelsmith`, dialect prefix `ks`, CLI tool `ks-opt`
+- **Domain**: Quantized inference on resource-constrained hardware (RISC-V edge SoCs, ARM phones/SBCs)
 - **License**: AGPL-3.0
 
 ## Quick Reference Commands
@@ -34,16 +35,24 @@ clang-format -i lib/**/*.cpp    # C++ format
 ## Architecture & Lowering Pipeline
 
 ```
-ks.matmul (high-level KernelSmith ops)     [IMPLEMENTED - parse/verify]
+ks.matmul / ks.conv2d / ...                [IMPLEMENTED - parse/verify]
     | --ks-lower-to-linalg                 [NOT IMPLEMENTED]
 linalg.matmul (standard MLIR linalg)
     | --ks-tile                            [NOT IMPLEMENTED]
 scf.for (tiled loops)
+    | --ks-pack                            [NOT IMPLEMENTED]
+packed operands (workspace buffers)
     | --ks-vectorize                       [NOT IMPLEMENTED]
 vector.load / vector.fma / vector.store
-    | --ks-lower-to-rvv                    [NOT IMPLEMENTED]
-LLVM IR with RVV intrinsics
+    | --ks-lower-to-rvv (RVV)             [NOT IMPLEMENTED]
+    | or LLVM autovectorize (ARM NEON)
+LLVM IR with target intrinsics
 ```
+
+### Target Priority
+1. **RISC-V RVV** (primary) — custom `--ks-lower-to-rvv` pass, QEMU testing
+2. **ARM NEON** (secondary) — LLVM autovectorization, profile-driven tile sizes
+3. Generic C (reference/fallback)
 
 ## Directory Layout
 
@@ -168,9 +177,13 @@ func.func @test_error(%arg0: tensor<64xf32>, %arg1: tensor<128x256xf32>) {
 - All lowering passes (ks -> linalg -> scf -> vector -> RVV)
 - Canonicalization patterns (MatmulOp stub exists but is empty)
 - Verifiers for remaining 8 ops (relu, gelu, silu, softmax, rms_norm, reduce_sum, reduce_max, batch_matmul result)
+- Quantization ops (quantize, dequantize) and INT8/INT4 support
+- Edge-critical ops (depthwise_conv2d, element-wise add/mul, pooling)
+- RVV target profile and custom lowering pass
+- ARM NEON target profile
 - Any transformation or optimization
 
-See `ROADMAP.md` for next milestones.
+See `ROADMAP.md` for milestones (edge-first: RVV primary, ARM NEON secondary, quantization early).
 
 ## Key Specifications
 
@@ -178,7 +191,8 @@ Before implementing kernels, always read the relevant spec:
 - `specs/kernels/matmul.md` - Matrix multiplication
 - `specs/kernels/conv2d.md` - 2D convolution
 - `specs/kernels/attention.md` - Attention mechanism
-- `specs/targets/riscv-rvv.md` - RVV target details
+- `specs/targets/riscv-rvv.md` - RVV target details (primary target)
+- `specs/targets/system-description.md` - Target profile format and validation
 
 ## Common Pitfalls
 
