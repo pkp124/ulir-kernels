@@ -166,22 +166,27 @@ func.func @test_error(%arg0: tensor<64xf32>, %arg1: tensor<128x256xf32>) {
 
 ### Implemented
 - KS dialect with 13 operations (matmul, batch_matmul, conv2d, attention, relu, gelu, silu, softmax, layer_norm, rms_norm, reduce_sum, reduce_max)
-- Verifiers for 5 ops (matmul, batch_matmul, conv2d, attention, layer_norm)
+- Verifiers for 9 ops (matmul, batch_matmul, conv2d, attention, softmax, layer_norm, rms_norm, reduce_sum, reduce_max)
 - TileType custom type
-- `ks-opt` CLI tool (parse/print only — no transformation passes)
-- Lit tests: parse/print round-trip, verifier negative tests
+- `ks-opt` CLI tool with `--ks-lower-activations` pass
+- `--ks-lower-activations` pass: lowers relu/gelu/silu to linalg.generic + arith/math ops
+- C kernel library (`lib/kernelsmith/`): `ks_matmul_f32`, `ks_relu_f32`, `ks_gelu_f32`, `ks_silu_f32`
+- Lit tests: parse/print round-trip, verifier negative tests (31 error cases), pass transformation
+- C API tests: matmul and activation smoke tests with NumPy validation
 - C++ unit test: dialect loading
+- CI: lint (ruff) + native build + container build (Docker) + GHCR publish
 - Python test infrastructure (test_data_generator, functional_validator, qemu_runner)
+- LLVM/MLIR 20 (bumped from 18)
 
 ### Not Yet Implemented
-- All lowering passes (ks -> linalg -> scf -> vector -> RVV)
+- Lowering passes: ks-lower-to-linalg, ks-tile, ks-pack, ks-vectorize, ks-lower-to-rvv
 - Canonicalization patterns (MatmulOp stub exists but is empty)
-- Verifiers for remaining 8 ops (relu, gelu, silu, softmax, rms_norm, reduce_sum, reduce_max, batch_matmul result)
+- Verifiers for 3 activation ops (relu, gelu, silu — hasVerifier=0 in TableGen)
+- Strengthened verifiers for layer_norm and rms_norm (currently minimal)
 - Quantization ops (quantize, dequantize) and INT8/INT4 support
 - Edge-critical ops (depthwise_conv2d, element-wise add/mul, pooling)
 - RVV target profile and custom lowering pass
 - ARM NEON target profile
-- Any transformation or optimization
 
 See `ROADMAP.md` for milestones (edge-first: RVV primary, ARM NEON secondary, quantization early).
 
@@ -198,7 +203,7 @@ Before implementing kernels, always read the relevant spec:
 
 - Do NOT add ops without corresponding lit tests (parse + verify + transform)
 - Do NOT describe unimplemented features as existing in docs or CLAUDE.md
-- The `.clang-format` project include regex references `AIKernels/` (legacy name); for new includes use `KernelSmith/`
+- The `.clang-format` project include regex may reference `AIKernels/` (legacy name); all code uses `KernelSmith/`
 - Always run `ctest --test-dir build` before committing
 - Design docs are required for non-trivial changes; use `./scripts/new-design.sh`
 - QEMU tests need specific setup; see `docs/guides/testing-guide.md`

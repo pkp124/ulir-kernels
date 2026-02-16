@@ -1,1 +1,1 @@
-"""Integration tests for AIKernels."""
+"""Integration tests for KernelSmith."""

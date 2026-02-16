@@ -210,7 +210,7 @@ struct LowerMyKernelPass
 `tests/lit/Dialect/Kernel/my_kernel.mlir`:
 
 ```mlir
-// RUN: aikernel-opt %s | aikernel-opt | FileCheck %s
+// RUN: ks-opt %s | ks-opt | FileCheck %s
 
 // CHECK-LABEL: func @test_my_kernel
 func.func @test_my_kernel(%input: tensor<1x3x28x28xf32>, 
@@ -230,7 +230,7 @@ func.func @test_my_kernel(%input: tensor<1x3x28x28xf32>,
 `tests/lit/Dialect/Kernel/my_kernel_invalid.mlir`:
 
 ```mlir
-// RUN: aikernel-opt %s -split-input-file -verify-diagnostics
+// RUN: ks-opt %s -split-input-file -verify-diagnostics
 
 func.func @test_wrong_rank(%input: tensor<28x28xf32>, 
                            %weight: tensor<64x3x3x3xf32>) {
@@ -258,7 +258,7 @@ func.func @test_channel_mismatch(%input: tensor<1x3x28x28xf32>,
 `tests/lit/Transforms/lower-my-kernel.mlir`:
 
 ```mlir
-// RUN: aikernel-opt %s --lower-my-kernel | FileCheck %s
+// RUN: ks-opt %s --ks-lower-my-kernel | FileCheck %s
 
 // CHECK-LABEL: func @test_lower_my_kernel
 func.func @test_lower_my_kernel(%input: tensor<1x3x28x28xf32>, 

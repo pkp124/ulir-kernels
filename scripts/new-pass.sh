@@ -17,27 +17,30 @@ UPPER_NAME=$(echo "$NAME" | tr '[:lower:]' '[:upper:]' | tr '-' '_')
 LOWER_NAME=$(echo "$NAME" | tr '[:upper:]' '[:lower:]' | tr '_' '-')
 CAMEL_NAME=$(echo "$NAME" | sed -r 's/(^|[-_])([a-z])/\U\2/g')
 
-echo "Creating pass: ${CAMEL_NAME}Pass"
+echo "Creating pass: KS${CAMEL_NAME}Pass"
 
 # Create pass implementation file
-PASS_DIR="src/passes"
+PASS_DIR="lib/Passes"
 mkdir -p "$PASS_DIR"
 
-PASS_FILE="${PASS_DIR}/${CAMEL_NAME}.cpp"
+PASS_FILE="${PASS_DIR}/${CAMEL_NAME}Pass.cpp"
 if [ ! -f "$PASS_FILE" ]; then
     cat > "$PASS_FILE" << EOF
 //===----------------------------------------------------------------------===//
-// ${CAMEL_NAME} Pass Implementation
+// KS${CAMEL_NAME}Pass Implementation
 //===----------------------------------------------------------------------===//
+
+#include "KernelSmith/Passes/Passes.h"
+
+#include "KernelSmith/Dialect/Kernel/KernelDialect.h"
 
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "AIKernels/Dialect/Kernel/KernelDialect.h"
 
-namespace aikernel {
+namespace kernelsmith::ks {
 
-#define GEN_PASS_DEF_${UPPER_NAME}
-#include "AIKernels/Passes.h.inc"
+#define GEN_PASS_DEF_KS${UPPER_NAME}
+#include "KernelSmith/Passes/Passes.h.inc"
 
 namespace {
 
@@ -51,17 +54,17 @@ namespace {
 // Pass Implementation
 //===----------------------------------------------------------------------===//
 
-struct ${CAMEL_NAME}Pass 
-    : public impl::${CAMEL_NAME}Base<${CAMEL_NAME}Pass> {
-  
+struct KS${CAMEL_NAME}Pass
+    : public impl::KS${CAMEL_NAME}Base<KS${CAMEL_NAME}Pass> {
+
   void runOnOperation() override {
     auto *context = &getContext();
     RewritePatternSet patterns(context);
-    
+
     // TODO: Add patterns
     // patterns.add<MyPattern>(context);
-    
-    if (failed(applyPatternsAndFoldGreedily(getOperation(), 
+
+    if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
       signalPassFailure();
     }
@@ -70,21 +73,17 @@ struct ${CAMEL_NAME}Pass
 
 } // namespace
 
-std::unique_ptr<mlir::Pass> create${CAMEL_NAME}Pass() {
-  return std::make_unique<${CAMEL_NAME}Pass>();
-}
-
-} // namespace aikernel
+} // namespace kernelsmith::ks
 EOF
     echo "Created: $PASS_FILE"
 fi
 
 # Create test file
-TEST_FILE="tests/lit/Transforms/${LOWER_NAME}.mlir"
+TEST_FILE="tests/lit/${LOWER_NAME}.mlir"
 mkdir -p "$(dirname "$TEST_FILE")"
 if [ ! -f "$TEST_FILE" ]; then
     cat > "$TEST_FILE" << EOF
-// RUN: aikernel-opt %s --${LOWER_NAME} | FileCheck %s
+// RUN: ks-opt %s --ks-${LOWER_NAME} | FileCheck %s
 
 // CHECK-LABEL: func @test_${LOWER_NAME//-/_}
 func.func @test_${LOWER_NAME//-/_}(%arg0: tensor<32x32xf32>) -> tensor<32x32xf32> {
@@ -100,7 +99,7 @@ echo ""
 echo "Pass scaffolding created!"
 echo ""
 echo "Next steps:"
-echo "  1. Add pass declaration to src/passes/Passes.td"
+echo "  1. Add pass declaration to include/KernelSmith/Passes/Passes.td"
 echo "  2. Implement patterns in $PASS_FILE"
-echo "  3. Register pass in PassRegistration.cpp"
-echo "  4. Run tests: make test-lit"
+echo "  3. Add $PASS_FILE to lib/Passes/CMakeLists.txt"
+echo "  4. Run tests: ctest --test-dir build --output-on-failure"
