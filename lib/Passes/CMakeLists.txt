@@ -25,6 +25,5 @@ add_mlir_library(KernelSmithPasses
   MLIRTensorDialect
   MLIRFuncDialect
   MLIRSCFDialect
-  MLIRSCFTransforms
   MLIRAffineDialect
 )

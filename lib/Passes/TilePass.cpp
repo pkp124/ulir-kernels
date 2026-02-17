@@ -22,7 +22,7 @@
 //     scf.yield %C1
 //   }
 //
-// Uses scf::tileUsingSCF (MLIR 20 recommended TilingInterface API).
+// Uses linalg::tileLinalgOp (MLIRLinalgTransforms, stable across MLIR 18-20).
 // Tile size = 0 on any dimension means "do not tile that dimension".
 // Non-divisible dimensions produce correct tail handling via affine.min.
 //===----------------------------------------------------------------------===//
@@ -35,11 +35,9 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
-#include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/IR/PatternMatch.h"
-#include "mlir/Interfaces/TilingInterface.h"
 
 namespace kernelsmith {
 
@@ -68,39 +66,33 @@ struct KSTilePass : impl::KSTilePassBase<KSTilePass> {
     if (matmulOps.empty())
       return;
 
-    // Build tile sizes as OpFoldResult (attribute constants, index type).
-    // A size of 0 means "do not tile this dimension".
-    SmallVector<OpFoldResult> tileSizes = {
-        rewriter.getIndexAttr(tileSizeM),
-        rewriter.getIndexAttr(tileSizeN),
-        rewriter.getIndexAttr(tileSizeK),
-    };
+    // A tile size of 0 means "do not tile this dimension". If all three
+    // dimensions are 0 the pass is a no-op — bail early.
+    if (tileSizeM == 0 && tileSizeN == 0 && tileSizeK == 0)
+      return;
 
-    scf::SCFTilingOptions tilingOptions;
-    tilingOptions.setTileSizes(tileSizes);
+    // linalg::LinalgTilingOptions / tileLinalgOp — stable across MLIR 18-20.
+    // tensorResults in TiledLinalgOp is the replacement for the original op.
+    linalg::LinalgTilingOptions opts;
+    opts.setTileSizes(
+        SmallVector<int64_t>{tileSizeM, tileSizeN, tileSizeK});
+    // Default loop type is LinalgTilingLoopType::Loops (scf.for).
 
     for (linalg::MatmulOp matmulOp : matmulOps) {
       rewriter.setInsertionPoint(matmulOp);
 
-      auto tilingInterface =
-          dyn_cast<TilingInterface>(matmulOp.getOperation());
-      if (!tilingInterface) {
-        matmulOp->emitError("linalg.matmul does not implement TilingInterface");
-        signalPassFailure();
-        return;
-      }
-
-      FailureOr<scf::SCFTilingResult> result =
-          scf::tileUsingSCF(rewriter, tilingInterface, tilingOptions);
+      FailureOr<linalg::TiledLinalgOp> result =
+          linalg::tileLinalgOp(rewriter, matmulOp, opts);
 
       if (failed(result)) {
-        matmulOp->emitError("scf::tileUsingSCF failed");
+        matmulOp->emitError("linalg::tileLinalgOp failed on linalg.matmul");
         signalPassFailure();
         return;
       }
 
-      // Replace the original op with the results produced by the tiled loops.
-      rewriter.replaceOp(matmulOp, result->replacements);
+      // tensorResults holds the values yielded by the outermost tiled loop,
+      // which replace the results of the original untiled op.
+      rewriter.replaceOp(matmulOp, result->tensorResults);
     }
   }
 };
