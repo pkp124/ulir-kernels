@@ -3,8 +3,8 @@ name: CI
 on:
   push:
     branches: [main, develop]
-  pull_request:
-    branches: [main]
+  pull_request:         # all branches — catches failures before merge
+  workflow_dispatch:    # manual trigger for any branch
 
 env:
   REGISTRY: ghcr.io
@@ -38,6 +38,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Cache LLVM 20 apt packages
+        uses: actions/cache@v4
+        with:
+          path: /var/cache/apt/archives
+          key: apt-llvm-20-${{ runner.os }}-v1
+
       - name: Install LLVM/MLIR 20
         run: |
           wget -qO- https://apt.llvm.org/llvm.sh | sudo bash -s -- 20
@@ -68,11 +74,25 @@ jobs:
     name: Container Build & Test
     runs-on: ubuntu-latest
     needs: lint
+    # Only run on push to main/develop — build-and-test already proves
+    # correctness on PRs. Container build (~20 min) is too expensive to
+    # run on every feature-branch push.
+    if: github.event_name == 'push'
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build test image
-        run: docker build --target test -t kernelsmith:test .
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build test image (with GHA layer cache)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: test
+          load: true
+          tags: kernelsmith:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Run tests in container
         run: docker run --rm kernelsmith:test
