@@ -21,8 +21,9 @@ source .venv/bin/activate
 cmake --build build --parallel
 ctest --test-dir build --output-on-failure
 
-# Container verify — run this before every push to confirm the container build
-# matches CI exactly (cached after first run; add --no-cache for a clean build)
+# Container verify — run this before every push to confirm lint + build + tests
+# all pass inside the container (matches CI exactly). Cached after first run;
+# add --no-cache for a clean build.
 ./scripts/docker-verify.sh
 
 # Quality
@@ -111,7 +112,7 @@ def KS_ExampleOp : KS_Op<"example", [Pure]> {
 2. **Check design docs** in `docs/design/` for existing decisions
 3. **TDD**: Write a failing lit/unit test first, then implement
 4. **Small commits**: Each commit should pass `ctest --test-dir build`
-5. **Container verify before push**: Run `./scripts/docker-verify.sh` before every `git push` to confirm the container build and tests pass in the same environment CI uses
+5. **Container verify before push**: Run `./scripts/docker-verify.sh` before every `git push` to confirm lint (ruff + clang-format) and the container build + tests all pass in the same environment CI uses
 6. **Commit format**: `<type>(<scope>): <subject>` (e.g., `feat(dialect): add ks.relu operation`)
 
 ### Commit Types

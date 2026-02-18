@@ -64,6 +64,21 @@ COPY . .
 
 CMD ["/bin/bash"]
 
+# ---------- stage: lint ----------
+# Fast check — branches off 'dev', no C++ compilation needed.
+# Runs: ruff (Python lint + format) and clang-format (C++ format check).
+FROM dev AS lint
+
+CMD ["bash", "-c", "\
+  set -e && \
+  echo '--- Python lint ---' && \
+  ruff check . && \
+  ruff format --check . && \
+  echo '--- C++ format check ---' && \
+  find lib include tools \\( -name '*.cpp' -o -name '*.h' \\) | \
+    xargs clang-format-${LLVM_VERSION} --dry-run --Werror && \
+  echo 'All lint checks passed.'"]
+
 # ---------- stage: build ----------
 FROM dev AS build
 
