@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# KernelSmith — container build + test verification
+# KernelSmith — container lint + build + test verification
 #
-# Replicates exactly what the CI container-test job does, so you can catch
-# failures locally before pushing to the branch.
+# Replicates exactly what CI does, so you can catch failures locally before
+# pushing to the branch:
+#   1. Lint  (ruff + clang-format) — mirrors the CI 'lint' job
+#   2. Build + test (ctest)        — mirrors the CI 'container-test' job
 #
 # Usage:
 #   ./scripts/docker-verify.sh             # cached (fast after first run)
@@ -15,7 +17,6 @@
 set -e
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-IMAGE="kernelsmith:verify"
 BUILD_ARGS=()
 
 RED='\033[0;31m'
@@ -35,27 +36,44 @@ fi
 command -v docker &>/dev/null || fail "docker not found. Install Docker Desktop or Docker Engine."
 
 echo "============================================"
-echo "KernelSmith — container build + test"
+echo "KernelSmith — container verify (lint + test)"
 echo "============================================"
 echo ""
 
 cd "$REPO_ROOT"
 
-# Stage 1: build the 'test' image (mirrors CI container-test exactly)
+# ---------------------------------------------------------------------------
+# Stage 1: lint (ruff + clang-format) — fast, no C++ compilation
+# ---------------------------------------------------------------------------
+echo "--- Building 'lint' stage ---"
+DOCKER_BUILDKIT=1 docker build \
+  "${BUILD_ARGS[@]}" \
+  --target lint \
+  --tag kernelsmith:verify-lint \
+  .
+
+echo ""
+echo "--- Running lint checks in container ---"
+docker run --rm kernelsmith:verify-lint
+
+info "Lint passed."
+echo ""
+
+# ---------------------------------------------------------------------------
+# Stage 2: build + test (ctest) — mirrors CI container-test job exactly
+# ---------------------------------------------------------------------------
 echo "--- Building 'test' stage ---"
 DOCKER_BUILDKIT=1 docker build \
   "${BUILD_ARGS[@]}" \
   --target test \
-  --tag "$IMAGE" \
+  --tag kernelsmith:verify-test \
   .
 
 echo ""
-
-# Stage 2: run the tests inside the container
 echo "--- Running tests in container ---"
-docker run --rm "$IMAGE"
+docker run --rm kernelsmith:verify-test
 
 echo ""
 info "Container build and tests passed."
 echo ""
-echo "The image matches what CI will build — safe to push."
+echo "All checks match CI — safe to push."
