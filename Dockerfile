@@ -16,7 +16,7 @@ LABEL org.opencontainers.image.description="KernelSmith MLIR compiler framework"
 LABEL org.opencontainers.image.licenses="AGPL-3.0"
 
 ENV DEBIAN_FRONTEND=noninteractive
-ENV LLVM_VERSION=20
+ENV LLVM_VERSION=21
 
 # Base system packages (no LLVM yet)
 RUN apt-get update -qq && \

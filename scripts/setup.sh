@@ -33,7 +33,7 @@ cd "$REPO_ROOT"
 [ -f "pyproject.toml" ] || fail "pyproject.toml not found. Run from repo root."
 
 # ==============================================================================
-# 1. System dependencies (LLVM/MLIR 20, cmake, ninja)
+# 1. System dependencies (LLVM/MLIR 21, cmake, ninja)
 # ==============================================================================
 
 echo "--- System dependencies ---"
@@ -61,11 +61,11 @@ install_macos() {
     info "ninja $(ninja --version)"
   fi
 
-  # llvm@20 (includes MLIR)
-  if ! brew ls --versions llvm@20 &>/dev/null; then
-    pkgs+=(llvm@20)
+  # llvm@21 (includes MLIR)
+  if ! brew ls --versions llvm@21 &>/dev/null; then
+    pkgs+=(llvm@21)
   else
-    info "llvm@20 (Homebrew)"
+    info "llvm@21 (Homebrew)"
   fi
 
   if [ ${#pkgs[@]} -gt 0 ]; then
@@ -75,7 +75,7 @@ install_macos() {
   fi
 
   # Resolve LLVM paths (Homebrew keg-only)
-  LLVM_PREFIX="$(brew --prefix llvm@20)"
+  LLVM_PREFIX="$(brew --prefix llvm@21)"
   LLVM_DIR="${LLVM_PREFIX}/lib/cmake/llvm"
   MLIR_DIR="${LLVM_PREFIX}/lib/cmake/mlir"
 }
@@ -97,13 +97,13 @@ install_linux() {
     info "ninja $(ninja --version)"
   fi
 
-  # LLVM/MLIR 20
-  if ! dpkg -s mlir-20-tools &>/dev/null 2>&1; then
-    echo "Adding LLVM 20 apt repository ..."
-    wget -qO- https://apt.llvm.org/llvm.sh | sudo bash -s -- 20
-    pkgs+=(mlir-20-tools libmlir-20-dev llvm-20-dev libgtest-dev)
+  # LLVM/MLIR 21
+  if ! dpkg -s mlir-21-tools &>/dev/null 2>&1; then
+    echo "Adding LLVM 21 apt repository ..."
+    wget -qO- https://apt.llvm.org/llvm.sh | sudo bash -s -- 21
+    pkgs+=(mlir-21-tools libmlir-21-dev llvm-21-dev libgtest-dev)
   else
-    info "mlir-20-tools (apt)"
+    info "mlir-21-tools (apt)"
   fi
 
   if [ ${#pkgs[@]} -gt 0 ]; then
@@ -113,8 +113,8 @@ install_linux() {
     info "Installed ${pkgs[*]}"
   fi
 
-  LLVM_DIR="/usr/lib/llvm-20/lib/cmake/llvm"
-  MLIR_DIR="/usr/lib/llvm-20/lib/cmake/mlir"
+  LLVM_DIR="/usr/lib/llvm-21/lib/cmake/llvm"
+  MLIR_DIR="/usr/lib/llvm-21/lib/cmake/mlir"
 }
 
 case "$OS" in

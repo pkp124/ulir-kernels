@@ -38,16 +38,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Cache LLVM 20 apt packages
+      - name: Cache LLVM 21 apt packages
         uses: actions/cache@v4
         with:
           path: /var/cache/apt/archives
-          key: apt-llvm-20-${{ runner.os }}-v1
+          key: apt-llvm-21-${{ runner.os }}-v1
 
-      - name: Install LLVM/MLIR 20
+      - name: Install LLVM/MLIR 21
         run: |
-          wget -qO- https://apt.llvm.org/llvm.sh | sudo bash -s -- 20
-          sudo apt-get install -y mlir-20-tools libmlir-20-dev llvm-20-dev libgtest-dev
+          wget -qO- https://apt.llvm.org/llvm.sh | sudo bash -s -- 21
+          sudo apt-get install -y mlir-21-tools libmlir-21-dev llvm-21-dev libgtest-dev
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -61,8 +61,8 @@ jobs:
         run: |
           cmake -S . -B build \
             -DCMAKE_BUILD_TYPE=Release \
-            -DLLVM_DIR=/usr/lib/llvm-20/lib/cmake/llvm \
-            -DMLIR_DIR=/usr/lib/llvm-20/lib/cmake/mlir
+            -DLLVM_DIR=/usr/lib/llvm-21/lib/cmake/llvm \
+            -DMLIR_DIR=/usr/lib/llvm-21/lib/cmake/mlir
 
       - name: Build
         run: cmake --build build --parallel

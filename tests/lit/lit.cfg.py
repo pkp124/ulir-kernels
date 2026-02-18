@@ -26,7 +26,7 @@ config.substitutions.append(("%ks-opt", os.path.join(tools_dir, "ks-opt")))
 # Find FileCheck
 filecheck = lit.util.which("FileCheck")
 if not filecheck:
-    llvm_tools = getattr(config, "llvm_tools_dir", "/usr/lib/llvm-20/bin")
+    llvm_tools = getattr(config, "llvm_tools_dir", "/usr/lib/llvm-21/bin")
     filecheck = os.path.join(llvm_tools, "FileCheck")
 config.substitutions.append(("%FileCheck", filecheck))
 
