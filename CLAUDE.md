@@ -5,7 +5,7 @@
 KernelSmith is an MLIR-based compiler framework that generates optimized ML inference kernels for **edge, embedded, and physical AI** devices. Primary target: RISC-V RVV. Secondary target: ARM NEON. Quantization is a core feature.
 
 - **Language**: C++17 (core), Python (tooling/tests)
-- **Compiler infra**: MLIR / LLVM 18+
+- **Compiler infra**: MLIR / LLVM 21+
 - **Namespace**: `kernelsmith`, dialect prefix `ks`, CLI tool `ks-opt`
 - **Domain**: Quantized inference on resource-constrained hardware (RISC-V edge SoCs, ARM phones/SBCs)
 - **License**: AGPL-3.0
@@ -13,13 +13,17 @@ KernelSmith is an MLIR-based compiler framework that generates optimized ML infe
 ## Quick Reference Commands
 
 ```bash
-# Full setup (installs LLVM/MLIR 18, cmake, ninja, Python deps, builds, tests)
+# Full setup (installs LLVM/MLIR 21, cmake, ninja, Python deps, builds, tests)
 ./scripts/setup.sh
 
 # Rebuild after changes
 source .venv/bin/activate
 cmake --build build --parallel
 ctest --test-dir build --output-on-failure
+
+# Container verify — run this before every push to confirm the container build
+# matches CI exactly (cached after first run; add --no-cache for a clean build)
+./scripts/docker-verify.sh
 
 # Quality
 ruff check .                    # Python lint
@@ -107,7 +111,8 @@ def KS_ExampleOp : KS_Op<"example", [Pure]> {
 2. **Check design docs** in `docs/design/` for existing decisions
 3. **TDD**: Write a failing lit/unit test first, then implement
 4. **Small commits**: Each commit should pass `ctest --test-dir build`
-5. **Commit format**: `<type>(<scope>): <subject>` (e.g., `feat(dialect): add ks.relu operation`)
+5. **Container verify before push**: Run `./scripts/docker-verify.sh` before every `git push` to confirm the container build and tests pass in the same environment CI uses
+6. **Commit format**: `<type>(<scope>): <subject>` (e.g., `feat(dialect): add ks.relu operation`)
 
 ### Commit Types
 
@@ -176,7 +181,7 @@ func.func @test_error(%arg0: tensor<64xf32>, %arg1: tensor<128x256xf32>) {
 - C++ unit test: dialect loading
 - CI: lint (ruff) + native build + container build (Docker) + GHCR publish
 - Python test infrastructure (test_data_generator, functional_validator, qemu_runner)
-- LLVM/MLIR 20 (bumped from 18)
+- LLVM/MLIR 21 (bumped from 20)
 
 ### Not Yet Implemented
 - Lowering passes: ks-lower-to-linalg, ks-tile, ks-pack, ks-vectorize, ks-lower-to-rvv
