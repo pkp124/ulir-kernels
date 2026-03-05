@@ -22,7 +22,7 @@
 //     scf.yield %C1
 //   }
 //
-// Uses linalg::tileLinalgOp (MLIRLinalgTransforms, stable across MLIR 18-20).
+// Uses linalg::tileLinalgOp (MLIRLinalgTransforms) with LinalgTilingOptions.
 // Tile size = 0 on any dimension means "do not tile that dimension".
 // Non-divisible dimensions produce correct tail handling via affine.min.
 //===----------------------------------------------------------------------===//
