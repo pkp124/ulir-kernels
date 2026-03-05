@@ -183,9 +183,12 @@ func.func @test_error(%arg0: tensor<64xf32>, %arg1: tensor<128x256xf32>) {
 - CI: lint (ruff) + native build + container build (Docker) + GHCR publish
 - Python test infrastructure (test_data_generator, functional_validator, qemu_runner)
 - LLVM/MLIR 21 (bumped from 20)
+- `--ks-lower-to-linalg` pass: lowers ks.matmul → linalg.fill + linalg.matmul (static + dynamic shapes)
+- `--ks-tile` pass: tiles linalg.matmul → nested scf.for loops (profile-driven tile sizes)
+- Design doc DES-008 (M3 matmul lowering to linalg, generic target)
 
 ### Not Yet Implemented
-- Lowering passes: ks-lower-to-linalg, ks-tile, ks-pack, ks-vectorize, ks-lower-to-rvv
+- Lowering passes: ks-pack, ks-vectorize, ks-lower-to-rvv
 - Canonicalization patterns (MatmulOp stub exists but is empty)
 - Verifiers for 3 activation ops (relu, gelu, silu — hasVerifier=0 in TableGen)
 - Strengthened verifiers for layer_norm and rms_norm (currently minimal)
