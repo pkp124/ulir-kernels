@@ -5,6 +5,9 @@ add_mlir_library(KernelSmithPasses
   LowerActivationsPass.cpp
   LowerToLinalgPass.cpp
   TilePass.cpp
+  PackPass.cpp
+  VectorizePass.cpp
+  LowerToRVVPass.cpp
 
   ADDITIONAL_HEADER_DIRS
   ${PROJECT_SOURCE_DIR}/include/KernelSmith/Passes
@@ -18,6 +21,7 @@ add_mlir_library(KernelSmithPasses
   MLIRPass
   MLIRTransforms
   MLIRSupport
+  # Dialect libraries
   MLIRLinalgDialect
   MLIRLinalgTransforms
   MLIRArithDialect
@@ -26,4 +30,20 @@ add_mlir_library(KernelSmithPasses
   MLIRFuncDialect
   MLIRSCFDialect
   MLIRAffineDialect
+  MLIRVectorDialect
+  MLIRMemRefDialect
+  MLIRControlFlowDialect
+  MLIRBufferizationDialect
+  MLIRBufferizationTransforms
+  MLIRLLVMDialect
+  # Conversion libraries (M4: vectorize + lower-to-rvv pipeline)
+  MLIRConversionPasses
+  MLIRAffineToStandard
+  MLIRArithToLLVM
+  MLIRControlFlowToLLVM
+  MLIRFuncToLLVM
+  MLIRLinalgToStandard
+  MLIRMemRefToLLVM
+  MLIRSCFToControlFlow
+  MLIRVectorToLLVM
 )
