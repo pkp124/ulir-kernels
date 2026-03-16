@@ -6,6 +6,7 @@
 
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/DialectImplementation.h"
+
 #include "llvm/ADT/TypeSwitch.h"
 
 using namespace mlir;
@@ -23,5 +24,5 @@ void KSDialect::initialize() {
   addOperations<
 #define GET_OP_LIST
 #include "KernelSmith/Dialect/Kernel/KernelOps.cpp.inc"
-  >();
+      >();
 }

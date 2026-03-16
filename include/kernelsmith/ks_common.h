@@ -22,9 +22,9 @@ extern "C" {
 
 /* ── Error Codes ────────────────────────────────────────────────────────── */
 
-#define KS_OK              0
+#define KS_OK 0
 #define KS_ERR_INVALID_ARG (-1)
-#define KS_ERR_WORKSPACE   (-2)
+#define KS_ERR_WORKSPACE (-2)
 #define KS_ERR_UNSUPPORTED (-3)
 
 /* ── Target Information ─────────────────────────────────────────────────── */

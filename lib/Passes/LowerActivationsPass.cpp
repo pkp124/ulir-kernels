@@ -2,9 +2,8 @@
 // KSLowerActivationsPass — Lower ks.relu/gelu/silu to linalg.generic
 //===----------------------------------------------------------------------===//
 
-#include "KernelSmith/Passes/Passes.h"
-
 #include "KernelSmith/Dialect/Kernel/KernelDialect.h"
+#include "KernelSmith/Passes/Passes.h"
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -65,8 +64,8 @@ struct ReluLowering : public OpRewritePattern<ks::ReLUOp> {
     Type elemType = resultType.getElementType();
 
     Value empty = createEmptyTensorLike(rewriter, loc, input);
-    Value zero = rewriter.create<arith::ConstantOp>(
-        loc, rewriter.getZeroAttr(elemType));
+    Value zero =
+        rewriter.create<arith::ConstantOp>(loc, rewriter.getZeroAttr(elemType));
 
     SmallVector<AffineMap> maps;
     SmallVector<utils::IteratorType> iters;

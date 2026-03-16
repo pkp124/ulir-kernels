@@ -6,6 +6,7 @@
 
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/DialectImplementation.h"
+
 #include "llvm/ADT/TypeSwitch.h"
 
 using namespace mlir;
@@ -18,7 +19,8 @@ using namespace kernelsmith::ks;
 int64_t TileType::getNumElements() const {
   int64_t num = 1;
   for (int64_t dim : getShape()) {
-    if (dim < 0) return -1;
+    if (dim < 0)
+      return -1;
     num *= dim;
   }
   return num;
@@ -39,5 +41,5 @@ void KSDialect::registerTypes() {
   addTypes<
 #define GET_TYPEDEF_LIST
 #include "KernelSmith/Dialect/Kernel/KernelTypes.cpp.inc"
-  >();
+      >();
 }
