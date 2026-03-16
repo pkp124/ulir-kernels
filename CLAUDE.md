@@ -41,17 +41,20 @@ clang-format -i lib/**/*.cpp    # C++ format
 
 ```
 ks.matmul / ks.conv2d / ...                [IMPLEMENTED - parse/verify]
-    | --ks-lower-to-linalg                 [NOT IMPLEMENTED]
+    | --ks-lower-to-linalg                 [IMPLEMENTED - M3]
 linalg.matmul (standard MLIR linalg)
-    | --ks-tile                            [NOT IMPLEMENTED]
-scf.for (tiled loops)
-    | --ks-pack                            [NOT IMPLEMENTED]
-packed operands (workspace buffers)
-    | --ks-vectorize                       [NOT IMPLEMENTED]
-vector.load / vector.fma / vector.store
-    | --ks-lower-to-rvv (RVV)             [NOT IMPLEMENTED]
+    | --ks-tile (L2)                       [IMPLEMENTED - M3]
+scf.for (L2-tiled loops)
+    | --ks-pack                            [IMPLEMENTED - M4]
+packed operands (B in [N/NR, K, NR] layout)
+    | --ks-tile (register)                 [IMPLEMENTED - M3/M4]
+scf.for (register-tiled)
+    | --ks-vectorize                       [IMPLEMENTED - M4]
+vector.transfer_read / vector.contract / vector.transfer_write
+    | --ks-lower-to-rvv (RVV)             [IMPLEMENTED - M4]
     | or LLVM autovectorize (ARM NEON)
-LLVM IR with target intrinsics
+LLVM dialect -> mlir-translate -> llc -march=riscv64 -mattr=+v
+RISC-V RVV assembly (vle32.v / vfmacc.vv / vse32.v)
 ```
 
 ### Target Priority
@@ -174,7 +177,7 @@ func.func @test_error(%arg0: tensor<64xf32>, %arg1: tensor<128x256xf32>) {
 - KS dialect with 13 operations (matmul, batch_matmul, conv2d, attention, relu, gelu, silu, softmax, layer_norm, rms_norm, reduce_sum, reduce_max)
 - Verifiers for 9 ops (matmul, batch_matmul, conv2d, attention, softmax, layer_norm, rms_norm, reduce_sum, reduce_max)
 - TileType custom type
-- `ks-opt` CLI tool with `--ks-lower-activations` pass
+- `ks-opt` CLI tool with all M1–M4 passes registered
 - `--ks-lower-activations` pass: lowers relu/gelu/silu to linalg.generic + arith/math ops
 - C kernel library (`lib/kernelsmith/`): `ks_matmul_f32`, `ks_relu_f32`, `ks_gelu_f32`, `ks_silu_f32`
 - Lit tests: parse/print round-trip, verifier negative tests (31 error cases), pass transformation
@@ -186,16 +189,24 @@ func.func @test_error(%arg0: tensor<64xf32>, %arg1: tensor<128x256xf32>) {
 - `--ks-lower-to-linalg` pass: lowers ks.matmul → linalg.fill + linalg.matmul (static + dynamic shapes)
 - `--ks-tile` pass: tiles linalg.matmul → nested scf.for loops (profile-driven tile sizes)
 - Design doc DES-008 (M3 matmul lowering to linalg, generic target)
+- **M4 (RISC-V RVV Target)**:
+  - `target/riscv_rvv_256.h` — RVV target profile (VLEN=256, LMUL=4, f32)
+  - `--ks-pack` pass: packs B operand into `[N/NR, K, NR]` column-panel layout
+  - `--ks-vectorize` pass: linalg → vector dialect (`vector.contract` + transfer ops)
+  - `--ks-lower-to-rvv` pass: full pipeline to LLVM dialect (bufferize→scf→cf→vector→LLVM)
+  - `scripts/compile-rvv.sh` — driver for ks-opt + mlir-translate + llc
+  - Lit tests for pack, vectorize, lower-to-rvv passes
+  - QEMU runner updated for multi-VLEN correctness and benchmark testing
+  - Design doc DES-009 (M4 RVV lowering pipeline)
 
 ### Not Yet Implemented
-- Lowering passes: ks-pack, ks-vectorize, ks-lower-to-rvv
 - Canonicalization patterns (MatmulOp stub exists but is empty)
 - Verifiers for 3 activation ops (relu, gelu, silu — hasVerifier=0 in TableGen)
 - Strengthened verifiers for layer_norm and rms_norm (currently minimal)
 - Quantization ops (quantize, dequantize) and INT8/INT4 support
 - Edge-critical ops (depthwise_conv2d, element-wise add/mul, pooling)
-- RVV target profile and custom lowering pass
 - ARM NEON target profile
+- QEMU correctness tests (require cross-compiler + qemu-riscv64 in CI)
 
 See `ROADMAP.md` for milestones (edge-first: RVV primary, ARM NEON secondary, quantization early).
 

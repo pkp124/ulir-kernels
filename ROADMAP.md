@@ -26,7 +26,7 @@
 
 ---
 
-## Milestone 1: C API + Reference Library (Current)
+## Milestone 1: C API + Reference Library (Complete)
 
 **Goal**: Ship a working `libkernelsmith.a` with stable C headers. Handwritten
 reference implementations. No MLIR in the critical path yet.
@@ -110,7 +110,7 @@ no packing, generic target profile. Proves the full ks -> linalg -> LLVM pipelin
 
 ---
 
-## Milestone 4: RISC-V RVV Target (Primary)
+## Milestone 4: RISC-V RVV Target (Primary) — In Progress
 
 **Goal**: End-to-end optimized matmul and activations for RISC-V RVV. This is
 the project's primary hardware target. Multi-level tiling, B packing, and
@@ -121,33 +121,32 @@ Kendryte K230) are the primary deployment targets. RVV's vector-length-agnostic
 (VLA) model requires a custom lowering pass — LLVM autovectorization is
 insufficient for high-performance VLA code.
 
-**Deliverables**:
-- `target/riscv_rvv_256.h` — RVV target profile (VLEN=256 baseline)
-- `KSPackPass` (`--ks-pack`) — B operand packing into workspace
-- Multi-level tiling (L2 + L1/register tile) driven by RVV profile
-- `KSVectorizePass` (`--ks-vectorize`) — SIMD using profile vector width
-- `KSLowerToRVVPass` (`--ks-lower-to-rvv`) — RVV intrinsics, vsetvl management
-- Workspace query returns correct size for pack buffers
-- Cross-compilation for riscv64 target triple
-- QEMU-based test runner for correctness validation
-- Benchmark: generic vs RVV (demonstrating speedup on QEMU)
+**Design**: [DES-009](docs/design/DES-009-m4-rvv-lowering.md)
+
+**Deliverables** (completed ✓ / pending …):
+- ✓ `target/riscv_rvv_256.h` — RVV target profile (VLEN=256, LMUL=4, f32)
+- ✓ `KSPackPass` (`--ks-pack`) — B operand packing into `[N/NR, K, NR]` layout
+- ✓ Multi-level tiling via two `--ks-tile` invocations (L2 then register)
+- ✓ `KSVectorizePass` (`--ks-vectorize`) — linalg → vector dialect
+- ✓ `KSLowerToRVVPass` (`--ks-lower-to-rvv`) — full LLVM dialect lowering pipeline
+- ✓ `scripts/compile-rvv.sh` — driver script (ks-opt + mlir-translate + llc)
+- ✓ Lit tests: pack, vectorize, lower-to-rvv
+- ✓ QEMU runner updated for multi-VLEN correctness + benchmark
+- … QEMU correctness validation (requires cross-compiler + qemu-user in CI)
+- … Benchmark: generic vs RVV (demonstrating speedup on QEMU)
+- … Stride and tail handling (non-divisible N)
 
 **Tasks**:
-1. Write `target/riscv_rvv_256.h` target profile
-2. Implement `--ks-pack` (linalg.pack for B operand, workspace memref)
-3. Extend `--ks-tile` to multi-level (L2 outer + MR/NR register tile)
-4. Update workspace query to account for pack buffer size
-5. Implement `--ks-vectorize` (inner loops -> vector.load/fma/store)
-6. Implement `--ks-lower-to-rvv` (vector ops -> RVV intrinsics):
-   - `vector.load` -> `vle{SEW}.v`
-   - `vector.fma` -> `vfmacc.vv`
-   - `vector.store` -> `vse{SEW}.v`
-   - Minimize `vsetvl` instructions across loop bodies
-   - LMUL > 1 for compute-bound matmul micro-kernel
-7. Set up cross-compilation: LLVM riscv64 target triple + `+v` feature
-8. QEMU test runner: validate generated code with multiple VLEN configs
-9. Stride and tail handling tests (non-aligned dimensions)
-10. Lit tests for RVV lowering pass
+1. ✓ Write `target/riscv_rvv_256.h` target profile
+2. ✓ Implement `--ks-pack` (linalg.pack for B operand)
+3. ✓ Extend `--ks-tile` to multi-level (L2 + register tile via two invocations)
+4. ✓ Implement `--ks-vectorize` (linalg → vector.contract + transfer ops)
+5. ✓ Implement `--ks-lower-to-rvv` (full bufferize→cf→vector→LLVM pipeline)
+6. ✓ Set up cross-compilation: `scripts/compile-rvv.sh` driver
+7. ✓ QEMU test runner: multi-VLEN correctness and benchmark support
+8. ✓ Lit tests for all three new passes
+9. … Run QEMU correctness tests on actual RISC-V binary (needs CI cross-compiler)
+10. … Benchmark speedup measurement (QEMU VLEN=256 vs generic)
 
 ---
 
