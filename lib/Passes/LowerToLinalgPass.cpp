@@ -15,9 +15,8 @@
 // while ks.matmul has pure-replacement semantics (C = A*B).
 //===----------------------------------------------------------------------===//
 
-#include "KernelSmith/Passes/Passes.h"
-
 #include "KernelSmith/Dialect/Kernel/KernelDialect.h"
+#include "KernelSmith/Passes/Passes.h"
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -52,13 +51,12 @@ static Value createZeroFilledTensor(OpBuilder &b, Location loc,
   if (resultType.isDynamicDim(1))
     dynamicSizes.push_back(b.create<tensor::DimOp>(loc, rhs, 1));
 
-  Value empty =
-      b.create<tensor::EmptyOp>(loc, resultType.getShape(),
-                                resultType.getElementType(), dynamicSizes);
+  Value empty = b.create<tensor::EmptyOp>(
+      loc, resultType.getShape(), resultType.getElementType(), dynamicSizes);
 
   // Zero constant matching the element type (float or integer).
-  Value zero =
-      b.create<arith::ConstantOp>(loc, b.getZeroAttr(resultType.getElementType()));
+  Value zero = b.create<arith::ConstantOp>(
+      loc, b.getZeroAttr(resultType.getElementType()));
 
   return b.create<linalg::FillOp>(loc, zero, empty).getResult(0);
 }
@@ -84,12 +82,11 @@ struct MatmulToLinalgPattern : public OpRewritePattern<ks::MatmulOp> {
     Location loc = op.getLoc();
     auto resultType = cast<RankedTensorType>(op.getType());
 
-    Value filled =
-        createZeroFilledTensor(rewriter, loc, resultType, op.getLhs(), op.getRhs());
+    Value filled = createZeroFilledTensor(rewriter, loc, resultType,
+                                          op.getLhs(), op.getRhs());
 
     rewriter.replaceOpWithNewOp<linalg::MatmulOp>(
-        op, TypeRange{resultType},
-        ValueRange{op.getLhs(), op.getRhs()},
+        op, TypeRange{resultType}, ValueRange{op.getLhs(), op.getRhs()},
         ValueRange{filled});
     return success();
   }

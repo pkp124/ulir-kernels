@@ -45,10 +45,8 @@ extern "C" {
  *   KS_ERR_INVALID_ARG - NULL pointer or invalid dimensions
  *   KS_ERR_WORKSPACE   - Workspace too small
  */
-int ks_matmul_f32(const float *A, size_t lda,
-                  const float *B, size_t ldb,
-                  float *C, size_t ldc,
-                  size_t M, size_t N, size_t K,
+int ks_matmul_f32(const float *A, size_t lda, const float *B, size_t ldb,
+                  float *C, size_t ldc, size_t M, size_t N, size_t K,
                   void *workspace, size_t ws_size);
 
 /*

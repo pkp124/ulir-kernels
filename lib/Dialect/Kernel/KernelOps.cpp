@@ -231,9 +231,8 @@ LogicalResult RMSNormOp::verify() {
 //===----------------------------------------------------------------------===//
 
 /// Shared verification logic for reduction operations.
-static LogicalResult verifyReductionAxes(Operation *op,
-                                         RankedTensorType inputType,
-                                         ArrayAttr axes) {
+static LogicalResult
+verifyReductionAxes(Operation *op, RankedTensorType inputType, ArrayAttr axes) {
   int64_t rank = inputType.getRank();
   llvm::SmallSet<int64_t, 4> seen;
 

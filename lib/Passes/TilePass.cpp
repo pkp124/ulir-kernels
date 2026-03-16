@@ -27,9 +27,8 @@
 // Non-divisible dimensions produce correct tail handling via affine.min.
 //===----------------------------------------------------------------------===//
 
-#include "KernelSmith/Passes/Passes.h"
-
 #include "KernelSmith/Dialect/Kernel/KernelDialect.h"
+#include "KernelSmith/Passes/Passes.h"
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -71,11 +70,10 @@ struct KSTilePass : impl::KSTilePassBase<KSTilePass> {
     if (tileSizeM == 0 && tileSizeN == 0 && tileSizeK == 0)
       return;
 
-    // linalg::LinalgTilingOptions / tileLinalgOp — stable across MLIR 18-20.
+    // linalg::LinalgTilingOptions / tileLinalgOp — stable across MLIR 18-21+.
     // tensorResults in TiledLinalgOp is the replacement for the original op.
     linalg::LinalgTilingOptions opts;
-    opts.setTileSizes(
-        SmallVector<int64_t>{tileSizeM, tileSizeN, tileSizeK});
+    opts.setTileSizes(SmallVector<int64_t>{tileSizeM, tileSizeN, tileSizeK});
     // Default loop type is LinalgTilingLoopType::Loops (scf.for).
 
     for (linalg::MatmulOp matmulOp : matmulOps) {
