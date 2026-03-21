@@ -1,0 +1,289 @@
+# =============================================================================
+# CI: RISC-V RVV Simulation Tests
+# =============================================================================
+# Tests the M4 RVV lowering pipeline end-to-end:
+#   1. build-rvv-kernels — compiles MLIR tests to riscv64 ELF binaries
+#      using ks-opt + mlir-translate + llc + riscv64-linux-gnu-gcc
+#   2. simulate-qemu    — runs each ELF on qemu-riscv64 with VLEN=128/256/512
+#   3. simulate-spike   — runs on Spike ISA simulator (optional, better RVV 1.0)
+#
+# Adapted from: https://github.com/pkp124/riscv (ci-build.yml patterns)
+#
+# Key differences from pkp124/riscv:
+#   - Uses qemu-user (user-mode) instead of qemu-system (bare-metal).
+#   - ks-opt pipeline: ks.mlir → LLVM dialect → llc (riscv64) → ELF.
+#   - Tests M4 RVV passes: --ks-lower-to-rvv with vector.maximumf, etc.
+# =============================================================================
+
+name: CI - RVV Simulation
+
+on:
+  push:
+    branches: [main, develop, 'claude/**']
+    paths:
+      - 'lib/Passes/**'
+      - 'include/KernelSmith/Passes/**'
+      - 'target/riscv_rvv_256.h'
+      - 'tests/riscv/**'
+      - 'scripts/compile-rvv.sh'
+      - 'scripts/setup-rvv-sim.sh'
+      - '.github/workflows/ci-rvv-sim.yml'
+  pull_request:
+    paths:
+      - 'lib/Passes/**'
+      - 'include/KernelSmith/Passes/**'
+      - 'target/riscv_rvv_256.h'
+      - 'tests/riscv/**'
+      - 'scripts/compile-rvv.sh'
+  workflow_dispatch:
+    inputs:
+      run_spike:
+        description: 'Run Spike simulations (slow — builds from source)'
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# =============================================================================
+# Job 1: Build ks-opt and compile RVV ELF binaries
+# =============================================================================
+jobs:
+  build-rvv-kernels:
+    name: "Build RVV kernels"
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # -----------------------------------------------------------------------
+      # Cache LLVM 21 apt packages (matches existing ci.yml)
+      # -----------------------------------------------------------------------
+      - name: Cache LLVM 21 apt packages
+        uses: actions/cache@v4
+        with:
+          path: /var/cache/apt/archives
+          key: apt-llvm-21-rvv-${{ runner.os }}-v1
+
+      - name: Install LLVM/MLIR 21
+        run: |
+          wget -qO- https://apt.llvm.org/llvm.sh | sudo bash -s -- 21
+          sudo apt-get install -y \
+            mlir-21-tools \
+            libmlir-21-dev \
+            llvm-21-dev \
+            libgtest-dev \
+            clang-21
+
+          # Ensure unversioned symlinks exist for ks-opt build + llc usage.
+          for tool in mlir-translate llc clang; do
+            if ! command -v "${tool}" &>/dev/null && command -v "${tool}-21" &>/dev/null; then
+              sudo update-alternatives --install /usr/bin/${tool} ${tool} \
+                /usr/bin/${tool}-21 21
+            fi
+          done
+
+          echo "mlir-translate: $(mlir-translate --version 2>&1 | head -1)"
+          echo "llc: $(llc --version 2>&1 | head -1)"
+          llc --version 2>&1 | grep -i "riscv" || echo "WARNING: LLVM RISC-V target not listed"
+
+      # -----------------------------------------------------------------------
+      # Install RISC-V cross-compiler (for linking ELF binaries)
+      # -----------------------------------------------------------------------
+      - name: Install RISC-V cross-compiler
+        run: |
+          sudo apt-get install -y \
+            gcc-riscv64-linux-gnu \
+            binutils-riscv64-linux-gnu \
+            libc6-dev-riscv64-cross
+          riscv64-linux-gnu-gcc --version | head -1
+
+      # -----------------------------------------------------------------------
+      # Build ks-opt (same as ci.yml build-and-test)
+      # -----------------------------------------------------------------------
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Configure KernelSmith
+        run: |
+          cmake -S . -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DLLVM_DIR=/usr/lib/llvm-21/lib/cmake/llvm \
+            -DMLIR_DIR=/usr/lib/llvm-21/lib/cmake/mlir
+
+      - name: Build ks-opt
+        run: cmake --build build --parallel --target ks-opt
+
+      # -----------------------------------------------------------------------
+      # Compile MLIR test programs to riscv64 ELF using the M4 pipeline
+      # -----------------------------------------------------------------------
+      - name: Compile relu_rvv ELF
+        env:
+          KS_OPT: build/bin/ks-opt
+          MLIR_TRANSLATE: mlir-translate
+          LLC: llc
+        run: |
+          mkdir -p build-rvv/bin
+
+          echo "=== Stage 1: ks-opt --ks-lower-to-rvv ==="
+          build/bin/ks-opt tests/riscv/relu_rvv.mlir \
+            --ks-lower-to-rvv \
+            -o build-rvv/relu_llvm.mlir
+
+          echo "=== Stage 2: mlir-translate ==="
+          mlir-translate --mlir-to-llvmir build-rvv/relu_llvm.mlir \
+            -o build-rvv/relu.ll
+
+          echo "=== Stage 3: llc → riscv64 object ==="
+          llc -march=riscv64 \
+              -mattr=+v,+zve64d,+zvl256b \
+              -float-abi=double \
+              -filetype=obj \
+              build-rvv/relu.ll \
+              -o build-rvv/relu.o
+
+          echo "=== Stage 4: link static ELF ==="
+          riscv64-linux-gnu-gcc \
+            -static build-rvv/relu.o \
+            -o build-rvv/bin/relu_rvv \
+            -lm
+          file build-rvv/bin/relu_rvv
+          echo "relu_rvv ELF built successfully"
+
+      - name: Upload RVV ELF artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: rvv-elf-binaries
+          path: build-rvv/bin/
+          retention-days: 7
+
+# =============================================================================
+# Job 2: QEMU simulation — multi-VLEN matrix
+# =============================================================================
+  simulate-qemu:
+    name: "QEMU ${{ matrix.name }}"
+    runs-on: ubuntu-24.04
+    needs: build-rvv-kernels
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: "RVV VLEN=128"
+            vlen: 128
+            cpu_args: "rv64,v=true,vlen=128,vext_spec=v1.0"
+          - name: "RVV VLEN=256"
+            vlen: 256
+            cpu_args: "rv64,v=true,vlen=256,vext_spec=v1.0"
+          - name: "RVV VLEN=512"
+            vlen: 512
+            cpu_args: "rv64,v=true,vlen=512,vext_spec=v1.0"
+
+    steps:
+      - name: Install qemu-user
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y qemu-user qemu-user-static
+          qemu-riscv64 --version | head -1
+
+      - name: Download RVV ELF binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: rvv-elf-binaries
+          path: rvv-bin/
+
+      - name: Prepare binaries
+        run: chmod +x rvv-bin/*
+
+      - name: "Simulate relu_rvv (VLEN=${{ matrix.vlen }})"
+        timeout-minutes: 2
+        run: |
+          echo "Running relu_rvv with -cpu ${{ matrix.cpu_args }}"
+          qemu-riscv64 -cpu "${{ matrix.cpu_args }}" rvv-bin/relu_rvv
+          EXIT_CODE=$?
+          if [ $EXIT_CODE -eq 0 ]; then
+            echo "PASS: relu_rvv VLEN=${{ matrix.vlen }}"
+          else
+            echo "FAIL: relu_rvv VLEN=${{ matrix.vlen }} (exit $EXIT_CODE)"
+            exit 1
+          fi
+
+# =============================================================================
+# Job 3: Spike simulation (optional — only on workflow_dispatch with flag)
+# =============================================================================
+  simulate-spike:
+    name: "Spike RVV"
+    runs-on: ubuntu-24.04
+    needs: build-rvv-kernels
+    # Only run when manually triggered with run_spike=true.
+    # Spike build from source takes ~10 min; not suitable for every push.
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_spike == true }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Spike build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y \
+            device-tree-compiler \
+            libboost-regex-dev \
+            libboost-system-dev \
+            build-essential git
+
+      - name: Build Spike from source
+        run: |
+          git clone --depth 1 \
+            https://github.com/riscv-software-src/riscv-isa-sim.git /tmp/spike-src
+          cd /tmp/spike-src
+          mkdir build && cd build
+          ../configure --prefix=/opt/riscv
+          make -j$(nproc)
+          sudo make install
+          /opt/riscv/bin/spike --help 2>&1 | head -3 || true
+
+      - name: Install pk (proxy kernel) for Spike user-mode
+        run: |
+          # riscv-pk provides the pk proxy kernel needed for Spike user-mode ELF execution.
+          sudo apt-get install -y gcc-riscv64-linux-gnu
+          git clone --depth 1 \
+            https://github.com/riscv-software-src/riscv-pk.git /tmp/pk-src
+          mkdir -p /tmp/pk-src/build && cd /tmp/pk-src/build
+          ../configure --prefix=/opt/riscv --host=riscv64-linux-gnu
+          make -j$(nproc)
+          sudo make install
+
+      - name: Download RVV ELF binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: rvv-elf-binaries
+          path: rvv-bin/
+
+      - name: Prepare binaries
+        run: chmod +x rvv-bin/*
+
+      - name: "Simulate relu_rvv on Spike (RVV 1.0)"
+        timeout-minutes: 5
+        run: |
+          export PATH="/opt/riscv/bin:$PATH"
+          echo "Running relu_rvv on Spike with +v extension"
+          # Spike flags: --isa=rv64gcv enables V extension, --varch sets VLEN/ELEN.
+          spike \
+            --isa=rv64gcv \
+            --varch="vlen:256,elen:64" \
+            /opt/riscv/riscv64-unknown-linux-gnu/bin/pk \
+            rvv-bin/relu_rvv
+          EXIT_CODE=$?
+          if [ $EXIT_CODE -eq 0 ]; then
+            echo "PASS: relu_rvv on Spike"
+          else
+            echo "FAIL: relu_rvv on Spike (exit $EXIT_CODE)"
+            exit 1
+          fi
