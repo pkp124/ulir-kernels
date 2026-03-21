@@ -9,6 +9,11 @@
 //   qemu-riscv64 -cpu rv64,v=true,vlen=256 /tmp/relu_test
 //
 // Exit code 0 = PASS, 1 = FAIL.
+//
+// Note: uses only arith/vector/memref/func ops (no math.*) so that the file
+// is compatible with --ks-lower-to-rvv, which has no convert-math-to-llvm
+// step. Validation uses range checks (expected-eps < got < expected+eps)
+// via arith.cmpf instead of math.absf.
 
 func.func @main() -> i32 {
   // Allocate 8-element input and output buffers on the stack.
@@ -70,33 +75,55 @@ func.func @main() -> i32 {
   %o6 = memref.load %buf_out[%c6] : memref<8xf32>
   %o7 = memref.load %buf_out[%c7] : memref<8xf32>
 
-  // Check each output against expected using |got - exp| < eps.
-  %d0 = arith.subf %o0, %e0 : f32
-  %d1 = arith.subf %o1, %e0 : f32
-  %d2 = arith.subf %o2, %e0 : f32
-  %d3 = arith.subf %o3, %e0 : f32
-  %d4 = arith.subf %o4, %e4 : f32
-  %d5 = arith.subf %o5, %e5 : f32
-  %d6 = arith.subf %o6, %e6 : f32
-  %d7 = arith.subf %o7, %e7 : f32
+  // Range check: expected-eps < got < expected+eps.
+  // Avoids math.absf (not lowered by --ks-lower-to-rvv pipeline).
+  %lo0 = arith.subf %e0, %eps : f32
+  %hi0 = arith.addf %e0, %eps : f32
+  %ok0a = arith.cmpf ogt, %o0, %lo0 : f32
+  %ok0b = arith.cmpf olt, %o0, %hi0 : f32
+  %ok0  = arith.andi %ok0a, %ok0b : i1
 
-  %a0 = math.absf %d0 : f32
-  %a1 = math.absf %d1 : f32
-  %a2 = math.absf %d2 : f32
-  %a3 = math.absf %d3 : f32
-  %a4 = math.absf %d4 : f32
-  %a5 = math.absf %d5 : f32
-  %a6 = math.absf %d6 : f32
-  %a7 = math.absf %d7 : f32
+  %lo1 = arith.subf %e0, %eps : f32
+  %hi1 = arith.addf %e0, %eps : f32
+  %ok1a = arith.cmpf ogt, %o1, %lo1 : f32
+  %ok1b = arith.cmpf olt, %o1, %hi1 : f32
+  %ok1  = arith.andi %ok1a, %ok1b : i1
 
-  %ok0 = arith.cmpf olt, %a0, %eps : f32
-  %ok1 = arith.cmpf olt, %a1, %eps : f32
-  %ok2 = arith.cmpf olt, %a2, %eps : f32
-  %ok3 = arith.cmpf olt, %a3, %eps : f32
-  %ok4 = arith.cmpf olt, %a4, %eps : f32
-  %ok5 = arith.cmpf olt, %a5, %eps : f32
-  %ok6 = arith.cmpf olt, %a6, %eps : f32
-  %ok7 = arith.cmpf olt, %a7, %eps : f32
+  %lo2 = arith.subf %e0, %eps : f32
+  %hi2 = arith.addf %e0, %eps : f32
+  %ok2a = arith.cmpf ogt, %o2, %lo2 : f32
+  %ok2b = arith.cmpf olt, %o2, %hi2 : f32
+  %ok2  = arith.andi %ok2a, %ok2b : i1
+
+  %lo3 = arith.subf %e0, %eps : f32
+  %hi3 = arith.addf %e0, %eps : f32
+  %ok3a = arith.cmpf ogt, %o3, %lo3 : f32
+  %ok3b = arith.cmpf olt, %o3, %hi3 : f32
+  %ok3  = arith.andi %ok3a, %ok3b : i1
+
+  %lo4 = arith.subf %e4, %eps : f32
+  %hi4 = arith.addf %e4, %eps : f32
+  %ok4a = arith.cmpf ogt, %o4, %lo4 : f32
+  %ok4b = arith.cmpf olt, %o4, %hi4 : f32
+  %ok4  = arith.andi %ok4a, %ok4b : i1
+
+  %lo5 = arith.subf %e5, %eps : f32
+  %hi5 = arith.addf %e5, %eps : f32
+  %ok5a = arith.cmpf ogt, %o5, %lo5 : f32
+  %ok5b = arith.cmpf olt, %o5, %hi5 : f32
+  %ok5  = arith.andi %ok5a, %ok5b : i1
+
+  %lo6 = arith.subf %e6, %eps : f32
+  %hi6 = arith.addf %e6, %eps : f32
+  %ok6a = arith.cmpf ogt, %o6, %lo6 : f32
+  %ok6b = arith.cmpf olt, %o6, %hi6 : f32
+  %ok6  = arith.andi %ok6a, %ok6b : i1
+
+  %lo7 = arith.subf %e7, %eps : f32
+  %hi7 = arith.addf %e7, %eps : f32
+  %ok7a = arith.cmpf ogt, %o7, %lo7 : f32
+  %ok7b = arith.cmpf olt, %o7, %hi7 : f32
+  %ok7  = arith.andi %ok7a, %ok7b : i1
 
   %all01 = arith.andi %ok0, %ok1 : i1
   %all23 = arith.andi %ok2, %ok3 : i1
