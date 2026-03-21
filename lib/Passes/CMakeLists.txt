@@ -37,7 +37,6 @@ add_mlir_library(KernelSmithPasses
   MLIRBufferizationTransforms
   MLIRLLVMDialect
   # Conversion libraries (M4: vectorize + lower-to-rvv pipeline)
-  MLIRConversionPasses
   MLIRAffineToStandard
   MLIRArithToLLVM
   MLIRControlFlowToLLVM
