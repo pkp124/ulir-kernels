@@ -32,8 +32,7 @@ class QEMURunner:
     def _check_qemu_available(self):
         """Check if QEMU is available."""
         try:
-            subprocess.run([self.qemu_binary, "--version"],
-                           capture_output=True, check=True)
+            subprocess.run([self.qemu_binary, "--version"], capture_output=True, check=True)
         except (FileNotFoundError, subprocess.CalledProcessError) as err:
             raise RuntimeError(
                 f"{self.qemu_binary} not found. Install with: apt install qemu-user"
@@ -65,16 +64,15 @@ class QEMURunner:
         # -cpu rv64,v=true,vlen=<N>  enables the V extension at the given VLEN.
         cmd = [
             self.qemu_binary,
-            "-cpu", f"rv64,v=true,vlen={vlen},vext_spec=v1.0",
+            "-cpu",
+            f"rv64,v=true,vlen={vlen},vext_spec=v1.0",
             binary_path,
         ]
         if args:
             cmd.extend(args)
 
         try:
-            result = subprocess.run(
-                cmd, capture_output=True, text=True, timeout=timeout
-            )
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
             return result.returncode, result.stdout, result.stderr
         except subprocess.TimeoutExpired:
             return -1, "", f"Timeout ({timeout}s) running {binary_path}"
@@ -188,8 +186,7 @@ class QEMURunner:
         }
 
 
-def run_matmul_correctness_test(runner: QEMURunner, binary: str,
-                                 vlens: list) -> bool:
+def run_matmul_correctness_test(runner: QEMURunner, binary: str, vlens: list) -> bool:
     """
     Run the RVV matmul binary across all VLENs and validate consistency.
 
@@ -238,22 +235,19 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Run RISC-V RVV kernels on QEMU with multiple VLEN configs."
     )
+    parser.add_argument("--binary", required=True, help="Path to the RISC-V ELF binary to test.")
     parser.add_argument(
-        "--binary", required=True,
-        help="Path to the RISC-V ELF binary to test."
-    )
-    parser.add_argument(
-        "--vlens", nargs="+", type=int,
+        "--vlens",
+        nargs="+",
+        type=int,
         default=QEMURunner.STANDARD_VLENS,
-        help="VLEN values to test (default: 128 256 512)."
+        help="VLEN values to test (default: 128 256 512).",
     )
     parser.add_argument(
-        "--benchmark", action="store_true",
-        help="Run benchmark in addition to correctness test."
+        "--benchmark", action="store_true", help="Run benchmark in addition to correctness test."
     )
     parser.add_argument(
-        "--qemu", default="qemu-riscv64",
-        help="Path or name of the QEMU user-mode binary."
+        "--qemu", default="qemu-riscv64", help="Path or name of the QEMU user-mode binary."
     )
     args = parser.parse_args()
 
