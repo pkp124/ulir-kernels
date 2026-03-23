@@ -44,5 +44,5 @@ add_mlir_library(KernelSmithPasses
   MLIRLinalgToStandard
   MLIRMemRefToLLVM
   MLIRSCFToControlFlow
-  MLIRVectorToLLVM
+  MLIRVectorToLLVMPass
 )

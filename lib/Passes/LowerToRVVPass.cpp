@@ -34,13 +34,11 @@
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/ArithToLLVM/ArithToLLVM.h"
 #include "mlir/Conversion/ControlFlowToLLVM/ControlFlowToLLVM.h"
-#include "mlir/Conversion/FuncToLLVM/ConvertFuncToLLVM.h"
-#include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
-#include "mlir/Conversion/LLVMCommon/TypeConverter.h"
+#include "mlir/Conversion/FuncToLLVM/ConvertFuncToLLVMPass.h"
 #include "mlir/Conversion/LinalgToStandard/LinalgToStandard.h"
 #include "mlir/Conversion/MemRefToLLVM/MemRefToLLVM.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
-#include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVM.h"
+#include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVMPass.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
@@ -102,8 +100,7 @@ struct KSLowerToRVVPass : impl::KSLowerToRVVPassBase<KSLowerToRVVPass> {
     // Stage 5: Lower vector dialect -> LLVM dialect.
     // The RISC-V V backend in LLVM translates vector.* intrinsics to RVV when
     // the target triple and +v feature are set (via llc flags at compile time).
-    LowerVectorToLLVMOptions vectorOpts;
-    pm.addPass(createConvertVectorToLLVMPass(vectorOpts));
+    pm.addPass(createConvertVectorToLLVMPass());
 
     // Stage 6: Lower memref -> LLVM (pointer arithmetic, GEPs).
     pm.addPass(createFinalizeMemRefToLLVMConversionPass());
@@ -112,9 +109,7 @@ struct KSLowerToRVVPass : impl::KSLowerToRVVPassBase<KSLowerToRVVPass> {
     pm.addNestedPass<func::FuncOp>(createArithToLLVMConversionPass());
 
     // Stage 8: Lower func.func -> llvm.func (calling convention, linkage).
-    LowerToLLVMOptions funcOpts(module->getContext());
-    funcOpts.overrideIndexBitwidth(indexBitwidth);
-    pm.addPass(createConvertFuncToLLVMPass(funcOpts));
+    pm.addPass(createConvertFuncToLLVMPass());
 
     // Stage 9: Clean up unrealized casts left by conversions.
     pm.addPass(createReconcileUnrealizedCastsPass());
