@@ -33,6 +33,7 @@
 
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/ArithToLLVM/ArithToLLVM.h"
+#include "mlir/Conversion/ControlFlowToLLVM/ControlFlowToLLVM.h"
 #include "mlir/Conversion/FuncToLLVM/ConvertFuncToLLVMPass.h"
 #include "mlir/Conversion/MemRefToLLVM/MemRefToLLVM.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
@@ -95,6 +96,12 @@ struct KSLowerToRVVPass : impl::KSLowerToRVVPassBase<KSLowerToRVVPass> {
 
     // Stage 4: Convert scf.for/if -> cf.br (flat CFG for LLVM).
     pm.addPass(createConvertSCFToCFPass());
+
+    // Stage 4b: Convert cf.br/cf.cond_br -> llvm.br/llvm.cond_br.
+    // FuncToLLVM only converts the entry block signature; the remaining
+    // unstructured control flow (loop back-edges, conditionals) must be
+    // lowered explicitly here before the LLVM dialect conversion passes.
+    pm.addPass(createConvertControlFlowToLLVMPass());
 
     // Stage 5: Lower vector dialect -> LLVM dialect.
     // The RISC-V V backend in LLVM translates vector.* intrinsics to RVV when
