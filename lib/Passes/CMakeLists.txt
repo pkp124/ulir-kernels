@@ -41,7 +41,6 @@ add_mlir_library(KernelSmithPasses
   MLIRArithToLLVM
   MLIRControlFlowToLLVM
   MLIRFuncToLLVM
-  MLIRLinalgToStandard
   MLIRMemRefToLLVM
   MLIRSCFToControlFlow
   MLIRVectorToLLVMPass
