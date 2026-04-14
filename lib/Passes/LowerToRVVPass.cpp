@@ -37,6 +37,7 @@
 #include "mlir/Conversion/FuncToLLVM/ConvertFuncToLLVMPass.h"
 #include "mlir/Conversion/MemRefToLLVM/MemRefToLLVM.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
+#include "mlir/Conversion/LinalgToStandard/LinalgToStandard.h"
 #include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVMPass.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -47,7 +48,6 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -92,7 +92,7 @@ struct KSLowerToRVVPass : impl::KSLowerToRVVPassBase<KSLowerToRVVPass> {
     pm.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
 
     // Stage 3: Lower affine.apply -> arith (required before SCF->CF).
-    pm.addNestedPass<func::FuncOp>(createLowerAffinePass());
+    pm.addNestedPass<func::FuncOp>(affine::createLowerAffinePass());
 
     // Stage 4: Convert scf.for/if -> cf.br (flat CFG for LLVM).
     pm.addPass(createConvertSCFToCFPass());
