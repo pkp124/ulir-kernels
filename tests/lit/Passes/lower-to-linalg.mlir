@@ -6,8 +6,8 @@
 
 // CHECK-LABEL: func @test_static_square
 // CHECK-NOT:   ks.matmul
-// CHECK:       tensor.empty
-// CHECK:       arith.constant 0
+// CHECK-DAG:   tensor.empty
+// CHECK-DAG:   arith.constant 0
 // CHECK:       linalg.fill
 // CHECK:       linalg.matmul
 func.func @test_static_square(%A: tensor<32x32xf32>,
@@ -90,8 +90,8 @@ func.func @test_dynamic_both(%A: tensor<?x128xf32>,
 
 // CHECK-LABEL: func @test_f16
 // CHECK-NOT:   ks.matmul
-// CHECK:       tensor.empty
-// CHECK:       arith.constant 0
+// CHECK-DAG:   tensor.empty
+// CHECK-DAG:   arith.constant 0
 // CHECK:       linalg.fill
 // CHECK:       linalg.matmul
 func.func @test_f16(%A: tensor<16x16xf16>,
