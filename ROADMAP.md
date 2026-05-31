@@ -19,14 +19,17 @@
 **Status**: Done
 
 - KS dialect with 13 operations defined in TableGen
-- Verifiers for 5 operations (matmul, batch_matmul, conv2d, attention, layer_norm)
-- `ks-opt` CLI tool (parse/print)
+- Verifiers for 9 operations (matmul, batch_matmul, conv2d, attention,
+  softmax, layer_norm, rms_norm, reduce_sum, reduce_max)
+- `ks-opt` CLI tool (parse/print + pass driver)
 - Lit tests for parse round-trip and verifier errors
-- Build system (CMake + LLVM/MLIR 18 integration)
+- Build system (CMake + LLVM/MLIR 21 integration)
 
 ---
 
 ## Milestone 1: C API + Reference Library (Complete)
+
+**Status**: Done
 
 **Goal**: Ship a working `libkernelsmith.a` with stable C headers. Handwritten
 reference implementations. No MLIR in the critical path yet.
@@ -59,6 +62,9 @@ in later milestones — behind the same stable interface.
 
 ## Milestone 2: MLIR Lowering — Activations
 
+**Status**: Partial. The pass and lit tests are implemented; generated object
+integration into `libkernelsmith.a` is still pending.
+
 **Goal**: Replace handwritten activation functions with MLIR-generated code.
 Proves the pass infrastructure works end-to-end.
 
@@ -84,6 +90,10 @@ Proves the pass infrastructure works end-to-end.
 ---
 
 ## Milestone 3: MLIR Lowering — MatMul (Generic Target)
+
+**Status**: Current / partial. `--ks-lower-to-linalg` and `--ks-tile` are
+implemented and tested. Bufferization, allocation checking, generated object
+integration, and C library replacement remain open.
 
 **Goal**: Replace handwritten matmul with MLIR-generated code. Single-level tiling,
 no packing, generic target profile. Proves the full ks -> linalg -> LLVM pipeline.
