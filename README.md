@@ -12,19 +12,22 @@ KernelSmith is an MLIR-based compiler framework that generates optimized ML infe
 
 The MVP target is a quantized transformer running end-to-end on RISC-V RVV.
 
-## Features
+## Current Features
 
 - **High-Level Kernel Operations**: Matrix multiplication, convolution, attention, activation functions, normalization
-- **Quantization-First**: INT8 and INT4 kernels with accumulator promotion for edge inference
-- **Profile-Driven Tiling**: Target profiles drive tile sizes, packing, and vectorization at build time
-- **RVV-Specific Lowering**: Custom `--ks-lower-to-rvv` pass for vector-length-agnostic code
+- **C Kernel Library**: `libkernelsmith.a` with stable C headers and handwritten f32 reference kernels
+- **MLIR Lowering Passes**: Activations lower to `linalg.generic`; matmul lowers to `linalg.matmul` and tiled `scf.for`
+- **Profile-Driven Tiling**: Generic target tile sizes are available as `--ks-tile` pass options
 - **Comprehensive Testing**: Lit, unit, and numpy-validated C tests with CTest
+
+Planned work includes RISC-V RVV lowering, INT8 and INT4/W4A8 quantized kernels,
+and broader edge operator coverage.
 
 ## Quick Start
 
 ### Prerequisites
 
-- LLVM/MLIR 18+ (with MLIR enabled)
+- LLVM/MLIR 21+ (with MLIR enabled)
 - CMake 3.20+
 - Python 3.10+
 - C++17 compatible compiler
@@ -41,7 +44,7 @@ cmake -S . -B build \
 cmake --build build --parallel
 
 # Test
-ctest --test-dir build
+ctest --test-dir build --output-on-failure
 ```
 
 ### Basic Usage
@@ -56,9 +59,10 @@ func.func @matmul_kernel(%A: tensor<64x128xf32>,
 }
 ```
 
-Parse and print (lowering passes are not yet implemented):
+Parse, print, and run the currently implemented lowering passes:
 ```bash
 ks-opt input.mlir
+ks-opt input.mlir --ks-lower-to-linalg --ks-tile
 ```
 
 ## Project Structure
@@ -69,7 +73,7 @@ ks-opt input.mlir
 │   └── Dialect/Kernel/  # Kernel dialect definitions (.td, .h)
 ├── lib/                 # Implementation
 │   ├── Dialect/Kernel/  # Dialect, ops, types (.cpp)
-│   └── Passes/          # Pass implementations (stub)
+│   └── Passes/          # Pass implementations
 ├── tools/ks-opt/        # CLI optimizer entry point
 ├── tests/
 │   ├── lit/             # MLIR FileCheck tests (.mlir)
@@ -96,18 +100,18 @@ See [CLAUDE.md](CLAUDE.md) for development guidelines and [ROADMAP.md](ROADMAP.m
 
 | Kernel | Parse/Print | Verifier | Lowering |
 |--------|:-----------:|:--------:|:--------:|
-| `ks.matmul` | Yes | Yes | Not yet |
+| `ks.matmul` | Yes | Yes | linalg + tile |
 | `ks.batch_matmul` | Yes | Yes | Not yet |
 | `ks.conv2d` | Yes | Yes | Not yet |
 | `ks.attention` | Yes | Yes | Not yet |
-| `ks.softmax` | Yes | - | Not yet |
+| `ks.softmax` | Yes | Yes | Not yet |
 | `ks.layer_norm` | Yes | Yes | Not yet |
-| `ks.rms_norm` | Yes | - | Not yet |
-| `ks.gelu` | Yes | - | Not yet |
-| `ks.relu` | Yes | - | Not yet |
-| `ks.silu` | Yes | - | Not yet |
-| `ks.reduce_sum` | Yes | - | Not yet |
-| `ks.reduce_max` | Yes | - | Not yet |
+| `ks.rms_norm` | Yes | Yes | Not yet |
+| `ks.gelu` | Yes | - | activation pass |
+| `ks.relu` | Yes | - | activation pass |
+| `ks.silu` | Yes | - | activation pass |
+| `ks.reduce_sum` | Yes | Yes | Not yet |
+| `ks.reduce_max` | Yes | Yes | Not yet |
 
 ## License
 

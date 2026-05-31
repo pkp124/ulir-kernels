@@ -48,10 +48,10 @@ Progress updates with dates.
 
 | ID | Title | Status | Priority |
 |----|-------|--------|----------|
-| TASK-001 | Set up MLIR dialect infrastructure | Not Started | P0 |
-| TASK-002 | Implement Kernel dialect | Not Started | P0 |
-| TASK-003 | Implement matmul operation | Not Started | P1 |
-| TASK-004 | Implement tiling pass | Not Started | P1 |
+| TASK-001 | Set up MLIR dialect infrastructure | Complete | P0 |
+| TASK-002 | Implement Kernel dialect | Complete | P0 |
+| TASK-003 | Implement matmul operation | Complete | P1 |
+| TASK-004 | Implement tiling pass | In Progress | P1 |
 | TASK-005 | Implement RVV lowering | Not Started | P1 |
 
 ## Working with Tasks

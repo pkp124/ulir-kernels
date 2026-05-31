@@ -281,14 +281,14 @@ keeping the pass infrastructure consistent and familiar.
 
 ### Phase 1: Pass infrastructure and lowering (this PR)
 - [x] Design doc DES-008
-- [ ] `Passes.td`: add `KSLowerToLinalgPass`, `KSTilePass` with options
-- [ ] `LowerToLinalgPass.cpp`: `MatmulToLinalgPattern` with zero-fill + dynamic shape
-- [ ] `TilePass.cpp`: walk + `scf::tileUsingSCF` with option-driven sizes
-- [ ] `CMakeLists.txt`: add source files + `MLIRSCFDialect`, `MLIRSCFTransforms`
+- [x] `Passes.td`: add `KSLowerToLinalgPass`, `KSTilePass` with options
+- [x] `LowerToLinalgPass.cpp`: `MatmulToLinalgPattern` with zero-fill + dynamic shape
+- [x] `TilePass.cpp`: walk + MLIR tiling API with option-driven sizes
+- [x] `CMakeLists.txt`: add source files + required MLIR libraries
 
 ### Phase 2: Tests
-- [ ] `tests/lit/Passes/lower-to-linalg.mlir`
-- [ ] `tests/lit/Passes/tile.mlir`
+- [x] `tests/lit/Passes/lower-to-linalg.mlir`
+- [x] `tests/lit/Passes/tile.mlir`
 
 ### Phase 3: Integration (follow-up)
 - [ ] Build script: read `target/generic.h` defines → `--ks-tile` options
