@@ -6,7 +6,8 @@
 //
 // This pass applies MLIR's linalg vectorization to the innermost tiled ops.
 // It converts linalg.matmul, linalg.generic (from activations and packed gemm),
-// and similar structured ops to vector.transfer_read/write + vector.contract ops.
+// and similar structured ops to vector.transfer_read/write + vector.contract
+// ops.
 //
 // The resulting vector dialect IR is target-independent. The --ks-lower-to-rvv
 // pass then lowers it to LLVM dialect with RVV semantics (via the RISC-V
@@ -83,15 +84,23 @@ struct KSVectorizePass : impl::KSVectorizePassBase<KSVectorizePass> {
 
       rewriter.setInsertionPoint(linalgOp);
 
-      // linalg::vectorize: vectorizeNDExtract=false (standard GEMM path).
-      if (failed(linalg::vectorize(rewriter, linalgOp, /*inputVectorSizes=*/{},
-                                    /*inputScalableVecDims=*/{},
-                                    /*vectorizeNDExtract=*/false,
-                                    /*flatten1DDepthwiseConv=*/false))) {
+      // linalg::vectorize returns replacement values for tensor results; use
+      // them to remove the original linalg op from the tensor SSA chain.
+      FailureOr<linalg::VectorizationResult> result = linalg::vectorize(
+          rewriter, linalgOp, /*inputVectorSizes=*/{},
+          /*inputScalableVecDims=*/{}, /*vectorizeNDExtract=*/false,
+          /*flatten1DDepthwiseConv=*/false);
+      if (failed(result)) {
         // Non-fatal: some ops (e.g. dynamic-shape linalg.generic from partial
         // tiles) cannot be vectorized. Emit a remark and continue.
         linalgOp.emitRemark("ks-vectorize: skipping non-vectorizable op");
+        continue;
       }
+
+      if (linalgOp->getNumResults() == 0)
+        rewriter.eraseOp(linalgOp);
+      else
+        rewriter.replaceOp(linalgOp, result->replacements);
     }
   }
 };
