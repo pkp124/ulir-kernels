@@ -4,6 +4,10 @@
 
 #include "KernelSmith/Dialect/Kernel/KernelDialect.h"
 
+#include "mlir/Dialect/Linalg/Transforms/BufferizableOpInterfaceImpl.h"
+#include "mlir/Dialect/SCF/Transforms/BufferizableOpInterfaceImpl.h"
+#include "mlir/Dialect/Tensor/Transforms/BufferizableOpInterfaceImpl.h"
+#include "mlir/Dialect/Vector/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/IR/DialectRegistry.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/InitAllDialects.h"
@@ -20,8 +24,14 @@ int main(int argc, char **argv) {
   // Register standard MLIR dialects
   mlir::registerAllDialects(registry);
 
-  // Register KernelSmith dialect
+  // Register KernelSmith dialect.
   registry.insert<kernelsmith::ks::KSDialect>();
+
+  // One-shot bufferization relies on external models for upstream dialects.
+  mlir::linalg::registerBufferizableOpInterfaceExternalModels(registry);
+  mlir::scf::registerBufferizableOpInterfaceExternalModels(registry);
+  mlir::tensor::registerBufferizableOpInterfaceExternalModels(registry);
+  mlir::vector::registerBufferizableOpInterfaceExternalModels(registry);
 
   // Register all passes
   mlir::registerAllPasses();

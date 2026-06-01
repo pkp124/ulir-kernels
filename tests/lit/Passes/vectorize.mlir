@@ -10,6 +10,7 @@
 // CHECK:       vector.transfer_read
 // CHECK:       vector.multi_reduction
 // CHECK:       vector.transfer_write
+// CHECK-NOT:   linalg.matmul
 func.func @test_vectorize_matmul(
     %A: tensor<16x32xf32>,
     %B: tensor<32x32xf32>,
@@ -27,6 +28,7 @@ func.func @test_vectorize_matmul(
 // CHECK-NOT:   linalg.generic
 // CHECK:       vector.transfer_read
 // CHECK:       vector.transfer_write
+// CHECK-NOT:   linalg.generic
 func.func @test_vectorize_generic(%input: tensor<32xf32>) -> tensor<32xf32> {
   %empty = tensor.empty() : tensor<32xf32>
   %zero = arith.constant 0.0 : f32
@@ -58,6 +60,7 @@ func.func @test_vectorize_generic(%input: tensor<32xf32>) -> tensor<32xf32> {
 // PIPELINE-NOT:   linalg.matmul
 // PIPELINE:       vector.transfer_read
 // PIPELINE:       vector.multi_reduction
+// PIPELINE-NOT:   linalg.matmul
 func.func @test_pipeline_vectorize(
     %A: tensor<128x256xf32>,
     %B: tensor<256x128xf32>) -> tensor<128x128xf32> {

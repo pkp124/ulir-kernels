@@ -16,7 +16,7 @@ from KernelSmith's MLIR dialect representation.
 
 The pipeline transforms `ks.matmul` all the way to LLVM IR that, when compiled
 with `llc -march=riscv64 -mattr=+v`, emits RVV instructions
-(`vle32.v`, `vfmacc.vv`, `vse32.v`, etc.).
+(`vle32.v`, `vfmul.vv`/reductions or `vfmacc.vv`, `vse32.v`, etc.).
 
 ---
 
@@ -34,8 +34,8 @@ require:
 
 1. **Tiling** to match register tile to VLMAX (elements per vector group).
 2. **B-matrix packing** to eliminate strided memory accesses in the inner loop.
-3. **Explicit vectorization** to produce `vector.contract` ops that map to
-   `vfmacc.vv` in the RISC-V backend.
+3. **Explicit vectorization** to produce vector transfer/arithmetic/reduction
+   ops that the RISC-V backend can lower to RVV instructions.
 4. **Full lowering to LLVM dialect** so that `mlir-translate` + `llc` can
    target `riscv64` with V extension features.
 
@@ -134,7 +134,10 @@ scf.for %m = 0 to 128 step 16 {
 vector.transfer_write %d, %Cp[np,m,0]
 ```
 
-The `vector.contract` op maps to `vfmacc.vv` in the LLVM RVV backend.
+MLIR 21 may represent matmul vectorization as multiply plus `vector.multi_reduction`; the LLVM RVV backend lowers the resulting vector operations to RVV instructions.
+
+#### Current integration note
+The checked-in lower-to-rvv smoke test currently validates `ks.matmul -> linalg -> tile -> vectorize -> LLVM`. `--ks-pack` has independent lit coverage; full `linalg.pack`/`linalg.unpack` bufferization into the RVV lowering pipeline remains follow-up work.
 
 #### Stage 6: `--ks-lower-to-rvv` (NEW in M4)
 Full lowering from vector/tensor/scf to LLVM dialect via a nested PassManager:
@@ -156,12 +159,12 @@ After this stage, `mlir-translate --mlir-to-llvmir` produces LLVM IR.
 #### Stage 7: `llc` (external)
 ```bash
 llc -march=riscv64 -mattr=+v,+zve64d,+zvl256b \
-    -float-abi=double -filetype=obj module.ll -o module.o
+    -float-abi=hard -filetype=obj module.ll -o module.o
 ```
 
 The LLVM RISC-V backend emits:
 - `vle32.v` for unit-stride vector loads (from `vector.transfer_read`)
-- `vfmacc.vv` for fused multiply-accumulate (from `vector.contract`)
+- `vfmul.vv` plus vector reductions, or `vfmacc.vv` where LLVM combines the pattern
 - `vse32.v` for vector stores (from `vector.transfer_write`)
 - `vsetvli` is inserted by the backend, minimized across loop bodies
 
@@ -222,8 +225,8 @@ Using LMUL=4 for compute-bound matmul:
 
 ### 6.1 Lit tests (MLIR level)
 - `tests/lit/Passes/pack.mlir` — verify `linalg.pack` shape and indexing maps.
-- `tests/lit/Passes/vectorize.mlir` — verify `vector.contract` produced.
-- `tests/lit/Passes/lower-to-rvv.mlir` — verify LLVM dialect output.
+- `tests/lit/Passes/vectorize.mlir` — verify vector operations are produced and original linalg ops are replaced.
+- `tests/lit/Passes/lower-to-rvv.mlir` — verify LLVM dialect output for the lower/tile/vectorize path.
 
 ### 6.2 QEMU correctness tests
 ```bash
@@ -234,10 +237,10 @@ scripts/compile-rvv.sh tests/inputs/matmul_128x256x128.mlir \
 # Run on multiple VLENs
 python tests/qemu_runner.py \
     --binary build-rvv/bin/test_matmul_rvv \
-    --vlens 128 256 512
+    --vlens 256 512
 ```
 
-Expected: all VLENs produce `PASS` with identical output (bit-for-bit).
+Expected: supported baseline VLENs produce `PASS` with identical output (bit-for-bit). VLEN=128 requires a separate non-`zvl256b` profile/build.
 
 ### 6.3 Benchmark
 ```bash

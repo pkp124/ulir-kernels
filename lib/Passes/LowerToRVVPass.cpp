@@ -23,7 +23,7 @@
 //
 // After this pass, use mlir-translate + llc to produce assembly:
 //   mlir-translate --mlir-to-llvmir module.mlir -o module.ll
-//   llc -march=riscv64 -mattr=+v,+zve64d -float-abi=double \
+//   llc -march=riscv64 -mattr=+v,+zve64d -float-abi=hard \
 //       -filetype=obj module.ll -o module.o
 //
 // Or use the provided scripts/compile-rvv.sh driver.
