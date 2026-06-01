@@ -10,7 +10,8 @@
 // vector backend emits VLE/VSE/VFMACC and related RVV instructions.
 //
 // Pipeline stages (in order):
-//   1. one-shot-bufferize           tensor -> memref (alloc at function boundary)
+//   1. one-shot-bufferize           tensor -> memref
+//      (alloc at function boundary)
 //   2. convert-linalg-to-loops      remaining linalg.generic -> scf.for
 //   3. lower-affine                  affine.apply -> arith
 //   4. convert-scf-to-cf            scf.for/if -> cf.br (LLVM-compatible CFG)
@@ -35,19 +36,21 @@
 #include "mlir/Conversion/ArithToLLVM/ArithToLLVM.h"
 #include "mlir/Conversion/ControlFlowToLLVM/ControlFlowToLLVM.h"
 #include "mlir/Conversion/FuncToLLVM/ConvertFuncToLLVMPass.h"
-#include "mlir/Conversion/MemRefToLLVM/MemRefToLLVM.h"
-#include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Conversion/LinalgToStandard/LinalgToStandard.h"
+#include "mlir/Conversion/MemRefToLLVM/MemRefToLLVM.h"
+#include "mlir/Conversion/Passes.h"
+#include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVMPass.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Bufferization/Transforms/OneShotAnalysis.h"
 #include "mlir/Dialect/Bufferization/Transforms/Passes.h"
-#include "mlir/Dialect/CF/IR/CFOps.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -83,7 +86,7 @@ struct KSLowerToRVVPass : impl::KSLowerToRVVPassBase<KSLowerToRVVPass> {
     // one-shot-bufferize with function-boundary allocation:
     //   - function arguments stay as memref arguments (no internal alloc)
     //   - result tensors become memref returns (caller owns storage)
-    bufferization::OneShotBufferizationOptions bufOpts;
+    bufferization::OneShotBufferizePassOptions bufOpts;
     bufOpts.allowReturnAllocsFromLoops = true;
     bufOpts.bufferizeFunctionBoundaries = true;
     pm.addPass(bufferization::createOneShotBufferizePass(bufOpts));
@@ -92,10 +95,10 @@ struct KSLowerToRVVPass : impl::KSLowerToRVVPassBase<KSLowerToRVVPass> {
     pm.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
 
     // Stage 3: Lower affine.apply -> arith (required before SCF->CF).
-    pm.addNestedPass<func::FuncOp>(affine::createLowerAffinePass());
+    pm.addNestedPass<func::FuncOp>(createLowerAffinePass());
 
     // Stage 4: Convert scf.for/if -> cf.br (flat CFG for LLVM).
-    pm.addPass(createConvertSCFToCFPass());
+    pm.addPass(createSCFToControlFlowPass());
 
     // Stage 4b: Convert cf.br/cf.cond_br -> llvm.br/llvm.cond_br.
     // FuncToLLVM only converts the entry block signature; the remaining

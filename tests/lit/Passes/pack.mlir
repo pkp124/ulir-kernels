@@ -28,7 +28,7 @@ func.func @test_pack_matmul(
 // CHECK:       linalg.pack
 // CHECK-SAME:  inner_dims_pos = [1]
 // CHECK-SAME:  inner_tiles = [32]
-// CHECK-SAME:  tensor<256x128xf32> into tensor<4x256x32xf32>
+// CHECK-SAME:  tensor<256x128xf32> -> tensor<4x256x32xf32>
 func.func @test_pack_shape(
     %A: tensor<32x256xf32>,
     %B: tensor<256x128xf32>,
@@ -63,7 +63,7 @@ func.func @test_pack_noop(
 // NR8-LABEL: func @test_pack_nr8
 // NR8:       linalg.pack
 // NR8-SAME:  inner_tiles = [8]
-// NR8-SAME:  tensor<256x64xf32> into tensor<8x256x8xf32>
+// NR8-SAME:  tensor<256x64xf32> -> tensor<8x256x8xf32>
 func.func @test_pack_nr8(
     %A: tensor<32x256xf32>,
     %B: tensor<256x64xf32>,
