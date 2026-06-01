@@ -144,7 +144,7 @@ jobs:
           echo "=== Stage 3: llc → riscv64 object ==="
           llc -march=riscv64 \
               -mattr=+v,+zve64d,+zvl256b \
-              -float-abi=double \
+              -float-abi=hard \
               -filetype=obj \
               build-rvv/relu.ll \
               -o build-rvv/relu.o

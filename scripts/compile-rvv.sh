@@ -32,7 +32,7 @@ LLC="${LLC:-llc}"
 RVV_TRIPLE="riscv64-unknown-linux-gnu"
 RVV_MARCH="rv64gcv"
 RVV_MATTR="+v,+zve64d,+zvl256b"
-RVV_FLOAT_ABI="double"
+RVV_FLOAT_ABI="hard"
 
 # M4 tile sizes (from target/riscv_rvv_256.h)
 L2_M=128; L2_N=128; L2_K=256
