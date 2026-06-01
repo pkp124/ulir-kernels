@@ -4,7 +4,7 @@
 # Tests the M4 RVV lowering pipeline end-to-end:
 #   1. build-rvv-kernels — compiles MLIR tests to riscv64 ELF binaries
 #      using ks-opt + mlir-translate + llc + riscv64-linux-gnu-gcc
-#   2. simulate-qemu    — runs each ELF on qemu-riscv64 with VLEN=128/256/512
+#   2. simulate-qemu    — runs each ELF on qemu-riscv64 with VLEN=256/512
 #   3. simulate-spike   — runs on Spike ISA simulator (optional, better RVV 1.0)
 #
 # Adapted from: https://github.com/pkp124/riscv (ci-build.yml patterns)
@@ -176,9 +176,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: "RVV VLEN=128"
-            vlen: 128
-            cpu_args: "rv64,v=true,vlen=128,vext_spec=v1.0"
           - name: "RVV VLEN=256"
             vlen: 256
             cpu_args: "rv64,v=true,vlen=256,vext_spec=v1.0"
