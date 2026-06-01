@@ -1,14 +1,14 @@
 // RUN: %ks-opt %s --ks-vectorize | %FileCheck %s
 
 // ============================================================
-// Vectorize linalg.matmul -> vector.contract + transfer ops
+// Vectorize linalg.matmul -> vector operations + transfer ops
 // Tile sizes must be static (set before by --ks-tile).
 // ============================================================
 
 // CHECK-LABEL: func @test_vectorize_matmul
 // CHECK-NOT:   linalg.matmul
 // CHECK:       vector.transfer_read
-// CHECK:       vector.contract
+// CHECK:       vector.multi_reduction
 // CHECK:       vector.transfer_write
 func.func @test_vectorize_matmul(
     %A: tensor<16x32xf32>,
@@ -57,7 +57,7 @@ func.func @test_vectorize_generic(%input: tensor<32xf32>) -> tensor<32xf32> {
 // PIPELINE-NOT:   ks.matmul
 // PIPELINE-NOT:   linalg.matmul
 // PIPELINE:       vector.transfer_read
-// PIPELINE:       vector.contract
+// PIPELINE:       vector.multi_reduction
 func.func @test_pipeline_vectorize(
     %A: tensor<128x256xf32>,
     %B: tensor<256x128xf32>) -> tensor<128x128xf32> {

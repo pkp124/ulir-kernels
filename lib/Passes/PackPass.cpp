@@ -9,7 +9,8 @@
 //   inner loop causes strided reads with poor cache utilization.
 //
 //   After packing, B has layout [N/NR, K, NR] — the NR inner columns are
-//   contiguous in memory, enabling stride-free vector loads in the micro-kernel.
+//   contiguous in memory, enabling stride-free vector loads in the
+//   micro-kernel.
 //
 //   linalg.matmul ins(%A[M,K], %B[K,N]) outs(%C[M,N])
 //   ──►
@@ -69,7 +70,7 @@ struct PackMatmulBPattern : public OpRewritePattern<linalg::MatmulOp> {
     Location loc = matmul.getLoc();
     Value A = matmul.getOperand(0); // [M, K]
     Value B = matmul.getOperand(1); // [K, N]
-    Value C = matmul.getResult(0);  // [M, N]
+    Value C = matmul.getOperand(2); // [M, N] output/init
 
     auto bType = dyn_cast<RankedTensorType>(B.getType());
     auto cType = dyn_cast<RankedTensorType>(C.getType());
@@ -94,29 +95,31 @@ struct PackMatmulBPattern : public OpRewritePattern<linalg::MatmulOp> {
 
     // === Pack B: [K, N] -> [numPanels, K, NR] ===
     // inner_dims_pos=[1] means we tile dim-1 (N) with tiles of size NR.
-    auto packedBType = RankedTensorType::get(
-        {numPanels, K, packFactor}, bType.getElementType());
-    Value innerTileSize =
-        rewriter.create<arith::ConstantIndexOp>(loc, packFactor);
-    auto packB = rewriter.create<linalg::PackOp>(
-        loc, B,
-        /*dest=*/rewriter.create<tensor::EmptyOp>(
-            loc, packedBType.getShape(), packedBType.getElementType()),
-        /*innerDimsPos=*/ArrayRef<int64_t>{1},
-        /*innerTiles=*/ArrayRef<Value>{innerTileSize},
-        /*paddingValue=*/std::optional<Value>{});
+    auto packedBType = RankedTensorType::get({numPanels, K, packFactor},
+                                             bType.getElementType());
+    SmallVector<OpFoldResult> innerTiles{rewriter.getIndexAttr(packFactor)};
+    SmallVector<int64_t> outerDimsPerm{1, 0};
+    Value packedBInit = rewriter.create<tensor::EmptyOp>(
+        loc, packedBType.getShape(), packedBType.getElementType());
+    auto packB =
+        rewriter.create<linalg::PackOp>(loc, B, packedBInit,
+                                        /*innerDimsPos=*/ArrayRef<int64_t>{1},
+                                        /*innerTiles=*/innerTiles,
+                                        /*paddingValue=*/std::optional<Value>{},
+                                        /*outerDimsPerm=*/outerDimsPerm);
 
     // === Pack C: [M, N] -> [numPanels, M, NR] ===
     int64_t M = cType.getDimSize(0);
-    auto packedCType = RankedTensorType::get(
-        {numPanels, M, packFactor}, cType.getElementType());
-    auto packC = rewriter.create<linalg::PackOp>(
-        loc, C,
-        /*dest=*/rewriter.create<tensor::EmptyOp>(
-            loc, packedCType.getShape(), packedCType.getElementType()),
-        /*innerDimsPos=*/ArrayRef<int64_t>{1},
-        /*innerTiles=*/ArrayRef<Value>{innerTileSize},
-        /*paddingValue=*/std::optional<Value>{});
+    auto packedCType = RankedTensorType::get({numPanels, M, packFactor},
+                                             cType.getElementType());
+    Value packedCInit = rewriter.create<tensor::EmptyOp>(
+        loc, packedCType.getShape(), packedCType.getElementType());
+    auto packC =
+        rewriter.create<linalg::PackOp>(loc, C, packedCInit,
+                                        /*innerDimsPos=*/ArrayRef<int64_t>{1},
+                                        /*innerTiles=*/innerTiles,
+                                        /*paddingValue=*/std::optional<Value>{},
+                                        /*outerDimsPerm=*/outerDimsPerm);
 
     // === Packed matmul as linalg.generic ===
     //
@@ -133,8 +136,8 @@ struct PackMatmulBPattern : public OpRewritePattern<linalg::MatmulOp> {
 
     MLIRContext *ctx = rewriter.getContext();
     AffineExpr dNp = rewriter.getAffineDimExpr(0); // n_panel
-    AffineExpr dM  = rewriter.getAffineDimExpr(1); // m
-    AffineExpr dK  = rewriter.getAffineDimExpr(2); // k
+    AffineExpr dM = rewriter.getAffineDimExpr(1);  // m
+    AffineExpr dK = rewriter.getAffineDimExpr(2);  // k
     AffineExpr dNr = rewriter.getAffineDimExpr(3); // nr
 
     // A[m, k]
@@ -144,10 +147,10 @@ struct PackMatmulBPattern : public OpRewritePattern<linalg::MatmulOp> {
     // C[n_panel, m, nr]
     auto mapC = AffineMap::get(4, 0, {dNp, dM, dNr}, ctx);
 
-    auto parallel  = utils::IteratorType::parallel;
+    auto parallel = utils::IteratorType::parallel;
     auto reduction = utils::IteratorType::reduction;
     SmallVector<utils::IteratorType> iters = {parallel, parallel, reduction,
-                                               parallel};
+                                              parallel};
 
     auto packedGeneric = rewriter.create<linalg::GenericOp>(
         loc,
@@ -159,30 +162,44 @@ struct PackMatmulBPattern : public OpRewritePattern<linalg::MatmulOp> {
         /*doc=*/"packed matmul: C[np,m,nr] += A[m,k] * B[np,k,nr]",
         /*libraryCall=*/"");
 
-    rewriter.createBlock(&packedGeneric.getRegion(),
-                          packedGeneric.getRegion().end(),
-                          {bType.getElementType(), bType.getElementType(),
-                           cType.getElementType()},
-                          {loc, loc, loc});
-    Block &body = packedGeneric.getRegion().front();
+    Region &region = packedGeneric.getRegion();
+    Block *body = nullptr;
+    if (region.empty()) {
+      body =
+          rewriter.createBlock(&region, region.end(),
+                               {bType.getElementType(), bType.getElementType(),
+                                cType.getElementType(), cType.getElementType()},
+                               {loc, loc, loc, loc});
+    } else {
+      body = &region.front();
+      while (!body->empty())
+        body->back().erase();
+      if (body->getNumArguments() == 0) {
+        body->addArguments({bType.getElementType(), bType.getElementType(),
+                            cType.getElementType(), cType.getElementType()},
+                           {loc, loc, loc, loc});
+      }
+    }
     {
       OpBuilder::InsertionGuard g(rewriter);
-      rewriter.setInsertionPointToStart(&body);
-      Value a   = body.getArgument(0);
-      Value b   = body.getArgument(1);
-      Value acc = body.getArgument(2);
+      rewriter.setInsertionPointToEnd(body);
+      Value a = body->getArgument(0);
+      Value b = body->getArgument(1);
+      Value acc = body->getArgument(3);
       Value mul = rewriter.create<arith::MulFOp>(loc, a, b);
       Value add = rewriter.create<arith::AddFOp>(loc, acc, mul);
       rewriter.create<linalg::YieldOp>(loc, add);
     }
 
     // === Unpack C: [numPanels, M, NR] -> [M, N] ===
-    Value emptyC = rewriter.create<tensor::EmptyOp>(
-        loc, cType.getShape(), cType.getElementType());
+    rewriter.setInsertionPointAfter(packedGeneric);
+    Value emptyC = rewriter.create<tensor::EmptyOp>(loc, cType.getShape(),
+                                                    cType.getElementType());
     auto unpackC = rewriter.create<linalg::UnPackOp>(
         loc, packedGeneric.getResult(0), emptyC,
         /*innerDimsPos=*/ArrayRef<int64_t>{1},
-        /*innerTiles=*/ArrayRef<Value>{innerTileSize});
+        /*innerTiles=*/innerTiles,
+        /*outerDimsPerm=*/outerDimsPerm);
 
     rewriter.replaceOp(matmul, unpackC.getResult());
     return success();
