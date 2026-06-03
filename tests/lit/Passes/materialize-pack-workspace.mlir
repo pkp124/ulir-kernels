@@ -1,14 +1,17 @@
 // RUN: %ks-opt %s --ks-pack --ks-materialize-pack-workspace | %FileCheck %s
 
 // CHECK-LABEL: func.func @materialize_b_pack_workspace
-// CHECK-SAME: %[[WORKSPACE:.*]]: memref<?xi8>
+// CHECK-SAME: memref<?xi8>
 // CHECK: %[[OFFSET:.*]] = arith.constant 0 : index
-// CHECK: %[[PACKED:.*]] = memref.view %[[WORKSPACE]][%[[OFFSET]]][] : memref<?xi8> to memref<4x256x32xf32>
+// CHECK: %[[PACKED:.*]] = memref.view %arg3[%[[OFFSET]]][] : memref<?xi8> to memref<4x256x32xf32>
 // CHECK: %[[B_BUF:.*]] = bufferization.to_buffer %{{.*}} : tensor<256x128xf32> to memref<256x128xf32>
-// CHECK: linalg.pack %[[B_BUF]] outer_dims_perm = [1, 0] inner_dims_pos = [1] inner_tiles = [32] into %[[PACKED]] : memref<256x128xf32> -> memref<4x256x32xf32>
+// CHECK: linalg.generic
+// CHECK-SAME: ins(%[[B_BUF]]
+// CHECK-SAME: outs(%[[PACKED]]
 // CHECK: %[[PACKED_TENSOR:.*]] = bufferization.to_tensor %[[PACKED]] restrict : memref<4x256x32xf32> to tensor<4x256x32xf32>
 // CHECK: linalg.generic
 // CHECK-SAME: ins(%{{.*}}, %[[PACKED_TENSOR]]
+// CHECK-NOT: linalg.pack
 // CHECK-NOT: linalg.unpack
 // CHECK-NOT: memref.alloc
 func.func @materialize_b_pack_workspace(
@@ -27,8 +30,8 @@ func.func @materialize_b_pack_workspace(
 }
 
 // CHECK-LABEL: func.func @materialize_custom_alignment
-// CHECK-SAME: %[[WORKSPACE:.*]]: memref<?xi8>
-// CHECK: memref.view %[[WORKSPACE]]
+// CHECK-SAME: memref<?xi8>
+// CHECK: memref.view %arg3
 func.func @materialize_custom_alignment(
     %A: memref<32x256xf32>,
     %B: memref<256x64xf32>,

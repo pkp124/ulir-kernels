@@ -56,7 +56,9 @@ explicit workspace:
 %packed = memref.view %workspace[%offset][]
     : memref<?xi8> to memref<N/NRxKxNRxf32>
 %src = bufferization.to_buffer %B
-linalg.pack %src ... into %packed
+linalg.generic ins(%src) outs(%packed) {
+  // %packed[np, k, nr] = %src[k, np * NR + nr]
+}
 %packed_tensor = bufferization.to_tensor %packed restrict
 ```
 
@@ -94,7 +96,7 @@ checks are follow-up work.
   - verifies C unpack is not introduced
 - `tests/lit/Passes/materialize-pack-workspace.mlir`
   - verifies `memref.view` from `memref<?xi8>` workspace
-  - verifies memref `linalg.pack` into workspace
+  - verifies explicit memref `linalg.generic` copy into workspace
   - verifies no `memref.alloc`
 - `tests/lit/Passes/materialize-pack-workspace-invalid.mlir`
   - missing workspace diagnostic
