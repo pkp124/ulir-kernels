@@ -1,17 +1,18 @@
 # KernelSmith - Cursor AI Rules
 
-You are working on KernelSmith, an MLIR compiler framework that generates optimized AI accelerator kernels for RISC-V RVV. This is a serious compiler infrastructure project — precision, correctness, and adherence to MLIR/LLVM conventions matter more than speed.
+You are working on KernelSmith, an MLIR compiler framework that generates optimized AI accelerator kernels for edge targets, with RISC-V RVV as the primary backend. This is compiler infrastructure: correctness, MLIR/LLVM conventions, and tests matter more than speed.
 
 ## Critical Rules
 
-1. **Never implement without reading the spec first.** Check `specs/` for the relevant kernel or target specification before writing any code.
-2. **Never skip tests.** Every new operation needs lit tests (parse/print + verifier + transformation). Every pass needs before/after FileCheck tests. Use TDD: write the failing test first.
-3. **Always run `ctest --test-dir build --output-on-failure` before suggesting a commit.**
-4. **Check design docs** in `docs/design/` before making architectural decisions. If no design doc exists for a significant change, create one using `./scripts/new-design.sh`.
+1. **Read specs first.** Check `specs/` for the relevant kernel or target specification before writing code.
+2. **Use TDD.** Every new operation needs lit tests for parse/print and verifier behavior. Every pass needs before/after FileCheck tests and diagnostics for invalid cases where applicable.
+3. **Run tests.** Always run `ctest --test-dir build --output-on-failure` before claiming implementation work is ready.
+4. **Design significant changes.** Check `docs/design/`; create a design doc with `./scripts/new-design.sh` for new passes, target architecture changes, public APIs, or major lowering decisions.
+5. **Respect lowering layers.** Keep the path `ks -> linalg -> tiled scf/vector -> target/LLVM` unless a design doc explicitly approves a shortcut.
 
 ## Project Quick Facts
 
-- **Build**: CMake 3.20+, LLVM/MLIR 18+. Use `cmake --build build` / `ctest --test-dir build`.
+- **Build**: CMake 3.20+, LLVM/MLIR 21+. Use `./scripts/setup.sh`, `cmake --build build --parallel`, and `ctest --test-dir build`.
 - **Dialect prefix**: `ks.` (e.g., `ks.matmul`, `ks.relu`)
 - **Pass CLI prefix**: `--ks-` (e.g., `--ks-lower-to-linalg`, `--ks-tile`)
 - **C++ namespace**: `kernelsmith::ks`
@@ -19,77 +20,56 @@ You are working on KernelSmith, an MLIR compiler framework that generates optimi
 - **Python style**: ruff, 100 col, config in `pyproject.toml`
 - **Commit format**: `<type>(<scope>): <subject>` — types: feat, fix, docs, refactor, test, chore
 
-## Lowering Pipeline
+## Current Lowering Pipeline
 
-```
-ks ops → linalg → tiled scf.for → vector ops → RVV LLVM IR
+```text
+ks.matmul / ks activations
+  -> --ks-lower-to-linalg / --ks-lower-activations
+linalg ops
+  -> --ks-tile
+scf.for tiled loops
+  -> --ks-pack / --ks-materialize-pack-workspace where needed
+packed/tiled linalg
+  -> --ks-vectorize
+vector dialect
+  -> --ks-lower-to-rvv
+LLVM dialect / LLVM IR
 ```
 
-Each arrow is a separate MLIR pass. **None of these passes exist yet** — the codebase currently only supports parsing and printing KS ops. When implementing lowering, target one level at a time.
+Implemented infrastructure includes the KS dialect, parse/verify tests, C API smoke tests, matmul-to-linalg lowering, tiling, activation lowering, B packing, vectorization, RVV lowering, and CI/Docker verification paths. Do not describe these as unimplemented.
 
 ## File Locations
 
 | What you need | Where to find it |
 |---|---|
+| Agent/developer guide | `AGENTS.md`, `CLAUDE.md` |
 | Op definitions (TableGen) | `include/KernelSmith/Dialect/Kernel/*.td` |
 | Op implementations | `lib/Dialect/Kernel/*.cpp` |
+| Pass definitions | `include/KernelSmith/Passes/Passes.td` |
 | Pass implementations | `lib/Passes/*.cpp` |
 | Lit tests | `tests/lit/Dialect/Kernel/*.mlir`, `tests/lit/Passes/*.mlir` |
 | Unit tests | `tests/unit/` |
+| C API tests | `tests/capi/` |
 | Kernel specs | `specs/kernels/` |
 | Target specs | `specs/targets/` |
 | Design decisions | `docs/design/DES-XXX-*.md` |
-| Dev plan | `RISC-V_RVV_KERNEL_LIBRARY_PLAN.md` |
-
-## MLIR Conventions
-
-### Operation Definition (TableGen)
-```tablegen
-def KS_VerbNounOp : KS_Op<"verb_noun", [traits]> {
-  let summary = "brief";
-  let description = [{ detailed }];
-  let arguments = (ins ...);
-  let results = (outs ...);
-  let assemblyFormat = "...";
-  let hasVerifier = 1;
-}
-```
-
-### Pass Definition
-- Class: `KS{Action}Pass` (e.g., `KSTileKernelsPass`)
-- CLI: `--ks-tile-kernels`
-- File: `lib/Passes/TileKernels.cpp`
-
-### Lit Test Pattern
-```mlir
-// RUN: ks-opt %s --ks-some-pass | FileCheck %s
-// CHECK-LABEL: func @test_name
-// CHECK: expected.output
-// CHECK-NOT: removed.op
-```
-
-## RISC-V RVV Context
-
-- Vector Length Agnostic: code must work for any VLEN (128-16384 bits)
-- Key concepts: SEW (element width), LMUL (register grouping), VLMAX
-- Memory: `vle/vse` instructions. Arithmetic: `vfadd.vv`, `vfmul.vv`, `vfmacc.vv`
-- Reductions: `vfredusum.vs`, `vfredmax.vs`
-- Minimize `vsetvl` instructions; handle tail elements with masking
+| Cursor rules/skills/agents | `.cursor/` |
 
 ## Development Workflow
 
-1. Read spec in `specs/`
-2. Check/create design doc in `docs/design/` for non-trivial work
-3. Write failing test (RED)
-4. Implement minimum to pass (GREEN)
-5. Refactor (keep tests green)
-6. Run `ctest --test-dir build --output-on-failure`
-7. Commit with descriptive message
+1. Read the relevant spec and design docs.
+2. Write or update focused tests.
+3. Implement the minimum correct change.
+4. Build with `cmake --build build --parallel`.
+5. Run `ctest --test-dir build --output-on-failure`.
+6. Run `./scripts/docker-verify.sh` before push when Docker is available.
+7. Commit with a descriptive conventional message.
 
 ## What NOT to Do
 
-- Don't add operations without TableGen + lit tests
-- Don't bypass the lowering pipeline (ks → linalg → vector → target)
-- Don't hardcode VLEN — all code must be vector-length agnostic
-- Don't modify the architecture without a design review document
-- Don't use `AIKernels/` in include paths (legacy name; use `KernelSmith/`)
+- Do not add operations without TableGen + lit tests.
+- Do not bypass the lowering pipeline without a design doc.
+- Do not hardcode RVV VLEN; code must stay vector-length agnostic.
+- Do not modify architecture without design review documentation.
+- Do not use `AIKernels/` include paths; use `KernelSmith/`.
+- Do not commit build outputs, virtualenvs, or generated artifacts.

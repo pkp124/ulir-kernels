@@ -1,0 +1,46 @@
+---
+description: Rules for KernelSmith pass and lowering development
+globs: ["lib/Passes/**/*", "include/KernelSmith/Passes/**/*", "tests/lit/Passes/**/*", "docs/design/DES-*.md", "specs/**/*.md"]
+---
+
+# Pass and Lowering Development
+
+## Current pass pipeline
+
+Implemented passes include:
+
+- `--ks-lower-activations`
+- `--ks-lower-to-linalg`
+- `--ks-tile`
+- `--ks-pack`
+- `--ks-vectorize`
+- `--ks-lower-to-rvv`
+
+When adding a pass:
+
+1. Read the relevant spec and existing design docs.
+2. Add/update a design doc for significant lowering or target decisions.
+3. Add `Passes.td` definition with `--ks-*` CLI name and dependent dialects.
+4. Add the C++ implementation under `lib/Passes/`.
+5. Add the source to `lib/Passes/CMakeLists.txt`.
+6. Ensure pass registration flows through generated `Passes.h.inc`.
+7. Add lit tests in `tests/lit/Passes/` with FileCheck before/after expectations.
+8. Run `cmake --build build --parallel` and `ctest --test-dir build --output-on-failure`.
+
+## FileCheck expectations
+
+- Use `CHECK-LABEL` for function boundaries.
+- Use `CHECK-NOT` to prove removed ops are gone.
+- Add negative tests with `-verify-diagnostics` for verifier/pass failures.
+- Keep tests focused on behavior, not unstable SSA names, unless necessary.
+
+## Lowering discipline
+
+Keep the layered lowering model intact:
+
+```text
+ks -> linalg -> tiled scf/vector -> target/LLVM
+```
+
+Do not emit target-specific LLVM/RVV intrinsics from high-level KS operations
+unless a design doc explicitly approves that shortcut.

@@ -2,10 +2,10 @@
 # ==============================================================================
 # KernelSmith — container lint + build + test verification
 #
-# Replicates exactly what CI does, so you can catch failures locally before
+# Runs the strongest local container gate, so you can catch failures before
 # pushing to the branch:
-#   1. Lint  (ruff + clang-format) — mirrors the CI 'lint' job
-#   2. Build + test (ctest)        — mirrors the CI 'container-test' job
+#   1. Lint  (ruff + clang-format) — stricter than native PR lint
+#   2. Build + test (ctest)        — mirrors the CI container-test image
 #
 # Usage:
 #   ./scripts/docker-verify.sh             # cached (fast after first run)
@@ -60,7 +60,7 @@ info "Lint passed."
 echo ""
 
 # ---------------------------------------------------------------------------
-# Stage 2: build + test (ctest) — mirrors CI container-test job exactly
+# Stage 2: build + test (ctest) — mirrors the CI container-test image
 # ---------------------------------------------------------------------------
 echo "--- Building 'test' stage ---"
 DOCKER_BUILDKIT=1 docker build \

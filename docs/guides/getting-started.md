@@ -6,7 +6,7 @@ This guide walks you through setting up the project and generating your first ke
 
 ### Required
 
-- **LLVM/MLIR 18+**: With MLIR enabled
+- **LLVM/MLIR 21+**: With MLIR enabled
 - **CMake 3.20+**: Build system
 - **Python 3.10+**: For Python bindings and scripts
 - **C++17 compiler**: GCC 10+ or Clang 13+

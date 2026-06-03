@@ -16,11 +16,11 @@ The MVP target is a quantized transformer running end-to-end on RISC-V RVV.
 
 - **High-Level Kernel Operations**: Matrix multiplication, convolution, attention, activation functions, normalization
 - **C Kernel Library**: `libkernelsmith.a` with stable C headers and handwritten f32 reference kernels
-- **MLIR Lowering Passes**: Activations lower to `linalg.generic`; matmul lowers to `linalg.matmul` and tiled `scf.for`
+- **MLIR Lowering Passes**: Activations lower to `linalg.generic`; matmul lowers through linalg, tiling, packing, vectorization, and RVV/LLVM paths
 - **Profile-Driven Tiling**: Generic target tile sizes are available as `--ks-tile` pass options
 - **Comprehensive Testing**: Lit, unit, and numpy-validated C tests with CTest
 
-Planned work includes RISC-V RVV lowering, INT8 and INT4/W4A8 quantized kernels,
+Planned work includes stronger RVV end-to-end coverage, INT8 and INT4/W4A8 quantized kernels,
 and broader edge operator coverage.
 
 ## Quick Start

@@ -70,7 +70,10 @@ To help future agents understand context:
 Before marking any task complete:
 
 ```bash
-make verify  # Runs lint + tests + build check
+make verify
+# or, without make:
+cmake --build build --parallel
+ctest --test-dir build --output-on-failure
 ```
 
-All checks must pass.
+Run `./scripts/docker-verify.sh` before push when Docker is available. All required checks must pass or be explicitly reported as unavailable.
