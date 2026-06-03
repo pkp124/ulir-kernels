@@ -130,9 +130,9 @@ def KSMaterializePackWorkspacePass
     : Pass<"ks-materialize-pack-workspace", "mlir::func::FuncOp"> {
   let summary = "Materialize packed tensors into explicit workspace buffers";
   let description = [{
-    Rewrites supported tensor-level linalg.pack operations into memref
-    linalg.pack operations backed by a caller-provided memref<?xi8> workspace
-    argument. The packed memref is bridged back to tensor IR with
+    Rewrites supported tensor-level linalg.pack operations into explicit
+    memref linalg.generic copies backed by a caller-provided memref<?xi8>
+    workspace argument. The packed memref is bridged back to tensor IR with
     bufferization.to_tensor so the remaining tensor pipeline can continue until
     one-shot bufferization.
 

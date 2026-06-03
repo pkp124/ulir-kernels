@@ -167,16 +167,36 @@ struct KSMaterializePackWorkspacePass
       Value sourceBuffer = rewriter.create<bufferization::ToBufferOp>(
           loc, sourceMemrefType, packOp.getSource());
 
-      SmallVector<OpFoldResult> innerTiles{
-          rewriter.getIndexAttr(packOp.getStaticTiles().front())};
-      rewriter.create<linalg::PackOp>(loc, sourceBuffer, packedBuffer,
-                                      /*innerDimsPos=*/ArrayRef<int64_t>{1},
-                                      /*innerTiles=*/innerTiles,
-                                      /*paddingValue=*/std::optional<Value>{},
-                                      /*outerDimsPerm=*/ArrayRef<int64_t>{1, 0});
+      MLIRContext *ctx = rewriter.getContext();
+      AffineExpr dNp = rewriter.getAffineDimExpr(0);
+      AffineExpr dK = rewriter.getAffineDimExpr(1);
+      AffineExpr dNr = rewriter.getAffineDimExpr(2);
+      int64_t packFactor = packOp.getStaticTiles().front();
+      auto sourceMap = AffineMap::get(3, 0, {dK, dNp * packFactor + dNr}, ctx);
+      auto packedMap = AffineMap::get(3, 0, {dNp, dK, dNr}, ctx);
+      SmallVector<utils::IteratorType> iterators(
+          3, utils::IteratorType::parallel);
+      auto copy = rewriter.create<linalg::GenericOp>(
+          loc, /*resultTypes=*/TypeRange{}, /*inputs=*/ValueRange{sourceBuffer},
+          /*outputs=*/ValueRange{packedBuffer},
+          /*indexingMaps=*/ArrayRef<AffineMap>{sourceMap, packedMap},
+          /*iteratorTypes=*/iterators,
+          /*doc=*/"pack B panel into KernelSmith workspace",
+          /*libraryCall=*/"");
 
+      Region &region = copy.getRegion();
+      Block *body = rewriter.createBlock(
+          &region, region.end(),
+          {sourceType.getElementType(), packedType.getElementType()},
+          {loc, loc});
+      OpBuilder::InsertionGuard guard(rewriter);
+      rewriter.setInsertionPointToEnd(body);
+      rewriter.create<linalg::YieldOp>(loc, body->getArgument(0));
+
+      rewriter.setInsertionPointAfter(copy);
       auto packedTensor = rewriter.create<bufferization::ToTensorOp>(
-          loc, packedBuffer, /*restrict=*/true, /*writable=*/false);
+          loc, packedType, packedBuffer, /*restrict=*/true,
+          /*writable=*/false);
       rewriter.replaceOp(packOp, packedTensor.getResult());
     }
   }
