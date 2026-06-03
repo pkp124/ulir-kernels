@@ -137,7 +137,7 @@ vector.transfer_write %d, %Cp[np,m,0]
 MLIR 21 may represent matmul vectorization as multiply plus `vector.multi_reduction`; the LLVM RVV backend lowers the resulting vector operations to RVV instructions.
 
 #### Current integration note
-The checked-in lower-to-rvv smoke test currently validates `ks.matmul -> linalg -> tile -> vectorize -> LLVM`. `--ks-pack` has independent lit coverage; full `linalg.pack`/`linalg.unpack` bufferization into the RVV lowering pipeline remains follow-up work.
+The checked-in lower-to-rvv smoke test currently validates `ks.matmul -> linalg -> tile -> vectorize -> LLVM`. `--ks-pack` has independent lit coverage, and DES-010 adds `--ks-materialize-pack-workspace` to materialize supported B-panel packs into explicit caller-provided workspace before one-shot bufferization.
 
 #### Stage 6: `--ks-lower-to-rvv` (NEW in M4)
 Full lowering from vector/tensor/scf to LLVM dialect via a nested PassManager:

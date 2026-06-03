@@ -97,9 +97,10 @@ def KSPackPass : Pass<"ks-pack", "mlir::func::FuncOp"> {
     Packs the B (right-hand) operand of linalg.matmul into a column-panel
     layout that enables stride-free vector loads in the inner loop.
 
-    The packing inserts linalg.pack / linalg.unpack ops and updates the
-    linalg.matmul to consume the packed tensor. The pack factor is
-    configurable (default 32 — matches VLMAX for RVV VLEN=256/LMUL=4/f32).
+    The packing inserts linalg.pack for the B operand and updates the
+    linalg.matmul to a linalg.generic that consumes the packed tensor while
+    writing C in its original logical layout. The pack factor is configurable
+    (default 32 — matches VLMAX for RVV VLEN=256/LMUL=4/f32).
 
     This pass should run after --ks-tile (L2 tiling) and before the second
     --ks-tile (register tiling) and --ks-vectorize.
@@ -109,7 +110,7 @@ def KSPackPass : Pass<"ks-pack", "mlir::func::FuncOp"> {
       ──►
       %Bp = linalg.pack %B inner_dims_pos=[1] inner_tiles=[32]
               : tensor<256x128xf32> -> tensor<4x256x32xf32>
-      linalg.matmul_transpose_b ins(%A, %Bp) ...
+      linalg.generic ins(%A, %Bp) outs(%C) ...
   }];
   let options = [
     Option<"packFactor", "pack-factor", "int64_t", "32",
@@ -122,6 +123,33 @@ def KSPackPass : Pass<"ks-pack", "mlir::func::FuncOp"> {
     "mlir::arith::ArithDialect",
     "mlir::tensor::TensorDialect",
     "mlir::affine::AffineDialect"
+  ];
+}
+
+def KSMaterializePackWorkspacePass
+    : Pass<"ks-materialize-pack-workspace", "mlir::func::FuncOp"> {
+  let summary = "Materialize packed tensors into explicit workspace buffers";
+  let description = [{
+    Rewrites supported tensor-level linalg.pack operations into memref
+    linalg.pack operations backed by a caller-provided memref<?xi8> workspace
+    argument. The packed memref is bridged back to tensor IR with
+    bufferization.to_tensor so the remaining tensor pipeline can continue until
+    one-shot bufferization.
+
+    This pass is intentionally conservative: it supports the KernelSmith matmul
+    B-panel layout [K, N] -> [N/NR, K, NR] with static shapes, inner_dims_pos=[1],
+    outer_dims_perm=[1, 0], and a single positive static inner tile.
+  }];
+  let options = [
+    Option<"workspaceAlignment", "workspace-alignment", "int64_t", "64",
+           "Byte alignment used when carving packed buffers from workspace.">
+  ];
+  let dependentDialects = [
+    "mlir::linalg::LinalgDialect",
+    "mlir::arith::ArithDialect",
+    "mlir::bufferization::BufferizationDialect",
+    "mlir::memref::MemRefDialect",
+    "mlir::tensor::TensorDialect"
   ];
 }
 
