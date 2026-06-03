@@ -68,7 +68,7 @@ RISC-V RVV assembly (vle32.v / vfmacc.vv / vse32.v)
 |------|---------|
 | `include/KernelSmith/Dialect/Kernel/` | TableGen (.td) and headers for the ks dialect |
 | `lib/Dialect/Kernel/` | Dialect, ops, types implementation (.cpp) |
-| `lib/Passes/` | Pass implementations (stub — no passes yet) |
+| `lib/Passes/` | Pass implementations for lowering, tiling, packing, vectorization, and target conversion |
 | `tools/ks-opt/` | CLI optimizer entry point |
 | `tests/lit/` | MLIR FileCheck tests (.mlir) |
 | `tests/unit/` | C++ unit tests (Google Test) |

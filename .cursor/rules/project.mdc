@@ -27,15 +27,17 @@ KernelSmith crafts optimized AI accelerator kernels using the MLIR compiler infr
 ## Architecture
 
 ```
-ks.matmul (high-level)
-    ↓ --ks-lower-to-linalg
-linalg.matmul
+ks.matmul / ks activations
+    ↓ --ks-lower-to-linalg / --ks-lower-activations
+linalg ops
     ↓ --ks-tile
-scf.for (tiled loops)
+scf.for tiled loops
+    ↓ --ks-pack / --ks-materialize-pack-workspace where needed
+packed/tiled linalg
     ↓ --ks-vectorize
-vector.load/fma/store
+vector dialect
     ↓ --ks-lower-to-rvv
-LLVM IR (RVV intrinsics)
+LLVM dialect / LLVM IR
 ```
 
 ## Directory Structure
@@ -53,7 +55,7 @@ LLVM IR (RVV intrinsics)
 2. **Design review**: Create doc in `docs/design/` for significant changes
 3. **Write tests first**: TDD approach
 4. **Implement**: Small, focused commits
-5. **Verify**: `ctest --test-dir build --output-on-failure` before committing
+5. **Verify**: `ctest --test-dir build --output-on-failure` before committing; use `./scripts/docker-verify.sh` before push when Docker is available
 
 ## Code Style
 

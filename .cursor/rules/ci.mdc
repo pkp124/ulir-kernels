@@ -1,0 +1,52 @@
+---
+description: CI, Docker, and local verification rules for KernelSmith
+globs: [".github/workflows/**/*", "Dockerfile", "docker-compose.yml", "scripts/*.sh", "Makefile", "pyproject.toml"]
+---
+
+# CI and Development Infrastructure
+
+## Native CI
+
+`.github/workflows/ci.yml` runs on PRs, pushes to `main`/`develop`, and manual dispatch.
+
+- `lint`: Python only (`ruff check .`, `ruff format --check .`).
+- `build-and-test`: installs LLVM/MLIR 21, configures CMake, builds, runs CTest.
+- `container-test`: push events only, not PRs.
+- `publish`: push events only, publishes the `dev` image to GHCR.
+
+Do not assume PR CI runs Docker or clang-format. If C++ formatting matters, run
+`./scripts/docker-verify.sh` or `make format-check` when a local formatter exists.
+
+## Container path
+
+`Dockerfile` uses LLVM/MLIR 21 and has four useful stages:
+
+- `dev`: interactive toolchain image.
+- `lint`: ruff + clang-format.
+- `build`: CMake Release build.
+- `test`: runs `ctest --test-dir build --output-on-failure`.
+
+`./scripts/docker-verify.sh` builds/runs `lint` and `test` stages. Prefer it
+before push when Docker is available.
+
+## RVV simulation CI
+
+`.github/workflows/ci-rvv-sim.yml` is path-filtered. It builds `ks-opt`, compiles
+RVV ELF artifacts, then runs QEMU for VLEN 256/512. Spike is manual only through
+`workflow_dispatch` with `run_spike=true`.
+
+For local RVV work, use:
+
+```bash
+./scripts/setup-rvv-sim.sh
+scripts/compile-rvv.sh <input.mlir> <output>
+```
+
+## Local verification order
+
+1. `cmake --build build --parallel`
+2. `ctest --test-dir build --output-on-failure`
+3. `ruff check . && ruff format --check .` for Python changes
+4. `./scripts/docker-verify.sh` for pre-push/container parity when available
+
+Use `make verify` as the native shorthand; it intentionally does not require Docker.
