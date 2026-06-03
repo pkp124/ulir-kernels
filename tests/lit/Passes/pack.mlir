@@ -10,7 +10,7 @@
 // CHECK-NOT:   linalg.matmul
 // CHECK:       linalg.pack
 // CHECK:       linalg.generic
-// CHECK:       linalg.unpack
+// CHECK-NOT:   linalg.unpack
 func.func @test_pack_matmul(
     %A: tensor<64x256xf32>,
     %B: tensor<256x128xf32>,

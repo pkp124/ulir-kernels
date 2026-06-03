@@ -56,6 +56,7 @@ Examples:
 | ID | Title | Status | Scope | File |
 |----|-------|--------|-------|------|
 | [DES-006](DES-006-kernel-library-architecture.md) | **Kernel Library Architecture** | Draft | C API, memory mgmt, tiling, packing, target profiles | `DES-006-kernel-library-architecture.md` |
+| [DES-010](DES-010-pack-workspace-materialization.md) | **Pack Workspace Materialization** | Implemented | Explicit workspace-backed B packing | `DES-010-pack-workspace-materialization.md` |
 | [DES-001](DES-001-vector-operations-lowering.md) | Vector Operations Lowering to RISC-V RVV | Draft | RVV intrinsic mapping | `DES-001-vector-operations-lowering.md` |
 | [DES-002](DES-002-matmul-kernel.md) | MatMul Kernel (TDD Example) | Draft | MLIR pipeline (partially superseded by DES-006) | `DES-002-matmul-kernel.md` |
 | [DES-003](DES-003-conv2d-kernel.md) | Conv2D Kernel Implementation | Draft | Conv2D lowering | `DES-003-conv2d-kernel.md` |
