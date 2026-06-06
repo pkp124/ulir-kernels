@@ -7,7 +7,17 @@ globs: ["tasks/**/*", "specs/**/*"]
 
 ## Task Management System
 
-This project uses a structured task system in `tasks/` for tracking work:
+This project uses a structured task system in `tasks/` for tracking work.
+Use `.cursor/skills/manage-kernelsmith-tasks/SKILL.md` when grooming tasks or
+selecting the next work item.
+
+### Source of Truth
+
+- `ROADMAP.md` defines product direction and milestone goals.
+- `tasks/MILESTONES.md` is the operational milestone dashboard.
+- `tasks/TASK-XXX.md` files are executable work packets.
+- `.cursor/agents/task-planning-agent.md` is the focused agent template for
+  roadmap/task maintenance.
 
 ### Task File Format (`tasks/TASK-XXX.md`)
 
@@ -15,10 +25,16 @@ This project uses a structured task system in `tasks/` for tracking work:
 # TASK-XXX: Task Title
 
 ## Status
-[ ] Not Started / [~] In Progress / [x] Complete
+[ ] Not Started / [~] In Progress / [!] Blocked / [?] Needs Review / [x] Complete
 
 ## Priority
 P0 (Critical) / P1 (High) / P2 (Medium) / P3 (Low)
+
+## Milestone
+M4 — RISC-V RVV Target
+
+## Owner Agent
+.cursor/agents/<agent>.md or "general"
 
 ## Description
 What needs to be done and why.
@@ -51,8 +67,8 @@ Before implementing any feature:
 
 When pausing or completing work:
 
-1. **Update task status** in `tasks/`
-2. **Document current state** in task notes
+1. **Update task status** in `tasks/TASK-XXX.md`
+2. **Update milestone status** in `tasks/MILESTONES.md`
 3. **List any blockers** or open questions
 4. **Commit all changes** with descriptive message
 

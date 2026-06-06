@@ -1,76 +1,93 @@
-# Task Tracking
+# KernelSmith Task Tracking
 
-This directory contains task files for tracking development progress.
+This directory is the execution tracker for the product roadmap.
 
-## Task Format
+## Source of truth
 
-Each task is a markdown file with structured sections:
+- `ROADMAP.md` defines product direction, milestone goals, and long-term scope.
+- `tasks/MILESTONES.md` is the short operational dashboard: milestone status,
+  active task IDs, blockers, and next actions.
+- `tasks/TASK-XXX.md` files are executable work packets with acceptance
+  criteria and verification steps.
+- `.cursor/skills/manage-kernelsmith-tasks/SKILL.md` tells Cursor agents how to
+  maintain the tracker during implementation work.
+
+When status changes, update the task file and `tasks/MILESTONES.md` in the same
+PR. Update `ROADMAP.md` only when product scope or milestone content changes.
+
+## Status values
+
+| Status | Meaning |
+|---|---|
+| `[ ] Not Started` | Defined but no implementation work has begun. |
+| `[~] In Progress` | Work has started or partial implementation exists. |
+| `[!] Blocked` | Cannot progress without an external dependency or decision. |
+| `[?] Needs Review` | Implementation is ready but needs review/validation. |
+| `[x] Complete` | Acceptance criteria are met and verification is recorded. |
+
+## Priority values
+
+| Priority | Meaning |
+|---|---|
+| `P0` | Required to keep the project buildable or unblock all work. |
+| `P1` | Required for the current milestone. |
+| `P2` | Important follow-up for a near milestone. |
+| `P3` | Nice-to-have or future cleanup. |
+
+## Task file template
 
 ```markdown
 # TASK-XXX: Task Title
 
 ## Status
-[ ] Not Started / [~] In Progress / [x] Complete
+[ ] Not Started
 
 ## Priority
-P0 (Critical) / P1 (High) / P2 (Medium) / P3 (Low)
+P1
+
+## Milestone
+M4 — RISC-V RVV Target
+
+## Owner Agent
+Use `.cursor/agents/<agent>.md` or "general".
 
 ## Description
 What needs to be done and why.
 
 ## Acceptance Criteria
-- [ ] Criterion 1
-- [ ] Criterion 2
-
-## Implementation Notes
-Technical details, design decisions.
+- [ ] Observable outcome
+- [ ] Tests or validation added
 
 ## Dependencies
-- TASK-YYY (blocking)
+- TASK-YYY
 
 ## Verification
-How to verify this task is complete.
+- `ctest --test-dir build --output-on-failure`
+
+## Notes
+Design links, constraints, and open questions.
 
 ## Log
 Progress updates with dates.
 ```
 
-## Task Categories
+## Active task index
 
-- `TASK-0XX`: Infrastructure and setup
-- `TASK-1XX`: Kernel dialect and operations
-- `TASK-2XX`: Transformation passes
-- `TASK-3XX`: RISC-V RVV target
-- `TASK-4XX`: Testing and verification
-- `TASK-5XX`: Documentation and examples
+| ID | Milestone | Title | Status | Priority |
+|---|---|---|---|---|
+| TASK-001 | M0 | Set up MLIR dialect infrastructure | Complete | P0 |
+| TASK-002 | M0 | Implement Kernel dialect core | Complete | P0 |
+| TASK-003 | M0/M3 | Implement matmul operation | Complete | P1 |
+| TASK-004 | M3/M4 | Implement tiling and vectorization passes | Complete | P1 |
+| TASK-005 | M4 | Implement RVV lowering pipeline | Complete | P1 |
+| TASK-006 | M4 | Validate RVV correctness and benchmark path | In Progress | P1 |
+| TASK-007 | M5 | RISC-V quantization foundation | Not Started | P1 |
+| TASK-008 | M6 | Transformer minimum kernel set | Not Started | P1 |
 
-## Current Tasks
+## Agent workflow
 
-| ID | Title | Status | Priority |
-|----|-------|--------|----------|
-| TASK-001 | Set up MLIR dialect infrastructure | Complete | P0 |
-| TASK-002 | Implement Kernel dialect | Complete | P0 |
-| TASK-003 | Implement matmul operation | Complete | P1 |
-| TASK-004 | Implement tiling pass | In Progress | P1 |
-| TASK-005 | Implement RVV lowering | Not Started | P1 |
-
-## Working with Tasks
-
-### Create a new task
-
-```bash
-make new-task ID=006 TITLE="My new task"
-```
-
-### Update task status
-
-Edit the task file directly, updating:
-1. Status checkbox
-2. Log section with progress
-
-### Complete a task
-
-1. Ensure all acceptance criteria are met
-2. Run `make verify`
-3. Update status to `[x] Complete`
-4. Add completion note to log
+1. Read `tasks/MILESTONES.md` to identify the active milestone and next task.
+2. Read the selected `TASK-XXX.md`, relevant `specs/`, and design docs.
+3. Keep task scope small enough for one PR when possible.
+4. Update task status, checkboxes, and log entries before handoff.
+5. Run the verification listed in the task before marking it complete.

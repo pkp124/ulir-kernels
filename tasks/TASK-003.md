@@ -6,6 +6,12 @@
 ## Priority
 P1 (High)
 
+## Milestone
+M0/M3 — Dialect Infrastructure and Generic MatMul Lowering
+
+## Owner Agent
+`.cursor/agents/mlir-pass-agent.md`
+
 ## Description
 
 Implement the `ks.matmul` operation according to the specification in `specs/kernels/matmul.md`.
@@ -17,13 +23,13 @@ This is a foundational operation used in:
 
 ## Acceptance Criteria
 
-- [ ] Operation defined in KernelOps.td
-- [ ] Verifier validates shapes and types
-- [ ] Parsing/printing works correctly
-- [ ] Round-trip test passes
-- [ ] Invalid input tests pass
-- [ ] Batch matmul variant defined
-- [ ] Documentation updated
+- [x] Operation defined in KernelOps.td
+- [x] Verifier validates shapes and types
+- [x] Parsing/printing works correctly
+- [x] Round-trip test passes
+- [x] Invalid input tests pass
+- [x] Batch matmul variant defined
+- [x] Documentation updated
 
 ## Implementation Notes
 
@@ -94,5 +100,9 @@ make test-lit TESTS=tests/lit/Dialect/Kernel/matmul.mlir
 
 ## Log
 
+### 2026-06-06
+- Updated stale checklist to match completed matmul and batch matmul dialect
+  work.
+
 ### [Date TBD]
-- Task created
+- Task created.

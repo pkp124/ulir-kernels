@@ -28,16 +28,19 @@ LLVM dialect / LLVM IR / target object
 
 ## Non-negotiable workflow
 
-1. Read the relevant spec in `specs/` before implementing behavior.
-2. Check `docs/design/` before changing architecture. Add a design doc with
+1. Read `tasks/MILESTONES.md` and the active `tasks/TASK-XXX.md` when choosing
+   or continuing work. Use `.cursor/skills/manage-kernelsmith-tasks/SKILL.md`
+   for task grooming or status updates.
+2. Read the relevant spec in `specs/` before implementing behavior.
+3. Check `docs/design/` before changing architecture. Add a design doc with
    `./scripts/new-design.sh` for significant new passes, target decisions, or
    public interfaces.
-3. Use TDD for compiler behavior: write lit/unit tests before or alongside the
+4. Use TDD for compiler behavior: write lit/unit tests before or alongside the
    implementation.
-4. Preserve the layered lowering pipeline. Do not bypass `ks -> linalg -> vector
+5. Preserve the layered lowering pipeline. Do not bypass `ks -> linalg -> vector
    -> target` without a design document.
-5. Run at least `ctest --test-dir build --output-on-failure` before committing.
-6. Prefer `./scripts/docker-verify.sh` before push when Docker is available; it
+6. Run at least `ctest --test-dir build --output-on-failure` before committing.
+7. Prefer `./scripts/docker-verify.sh` before push when Docker is available; it
    checks container build/test plus C++ formatting.
 
 ## Development commands
@@ -82,6 +85,7 @@ make verify
 | Native setup | `scripts/setup.sh` | Installs LLVM/MLIR 21, creates `.venv`, builds, runs CTest. |
 | Local rebuild | `cmake --build build --parallel` | Reuses configured build directory. |
 | Tests | `tests/`, `tests/CMakeLists.txt` | Lit, C++ unit, C API, NumPy validation via CTest. |
+| Task tracking | `tasks/README.md`, `tasks/MILESTONES.md`, `tasks/TASK-*.md` | Roadmap-linked task dashboard and executable work packets. |
 | Container parity | `Dockerfile`, `docker-compose.yml`, `scripts/docker-verify.sh` | Docker lint includes `clang-format`; native CI lint currently only runs ruff. |
 | CI | `.github/workflows/ci.yml` | Native lint/build/test on PRs; container test/publish on push. |
 | RVV simulation | `.github/workflows/ci-rvv-sim.yml`, `scripts/setup-rvv-sim.sh`, `scripts/compile-rvv.sh` | Path-filtered QEMU matrix; Spike only on manual dispatch. |

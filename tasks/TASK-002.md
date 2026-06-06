@@ -6,6 +6,12 @@
 ## Priority
 P0 (Critical)
 
+## Milestone
+M0 — Dialect Infrastructure
+
+## Owner Agent
+General
+
 ## Description
 
 Implement the core Kernel dialect with:
@@ -16,13 +22,13 @@ Implement the core Kernel dialect with:
 
 ## Acceptance Criteria
 
-- [ ] Kernel dialect defined in TableGen
-- [ ] TileType and AccumulatorType defined
-- [ ] ks.relu operation implemented
-- [ ] ks.softmax operation implemented
-- [ ] Operations parse and print correctly
-- [ ] Verifiers catch invalid inputs
-- [ ] Lit tests pass
+- [x] Kernel dialect defined in TableGen
+- [x] TileType defined
+- [x] ks.relu operation implemented
+- [x] ks.softmax operation implemented
+- [x] Operations parse and print correctly
+- [x] Verifiers catch invalid inputs
+- [x] Lit tests pass
 
 ## Implementation Notes
 
@@ -81,5 +87,10 @@ make test-lit TESTS=tests/lit/Dialect/Kernel/
 
 ## Log
 
+### 2026-06-06
+- Updated stale checklist to match completed dialect infrastructure.
+- Removed accumulator type from completion criteria because it is not part of
+  the checked-in dialect core.
+
 ### [Date TBD]
-- Task created
+- Task created.

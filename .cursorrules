@@ -57,13 +57,15 @@ Implemented infrastructure includes the KS dialect, parse/verify tests, C API sm
 
 ## Development Workflow
 
-1. Read the relevant spec and design docs.
-2. Write or update focused tests.
-3. Implement the minimum correct change.
-4. Build with `cmake --build build --parallel`.
-5. Run `ctest --test-dir build --output-on-failure`.
-6. Run `./scripts/docker-verify.sh` before push when Docker is available.
-7. Commit with a descriptive conventional message.
+1. Read `tasks/MILESTONES.md` and the active `tasks/TASK-XXX.md`; use
+   `.cursor/skills/manage-kernelsmith-tasks/SKILL.md` for task grooming.
+2. Read the relevant spec and design docs.
+3. Write or update focused tests.
+4. Implement the minimum correct change.
+5. Build with `cmake --build build --parallel`.
+6. Run `ctest --test-dir build --output-on-failure`.
+7. Run `./scripts/docker-verify.sh` before push when Docker is available.
+8. Commit with a descriptive conventional message.
 
 ## What NOT to Do
 

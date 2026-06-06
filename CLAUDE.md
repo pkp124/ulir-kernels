@@ -111,12 +111,15 @@ def KS_ExampleOp : KS_Op<"example", [Pure]> {
 
 ## Development Workflow
 
-1. **Read the spec** in `specs/` before implementing any kernel or pass
-2. **Check design docs** in `docs/design/` for existing decisions
-3. **TDD**: Write a failing lit/unit test first, then implement
-4. **Small commits**: Each commit should pass `ctest --test-dir build`
-5. **Container verify before push**: Run `./scripts/docker-verify.sh` before every `git push` to confirm lint (ruff + clang-format) and the container build + tests all pass in the same environment CI uses
-6. **Commit format**: `<type>(<scope>): <subject>` (e.g., `feat(dialect): add ks.relu operation`)
+1. **Check task context** in `tasks/MILESTONES.md` and the active
+   `tasks/TASK-XXX.md`; use `.cursor/skills/manage-kernelsmith-tasks/SKILL.md`
+   for task grooming or status updates
+2. **Read the spec** in `specs/` before implementing any kernel or pass
+3. **Check design docs** in `docs/design/` for existing decisions
+4. **TDD**: Write a failing lit/unit test first, then implement
+5. **Small commits**: Each commit should pass `ctest --test-dir build`
+6. **Container verify before push**: Run `./scripts/docker-verify.sh` before every `git push` to confirm lint (ruff + clang-format) and the container build + tests all pass in the same environment CI uses
+7. **Commit format**: `<type>(<scope>): <subject>` (e.g., `feat(dialect): add ks.relu operation`)
 
 ### Commit Types
 

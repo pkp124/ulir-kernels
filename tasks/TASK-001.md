@@ -6,6 +6,12 @@
 ## Priority
 P0 (Critical)
 
+## Milestone
+M0 — Dialect Infrastructure
+
+## Owner Agent
+General
+
 ## Description
 
 Set up the foundational infrastructure for KernelSmith:
