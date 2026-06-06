@@ -49,13 +49,13 @@ static LogicalResult verifyZeroPointFits(Operation *op,
   if (integerType.isUnsigned()) {
     if (zeroPoint < 0)
       return op->emitOpError("zero_point ")
-             << zeroPoint << " does not fit in integer element type '"
-             << integerType << "'";
+             << zeroPoint << " does not fit in integer element type "
+             << integerType;
 
     if (width < 64 && static_cast<uint64_t>(zeroPoint) >= (1ULL << width)) {
       return op->emitOpError("zero_point ")
-             << zeroPoint << " does not fit in integer element type '"
-             << integerType << "'";
+             << zeroPoint << " does not fit in integer element type "
+             << integerType;
     }
     return success();
   }
@@ -67,8 +67,8 @@ static LogicalResult verifyZeroPointFits(Operation *op,
   int64_t max = (1LL << (width - 1)) - 1;
   if (zeroPoint < min || zeroPoint > max) {
     return op->emitOpError("zero_point ")
-           << zeroPoint << " does not fit in integer element type '"
-           << integerType << "'";
+           << zeroPoint << " does not fit in integer element type "
+           << integerType;
   }
 
   return success();
