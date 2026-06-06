@@ -166,6 +166,52 @@ def KS_SoftmaxOp : KS_Op<"softmax", [Pure, SameOperandsAndResultType]> {
 }
 
 //===----------------------------------------------------------------------===//
+// Quantization Operations
+//===----------------------------------------------------------------------===//
+
+def KS_QuantizeOp : KS_Op<"quantize", [Pure]> {
+  let summary = "Affine quantization from floating-point to integer tensor";
+  let description = [{
+    Converts a floating-point tensor to an integer tensor using scale and
+    zero-point metadata.
+  }];
+
+  let arguments = (ins
+    AnyTensor:$input,
+    F64Attr:$scale,
+    DefaultValuedAttr<I64Attr, "0">:$zero_point
+  );
+  let results = (outs AnyTensor:$output);
+
+  let assemblyFormat = [{
+    $input attr-dict `:` type($input) `->` type($output)
+  }];
+
+  let hasVerifier = 1;
+}
+
+def KS_DequantizeOp : KS_Op<"dequantize", [Pure]> {
+  let summary = "Affine dequantization from integer to floating-point tensor";
+  let description = [{
+    Converts an integer tensor to a floating-point tensor using scale and
+    zero-point metadata.
+  }];
+
+  let arguments = (ins
+    AnyTensor:$input,
+    F64Attr:$scale,
+    DefaultValuedAttr<I64Attr, "0">:$zero_point
+  );
+  let results = (outs AnyTensor:$output);
+
+  let assemblyFormat = [{
+    $input attr-dict `:` type($input) `->` type($output)
+  }];
+
+  let hasVerifier = 1;
+}
+
+//===----------------------------------------------------------------------===//
 // Normalization Operations
 //===----------------------------------------------------------------------===//
 

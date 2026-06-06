@@ -18,6 +18,7 @@ specs/
 │   ├── matmul.md
 │   ├── conv2d.md
 │   ├── attention.md
+│   ├── quantization.md
 │   └── ...
 ├── targets/          # Target architecture specifications
 │   ├── riscv-rvv.md
