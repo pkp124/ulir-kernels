@@ -32,13 +32,54 @@ static bool compatibleShapes(RankedTensorType inputType,
   return true;
 }
 
-static LogicalResult verifyPositiveFiniteScale(Operation *op,
-                                               FloatAttr scaleAttr) {
-  double scale = scaleAttr.getValueAsDouble();
-  if (!std::isfinite(scale) || scale <= 0.0)
-    return op->emitOpError("scale must be positive and finite");
+static bool compatibleWithStaticShape(RankedTensorType type,
+                                      ArrayRef<int64_t> shape) {
+  if (type.getRank() != static_cast<int64_t>(shape.size()))
+    return false;
+
+  for (auto [actualDim, expectedDim] : llvm::zip(type.getShape(), shape)) {
+    if (actualDim != ShapedType::kDynamic && actualDim != expectedDim)
+      return false;
+  }
+
+  return true;
+}
+
+static LogicalResult verifyFloatingPointElementType(Operation *op,
+                                                    RankedTensorType type,
+                                                    StringRef tensorName) {
+  if (!isa<FloatType>(type.getElementType()))
+    return op->emitOpError(tensorName)
+           << " element type must be floating-point";
 
   return success();
+}
+
+static LogicalResult verifyMatchingElementTypes(Operation *op,
+                                                ArrayRef<RankedTensorType> types,
+                                                StringRef tensorNames) {
+  Type elementType = types.front().getElementType();
+  for (RankedTensorType type : types.drop_front()) {
+    if (type.getElementType() != elementType)
+      return op->emitOpError(tensorNames) << " element types must match";
+  }
+
+  return success();
+}
+
+static LogicalResult verifyPositiveFiniteFloatAttr(Operation *op,
+                                                   FloatAttr attr,
+                                                   StringRef attrName) {
+  double value = attr.getValueAsDouble();
+  if (!std::isfinite(value) || value <= 0.0)
+    return op->emitOpError(attrName) << " must be positive and finite";
+
+  return success();
+}
+
+static LogicalResult verifyPositiveFiniteScale(Operation *op,
+                                               FloatAttr scaleAttr) {
+  return verifyPositiveFiniteFloatAttr(op, scaleAttr, "scale");
 }
 
 static LogicalResult verifyZeroPointFits(Operation *op,
@@ -242,9 +283,70 @@ LogicalResult ScaledDotProductAttentionOp::verify() {
 
 LogicalResult LayerNormOp::verify() {
   auto inputType = dyn_cast<RankedTensorType>(getInput().getType());
+  auto weightType = dyn_cast<RankedTensorType>(getWeight().getType());
+  auto biasType = dyn_cast<RankedTensorType>(getBias().getType());
+  auto outputType = dyn_cast<RankedTensorType>(getOutput().getType());
 
   if (!inputType)
     return emitOpError("input must be a ranked tensor");
+
+  if (!weightType)
+    return emitOpError("weight must be a ranked tensor");
+
+  if (!biasType)
+    return emitOpError("bias must be a ranked tensor");
+
+  if (!outputType)
+    return emitOpError("output must be a ranked tensor");
+
+  if (failed(
+          verifyFloatingPointElementType(getOperation(), inputType, "input")))
+    return failure();
+
+  if (failed(verifyMatchingElementTypes(
+          getOperation(), {inputType, weightType, biasType, outputType},
+          "input, weight, bias, and output")))
+    return failure();
+
+  if (!compatibleShapes(inputType, outputType))
+    return emitOpError("output shape must match input shape");
+
+  if (failed(verifyPositiveFiniteFloatAttr(getOperation(), getEpsAttr(),
+                                           "eps")))
+    return failure();
+
+  SmallVector<int64_t> normalizedShape;
+  normalizedShape.reserve(getNormalizedShape().size());
+  for (Attribute dimAttr : getNormalizedShape()) {
+    int64_t dim = cast<IntegerAttr>(dimAttr).getInt();
+    if (dim <= 0)
+      return emitOpError("normalized_shape dimensions must be positive");
+    normalizedShape.push_back(dim);
+  }
+
+  if (normalizedShape.empty())
+    return emitOpError("normalized_shape must not be empty");
+
+  int64_t normalizedRank = normalizedShape.size();
+  if (normalizedRank > inputType.getRank()) {
+    return emitOpError("normalized_shape rank ")
+           << normalizedRank << " exceeds input rank " << inputType.getRank();
+  }
+
+  if (!compatibleWithStaticShape(weightType, normalizedShape))
+    return emitOpError("weight shape must match normalized_shape");
+
+  if (!compatibleWithStaticShape(biasType, normalizedShape))
+    return emitOpError("bias shape must match normalized_shape");
+
+  ArrayRef<int64_t> inputTrailingShape =
+      inputType.getShape().take_back(normalizedRank);
+  for (auto [inputDim, normalizedDim] :
+       llvm::zip(inputTrailingShape, normalizedShape)) {
+    if (inputDim != ShapedType::kDynamic && inputDim != normalizedDim)
+      return emitOpError(
+          "input trailing dimensions must match normalized_shape");
+  }
 
   return success();
 }
@@ -331,12 +433,42 @@ LogicalResult DequantizeOp::verify() {
 LogicalResult RMSNormOp::verify() {
   auto inputType = dyn_cast<RankedTensorType>(getInput().getType());
   auto weightType = dyn_cast<RankedTensorType>(getWeight().getType());
+  auto outputType = dyn_cast<RankedTensorType>(getOutput().getType());
 
   if (!inputType || !weightType)
     return emitOpError("input and weight must be ranked tensors");
 
+  if (!outputType)
+    return emitOpError("output must be a ranked tensor");
+
   if (inputType.getRank() < 1)
     return emitOpError("input must have at least 1 dimension");
+
+  if (failed(
+          verifyFloatingPointElementType(getOperation(), inputType, "input")))
+    return failure();
+
+  if (failed(verifyMatchingElementTypes(
+          getOperation(), {inputType, weightType, outputType},
+          "input, weight, and output")))
+    return failure();
+
+  if (!compatibleShapes(inputType, outputType))
+    return emitOpError("output shape must match input shape");
+
+  if (failed(verifyPositiveFiniteFloatAttr(getOperation(), getEpsAttr(),
+                                           "eps")))
+    return failure();
+
+  if (weightType.getRank() != 1)
+    return emitOpError("weight must be a 1D tensor");
+
+  int64_t inputLastDim = inputType.getDimSize(inputType.getRank() - 1);
+  int64_t weightDim = weightType.getDimSize(0);
+  if (inputLastDim != ShapedType::kDynamic &&
+      weightDim != ShapedType::kDynamic && inputLastDim != weightDim) {
+    return emitOpError("weight dimension must match input last dimension");
+  }
 
   return success();
 }
