@@ -7,6 +7,7 @@ add_mlir_library(KernelSmithPasses
   TilePass.cpp
   PackPass.cpp
   MaterializePackWorkspacePass.cpp
+  AllocCheckPass.cpp
   VectorizePass.cpp
   LowerToRVVPass.cpp
 

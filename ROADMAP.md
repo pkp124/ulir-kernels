@@ -106,8 +106,8 @@ Proves the pass infrastructure works end-to-end.
 
 ## Milestone 3: MLIR Lowering — MatMul (Generic Target)
 
-**Status**: Current / partial. `--ks-lower-to-linalg` and `--ks-tile` are
-implemented and tested. Bufferization, allocation checking, generated object
+**Status**: Current / partial. `--ks-lower-to-linalg`, `--ks-tile`, and
+`--ks-alloc-check` are implemented and tested. Bufferization, generated object
 integration, and C library replacement remain open.
 
 **Goal**: Replace handwritten matmul with MLIR-generated code. Single-level tiling,
@@ -116,7 +116,7 @@ no packing, generic target profile. Proves the full ks -> linalg -> LLVM pipelin
 **Deliverables**:
 - `KSLowerToLinalgPass` (`--ks-lower-to-linalg`)
 - `KSTilePass` (`--ks-tile`) with profile-driven tile sizes
-- `KSAllocCheckPass` (`--ks-alloc-check`) — fail if any `memref.alloc` survives
+- ✓ `KSAllocCheckPass` (`--ks-alloc-check`) — fail if any `memref.alloc` survives
 - Bufferization config: all buffers are function arguments, zero internal malloc
 - Generated matmul for generic target
 - C library tests still pass
@@ -126,7 +126,7 @@ no packing, generic target profile. Proves the full ks -> linalg -> LLVM pipelin
 2. Add accumulator type attribute to ks.matmul for mixed-precision (f16->f32, i8->i32)
 3. Implement `--ks-tile` (single-level, reads tile sizes from pass options)
 4. Configure one-shot-bufferize: function-argument buffers only
-5. Implement `--ks-alloc-check` (reject stray memref.alloc as hard error)
+5. ✓ Implement `--ks-alloc-check` (reject stray memref.alloc as hard error)
 6. Build script: read target/generic.h, translate to pass options
 7. Pipeline: ks.matmul -> linalg -> tile -> bufferize -> LLVM IR -> .o
 8. Replace handwritten matmul with generated version
