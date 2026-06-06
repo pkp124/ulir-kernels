@@ -61,3 +61,7 @@ available. If unavailable, record the missing tools in the task log and PR body.
 ### 2026-06-06
 - Created from the remaining open M4 roadmap items: QEMU correctness,
   benchmarking, and tail/stride hardening.
+- Added the first descriptor-backed RISC-V functional verification path:
+  `tests/riscv_runner.py` builds generated RVV objects, links them with a C
+  max-error harness, rejects VLENs below the `riscv_rvv_256` baseline, and runs
+  QEMU user-mode cases that print `PASS`, `MAX_ABS_ERROR`, and `TIME_NS`.

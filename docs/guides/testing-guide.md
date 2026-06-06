@@ -253,28 +253,24 @@ Test kernels with different vector lengths:
 
 ### QEMU Configuration
 
-The `QEMURunner` class handles running RISC-V binaries on QEMU:
+The descriptor-backed RISC-V runner builds MLIR inputs into static RISC-V
+ELFs, runs them on QEMU, and validates stable output markers:
 
-```python
-from tests.qemu_runner import QEMURunner
+```bash
+PATH="/usr/lib/llvm-21/bin:$PATH" python3 tests/riscv_runner.py --all
+PATH="/usr/lib/llvm-21/bin:$PATH" python3 tests/riscv_runner.py --all --vlens 256
+```
 
-runner = QEMURunner()
+Cases live in `tests/riscv/cases.json`. The current `riscv_rvv_256` profile
+uses a `+zvl256b` object-code baseline, so the runner accepts VLEN 256 and 512
+and rejects VLEN 128 before execution.
 
-# Run with specific VLEN
-ret_code, stdout, stderr = runner.run_with_vlen(
-    binary_path="build/bin/test_matmul",
-    vlen=256
-)
+Each harness prints:
 
-# Run with multiple VLEN values
-results = runner.run_multi_vlen(
-    binary_path="build/bin/test_matmul",
-    vlens=[128, 256, 512]
-)
-
-# Check consistency
-consistent = runner.validate_consistent_results(results)
-print(f"Results consistent: {consistent}")
+```text
+MAX_ABS_ERROR: <value>
+TIME_NS: <value>
+PASS
 ```
 
 ### Installing QEMU
@@ -285,6 +281,7 @@ sudo apt install qemu-user
 
 # Verify installation
 qemu-riscv64 --version
+riscv64-linux-gnu-gcc --version
 ```
 
 ---

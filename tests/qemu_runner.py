@@ -4,12 +4,12 @@ QEMU Runner for Multi-VLEN Testing (M4: RISC-V RVV Target)
 
 Runs RISC-V kernels on QEMU with different vector lengths to validate
 that the KernelSmith RVV pipeline produces correct results across VLEN
-configurations (128, 256, 512 bits).
+configurations (256, 512 bits for the current +zvl256b baseline).
 
 Usage:
     python tests/qemu_runner.py --binary build-rvv/bin/test_matmul_rvv
     python tests/qemu_runner.py --binary build-rvv/bin/test_matmul_rvv \
-        --vlens 128 256 512 --benchmark
+        --vlens 256 512 --benchmark
 """
 
 import argparse
@@ -22,8 +22,8 @@ from pathlib import Path
 class QEMURunner:
     """Execute RISC-V binaries on QEMU with different VLEN configurations."""
 
-    # Standard VLEN values to test (bits)
-    STANDARD_VLENS = [128, 256, 512]
+    # Standard VLEN values for the current riscv_rvv_256 / +zvl256b profile.
+    STANDARD_VLENS = [256, 512]
 
     def __init__(self, qemu_binary: str = "qemu-riscv64"):
         self.qemu_binary = qemu_binary
@@ -50,7 +50,7 @@ class QEMURunner:
 
         Args:
             binary_path: Path to RISC-V executable.
-            vlen: Vector length in bits (128, 256, 512, etc.).
+            vlen: Vector length in bits (256, 512, etc.).
             args: Extra command line arguments to pass to the binary.
             timeout: Timeout in seconds.
 
@@ -241,7 +241,7 @@ def main() -> int:
         nargs="+",
         type=int,
         default=QEMURunner.STANDARD_VLENS,
-        help="VLEN values to test (default: 128 256 512).",
+        help="VLEN values to test (default: 256 512).",
     )
     parser.add_argument(
         "--benchmark", action="store_true", help="Run benchmark in addition to correctness test."

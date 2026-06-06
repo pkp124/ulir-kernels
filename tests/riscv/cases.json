@@ -1,0 +1,14 @@
+{
+  "cases": [
+    {
+      "name": "vector_relu_f32",
+      "input_mlir": "tests/riscv/vector_relu_f32.mlir",
+      "harness": "tests/riscv/harnesses/max_error_harness.c",
+      "entry_symbol": "ks_rvv_relu_max_abs_error",
+      "profile": "riscv_rvv_256",
+      "vlens": [256, 512],
+      "tolerance": 0.000001,
+      "benchmark": true
+    }
+  ]
+}

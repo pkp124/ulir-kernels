@@ -197,9 +197,7 @@ print_summary() {
     info "RVV simulation environment ready."
     echo ""
     info "Quick test:"
-    echo "  scripts/compile-rvv.sh tests/riscv/relu_rvv.mlir /tmp/relu.o"
-    echo "  riscv64-linux-gnu-gcc -static /tmp/relu.o -o /tmp/relu_test -lm"
-    echo "  qemu-riscv64 -cpu rv64,v=true,vlen=256 /tmp/relu_test && echo PASS"
+    echo "  PATH=\"/usr/lib/llvm-21/bin:\$PATH\" python3 tests/riscv_runner.py --all"
 }
 
 # =============================================================================
