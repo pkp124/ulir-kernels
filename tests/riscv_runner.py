@@ -198,6 +198,12 @@ def run_case(case: dict, output_dir: Path, qemu_binary: str, vlens: list[int]) -
         ]
         print("+ " + " ".join(cmd), flush=True)
         completed = subprocess.run(cmd, capture_output=True, text=True, timeout=60, check=False)
+        if should_retry_with_static_qemu(qemu_binary, completed):
+            static_qemu = "qemu-riscv64-static"
+            cmd[0] = static_qemu
+            print(f"Retrying with {static_qemu} after exit {completed.returncode}", flush=True)
+            print("+ " + " ".join(cmd), flush=True)
+            completed = subprocess.run(cmd, capture_output=True, text=True, timeout=60, check=False)
         result = parse_result(
             case["name"], vlen, completed.returncode, completed.stdout, completed.stderr
         )
@@ -206,13 +212,22 @@ def run_case(case: dict, output_dir: Path, qemu_binary: str, vlens: list[int]) -
     return results
 
 
+def should_retry_with_static_qemu(qemu_binary: str, completed: subprocess.CompletedProcess) -> bool:
+    if Path(qemu_binary).name != "qemu-riscv64":
+        return False
+    if completed.returncode == 0 or completed.stdout or completed.stderr:
+        return False
+    return shutil.which("qemu-riscv64-static") is not None
+
+
 def print_result(result: CaseResult) -> None:
     status = "PASS" if result.passed else "FAIL"
     err = "nan" if result.max_abs_error is None else f"{result.max_abs_error:.9g}"
     time_ns = "0" if result.time_ns is None else str(result.time_ns)
     print(
         f"RESULT case={result.name} sim=qemu-user vlen={result.vlen} "
-        f"status={status} max_abs_error={err} time_ns={time_ns}",
+        f"status={status} return_code={result.return_code} "
+        f"max_abs_error={err} time_ns={time_ns}",
         flush=True,
     )
     if result.stderr:
