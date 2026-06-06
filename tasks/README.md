@@ -81,6 +81,7 @@ Progress updates with dates.
 | TASK-004 | M3/M4 | Implement tiling and vectorization passes | Complete | P1 |
 | TASK-005 | M4 | Implement RVV lowering pipeline | Complete | P1 |
 | TASK-006 | M4 | Validate RVV correctness and benchmark path | In Progress | P1 |
+| TASK-009 | M4 | Plan RISC-V simulation verification | Needs Review | P1 |
 | TASK-007 | M5 | RISC-V quantization foundation | Not Started | P1 |
 | TASK-008 | M6 | Transformer minimum kernel set | Not Started | P1 |
 

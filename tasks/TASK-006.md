@@ -33,6 +33,7 @@ vectorize, and lower-to-RVV compiler pipeline is implemented.
 - TASK-005: RVV lowering pipeline
 - `specs/targets/riscv-rvv.md`
 - `docs/design/DES-009-m4-rvv-lowering.md`
+- `docs/design/DES-012-riscv-simulation-verification.md`
 
 ## Verification
 
@@ -49,6 +50,9 @@ available. If unavailable, record the missing tools in the task log and PR body.
 
 - Keep this task focused on validation and measurement, not new quantized
   lowering work.
+- Follow DES-012 for simulator platform tiers: QEMU user-mode first, Spike as
+  optional reference validation, and gem5/Renode only for later analysis or
+  board-level scenarios.
 - If tail handling requires new compiler behavior, split that implementation
   into a separate task and link it here.
 
