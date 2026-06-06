@@ -153,6 +153,21 @@ def KSMaterializePackWorkspacePass
   ];
 }
 
+def KSAllocCheckPass : Pass<"ks-alloc-check", "mlir::func::FuncOp"> {
+  let summary = "Reject internal memref allocations in generated kernels";
+  let description = [{
+    Enforces KernelSmith's caller-provided workspace model by failing the
+    pipeline if any memref.alloc survives lowering inside a function.
+
+    This pass is intended to run after bufferization and before final LLVM
+    conversion. Generated kernels must use function arguments or explicit
+    workspace buffers instead of heap-like internal memref.alloc operations.
+  }];
+  let dependentDialects = [
+    "mlir::memref::MemRefDialect"
+  ];
+}
+
 def KSVectorizePass : Pass<"ks-vectorize", "mlir::func::FuncOp"> {
   let summary = "Vectorize inner linalg ops to the vector dialect";
   let description = [{
