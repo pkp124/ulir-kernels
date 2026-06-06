@@ -188,6 +188,7 @@ def run_case(case: dict, output_dir: Path, qemu_binary: str, vlens: list[int]) -
     _, binary = case_paths(case, output_dir)
     if not binary.exists():
         raise FileNotFoundError(f"{binary} not found. Re-run with --build or --all.")
+    ensure_executable(binary)
 
     results = []
     for vlen in vlens:
@@ -212,6 +213,14 @@ def run_case(case: dict, output_dir: Path, qemu_binary: str, vlens: list[int]) -
         print_result(result)
         results.append(result)
     return results
+
+
+def ensure_executable(binary: Path) -> None:
+    mode = binary.stat().st_mode
+    if mode & 0o111:
+        return
+    binary.chmod(mode | 0o111)
+    print(f"Made RISC-V ELF executable: {binary}", flush=True)
 
 
 def should_retry_with_static_qemu(qemu_binary: str, completed: subprocess.CompletedProcess) -> bool:
