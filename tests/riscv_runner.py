@@ -3,6 +3,7 @@
 
 import argparse
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -190,20 +191,21 @@ def run_case(case: dict, output_dir: Path, qemu_binary: str, vlens: list[int]) -
 
     results = []
     for vlen in vlens:
-        cmd = [
-            qemu_binary,
-            "-cpu",
-            f"rv64,v=true,vlen={vlen},vext_spec=v1.0",
-            str(binary),
-        ]
-        print("+ " + " ".join(cmd), flush=True)
-        completed = subprocess.run(cmd, capture_output=True, text=True, timeout=60, check=False)
+        cpu = f"rv64,v=true,vlen={vlen},vext_spec=v1.0"
+        cmd = [qemu_binary, str(binary)]
+        env = {**os.environ, "QEMU_CPU": cpu}
+        print("+ QEMU_CPU=" + cpu + " " + " ".join(cmd), flush=True)
+        completed = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=60, check=False, env=env
+        )
         if should_retry_with_static_qemu(qemu_binary, completed):
             static_qemu = "qemu-riscv64-static"
             cmd[0] = static_qemu
             print(f"Retrying with {static_qemu} after exit {completed.returncode}", flush=True)
-            print("+ " + " ".join(cmd), flush=True)
-            completed = subprocess.run(cmd, capture_output=True, text=True, timeout=60, check=False)
+            print("+ QEMU_CPU=" + cpu + " " + " ".join(cmd), flush=True)
+            completed = subprocess.run(
+                cmd, capture_output=True, text=True, timeout=60, check=False, env=env
+            )
         result = parse_result(
             case["name"], vlen, completed.returncode, completed.stdout, completed.stderr
         )
