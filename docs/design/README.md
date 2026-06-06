@@ -57,6 +57,7 @@ Examples:
 |----|-------|--------|-------|------|
 | [DES-006](DES-006-kernel-library-architecture.md) | **Kernel Library Architecture** | Draft | C API, memory mgmt, tiling, packing, target profiles | `DES-006-kernel-library-architecture.md` |
 | [DES-010](DES-010-pack-workspace-materialization.md) | **Pack Workspace Materialization** | Implemented | Explicit workspace-backed B packing | `DES-010-pack-workspace-materialization.md` |
+| [DES-011](DES-011-riscv-first-transformer-demo.md) | **RISC-V First Transformer Demo Strategy** | Draft | Minimal llama2.c-style demo first; llama.cpp/GGML integration later | `DES-011-riscv-first-transformer-demo.md` |
 | [DES-001](DES-001-vector-operations-lowering.md) | Vector Operations Lowering to RISC-V RVV | Draft | RVV intrinsic mapping | `DES-001-vector-operations-lowering.md` |
 | [DES-002](DES-002-matmul-kernel.md) | MatMul Kernel (TDD Example) | Draft | MLIR pipeline (partially superseded by DES-006) | `DES-002-matmul-kernel.md` |
 | [DES-003](DES-003-conv2d-kernel.md) | Conv2D Kernel Implementation | Draft | Conv2D lowering | `DES-003-conv2d-kernel.md` |
@@ -70,11 +71,12 @@ See [ROADMAP.md](../../ROADMAP.md) for the complete milestone plan.
 The project follows a **library-first** approach (DES-006): ship stable C headers and
 reference implementations first, then incrementally replace with MLIR-generated code.
 
-### Current: Milestone 1 — C API + Reference Library
-- Public C headers (ks_matmul.h, ks_activations.h, ks_common.h)
-- Target profile system (target/generic.h)
-- Handwritten reference implementations
-- Reference: `DES-006-kernel-library-architecture.md`
+### Current Direction — RISC-V-First Kernel Backend
+- Public C headers and static library remain the product surface
+- MLIR stays internal build-time tooling
+- RISC-V RVV is the first optimized target
+- Minimal llama2.c-style transformer demo comes before llama.cpp/GGML integration
+- References: `DES-006-kernel-library-architecture.md`, `DES-011-riscv-first-transformer-demo.md`
 
 ## TDD Development Approach
 

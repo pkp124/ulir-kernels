@@ -1,16 +1,31 @@
 # KernelSmith Roadmap
 
-> **Vision**: Ship a C kernel library (`libkernelsmith.a` + headers) that provides
-> optimized ML inference kernels for **edge, embedded, and physical AI** devices.
-> Primary target: RISC-V RVV. Secondary target: ARM NEON.
+> **Vision**: Ship a RISC-V-first C kernel library (`libkernelsmith.a` +
+> headers) that provides optimized quantized ML inference kernels for **edge,
+> embedded, and physical AI** devices. RISC-V RVV is the first optimized target;
+> ARM NEON is a secondary port once the RVV path is proven.
 > No runtime dependencies. No MLIR knowledge required by users. Works with any
 > toolchain, any RTOS, any task execution engine.
 >
-> **Domain focus**: Quantized inference on resource-constrained hardware — phones,
-> SBCs, MCUs, and emerging RISC-V edge SoCs. Quantization is a core feature,
-> not an afterthought.
+> **Domain focus**: Quantized inference on resource-constrained RISC-V edge
+> SoCs, SBCs, robotics/physical-AI devices, and embedded systems. Quantization
+> is a core feature, not an afterthought. Phone-class ARM devices remain relevant
+> but are not the first strategic wedge.
 >
 > **Architecture reference**: [DES-006](docs/design/DES-006-kernel-library-architecture.md)
+> **Demo strategy**: [DES-011](docs/design/DES-011-riscv-first-transformer-demo.md)
+
+## Product Positioning
+
+KernelSmith is a **kernel backend**, not a full model deployment framework.
+MLIR is internal build-time machinery; users consume a static C library with
+stable headers and caller-provided workspace. Framework integrations such as
+llama.cpp/GGML, ExecuTorch, TFLite Micro, or IREE are downstream consumers of
+the C kernels.
+
+The first end-to-end proof is a minimal llama2.c-style RISC-V transformer
+runner. A full llama.cpp/GGML integration is a follow-on credibility demo after
+the generated RVV kernel ABI, quantized layouts, and workspace model are stable.
 
 ---
 
@@ -128,7 +143,8 @@ RVV-specific vectorization.
 
 **Why RVV first**: Edge RISC-V SoCs (e.g., T-Head C908/C910, SiFive X280,
 Kendryte K230) are the primary deployment targets. RVV's vector-length-agnostic
-(VLA) model requires a custom lowering pass — LLVM autovectorization is
+(VLA) model benefits from explicit vector-dialect lowering, profile-driven
+tiling, and packing; relying on scalar loops plus autovectorization is
 insufficient for high-performance VLA code.
 
 **Design**: [DES-009](docs/design/DES-009-m4-rvv-lowering.md)
@@ -160,141 +176,116 @@ insufficient for high-performance VLA code.
 
 ---
 
-## Milestone 5: Quantization Foundation
+## Milestone 5: RISC-V Quantization Foundation
 
-**Goal**: INT8 quantized matmul — the single most important operation for edge
-inference. This is what makes KernelSmith relevant to the edge AI domain.
+**Goal**: Establish the quantized arithmetic and ABI needed for RISC-V edge
+inference, with batch-1 transformer decode as the first optimization target.
 
-**Why now**: Every serious edge framework (TFLite, XNNPACK, QNN, ArmNN) is
-quantization-first. Deploying f32 models on edge devices is a non-starter for
-production workloads. INT8 symmetric quantization covers the majority of
-deployed edge models today.
+**Why now**: Edge inference is quantization-first. INT8 remains the baseline for
+general edge models, while on-device LLM inference depends on INT4 or other
+low-bit weight formats. For batch-1 transformer decode, quantized dot/GEMV is
+often more important than large GEMM because the workload is memory-bandwidth
+bound.
 
 **Deliverables**:
-- `ks.quantize` / `ks.dequantize` ops in the KS dialect
-- `ks_matmul_i8` — INT8 input, INT32 accumulator, requantize to INT8 output
-- Quantization-aware lowering: i8 multiply -> i32 accumulate -> shift/round -> i8
-- RVV-optimized quantized matmul (using widening multiply instructions)
-- C API: `ks_matmul_i8(input_i8, weight_i8, scale, zero_point, output_i8, ...)`
-- Numerical validation against numpy quantized reference
+- `ks.quantize` / `ks.dequantize` ops for semantic tests and explicit conversion
+- Quantized dot/GEMV C APIs:
+  - `ks_dot_i8`
+  - `ks_matvec_i8`
+  - `ks_dot_w4a8`
+  - `ks_matvec_w4a8`
+- `ks_matmul_i8` for small-batch/prefill and non-transformer workloads
+- Fused RVV lowering for unpack/dequantize + dot/GEMV/GEMM
+- Block or per-channel scale layout documented in the public ABI
+- NumPy references for i8 and W4A8 dot/GEMV/GEMM
 
 **Tasks**:
 1. Add `ks.quantize` and `ks.dequantize` ops (TableGen + verifier + lit tests)
-2. Add quantization attributes to `ks.matmul` (scale, zero_point, per-channel)
-3. Implement INT8 lowering in `--ks-lower-to-linalg`:
-   - `linalg.quantized_matmul` or manual `arith.extsi` + `linalg.matmul` + requantize
-4. INT8-specific tiling (profile parameters for i8 tile sizes)
-5. RVV INT8 path: `vwmul.vv` (widening multiply), `vnsra.wi` (narrowing shift)
-6. Write C header `ks_matmul.h` i8 variant with scale/zero_point parameters
-7. Numpy quantized reference for test validation
-8. Lit tests for quantized lowering pipeline
+2. Add accumulator/quantization metadata needed for i8 and W4A8 lowering
+3. Define C APIs and packed layouts for i8 and W4A8 dot/GEMV
+4. Implement INT8 lowering: i8 -> i32 accumulate -> requantize where needed
+5. Implement W4A8 fused unpack/dequantize + i32/f32 accumulation for RVV
+6. Add RVV i8/W4A8 tile parameters and pack factors to target profiles
+7. Add NumPy validation for quantized dot/GEMV/GEMM
+8. Add lit tests for quantized lowering and diagnostics
 
 ---
 
-## Milestone 6: Edge Operator Coverage
+## Milestone 6: Transformer Minimum Kernel Set
 
-**Goal**: Add the operators that edge inference models actually need beyond
-matmul and activations. Prioritized by frequency in deployed edge models
-(MobileNet, EfficientNet, tiny transformers).
+**Goal**: Add the small set of non-matmul kernels needed for a minimal
+llama-style transformer block on RISC-V RVV.
 
-**Deliverables**:
-- New ops with full lowering + RVV optimization + tests
-- C API headers for each new kernel
+**Why before broad operator coverage**: The first end-to-end proof is a
+quantized transformer demo, not a general vision model suite. The decode path
+needs normalization, softmax, residual add, activation, and quantized GEMV/dot.
 
-**Operators (in priority order)**:
-
-### 6a: Depthwise Conv2d
-The most critical missing op. MobileNet/EfficientNet use depthwise separable
-convolutions as their primary building block. More important than regular conv2d
-for edge vision models.
-- `ks.depthwise_conv2d` op (NHWC input, HW1C filter)
-- Lowering: direct convolution (no im2col — memory-constrained)
-- RVV vectorization along the channel dimension
-
-### 6b: Element-wise Add / Multiply
-Residual connections in every modern architecture. Trivial to implement but
-essential for end-to-end model support.
-- `ks.add`, `ks.mul` ops (element-wise, broadcasting)
-- Fuse with preceding matmul/conv where possible
-
-### 6c: Softmax + Layer Norm / RMS Norm
-Already defined as ops (Milestone 0) but need lowering paths.
-- Numerically stable softmax (max-subtract-exp-sum-divide)
-- Layer norm / RMS norm with f32 accumulation even for i8/f16 inputs
-
-### 6d: Pooling
-Average and max pooling for vision model downsampling.
-- `ks.avg_pool2d`, `ks.max_pool2d` ops (NHWC)
-
-### 6e: Conv2d (regular)
-Already defined as an op. Add lowering path (im2col + matmul or direct).
-
-### 6f: Reduce / Batch MatMul
-Already defined as ops. Add lowering paths.
-
----
-
-## Milestone 7: INT4 and Mixed Precision
-
-**Goal**: INT4 weights x INT8 activations — where on-device LLM inference lives.
-Combined with M5 (INT8) and M6 (edge ops), this completes the kernel library
-needed for a real-world quantized transformer demo on RISC-V RVV.
-
-**Why before ARM NEON**: The MVP is a complete quantized transformer running
-end-to-end on a RISC-V RVV platform. That requires INT4 weights (the standard
-for on-device LLMs), not a second architecture. Depth on one target with full
-quantization coverage is more compelling than breadth across two targets.
+**Design**: [DES-011](docs/design/DES-011-riscv-first-transformer-demo.md)
 
 **Deliverables**:
-- INT4 weight dequantization (W4A8 scheme)
-- `ks_matmul_w4a8` — INT4 weight, INT8 activation, INT32 accumulator
-- Block-wise quantization support (group size 32/64/128)
-- RVV-optimized: unpack INT4 -> INT8, then widening multiply
-- **MVP demo**: quantized LLM inference on RISC-V RVV via QEMU
+- `ks.add` / `ks.mul` element-wise ops and C APIs
+- Lowering and C API for `ks.rms_norm`
+- Numerically stable `ks.softmax` lowering and C API
+- RVV-friendly `ks_silu_f32` path for transformer feed-forward layers
+- C API smoke tests and NumPy validation for each transformer helper kernel
+- QEMU correctness for the transformer helper kernels where toolchains exist
 
 **Tasks**:
-1. INT4 storage format (packed 2 values per byte, little-endian nibble order)
-2. Dequantization op: `ks.dequantize_i4` (INT4 -> INT8 with scale per block)
-3. W4A8 matmul lowering (dequant + INT8 matmul fused in inner loop)
-4. RVV: 4-bit unpack using shift/mask, then `vwmul.vv`
-5. Block-wise scale handling (one scale per group of 32-128 weights)
-6. Test against reference W4A8 matmul (numpy)
-7. MVP demo (see below)
+1. Add `ks.add` and `ks.mul` ops with broadcasting rules, verifiers, and lit tests
+2. Add C APIs for `ks_add_f32`, `ks_mul_f32`, `ks_rms_norm_f32`, and `ks_softmax_f32`
+3. Lower add/mul/silu to vectorizable linalg or loop forms
+4. Lower RMSNorm with f32 accumulation and explicit epsilon behavior
+5. Lower softmax using max-subtract-exp-sum-divide for numerical stability
+6. Add functional validator coverage for transformer helper kernels
+7. Add QEMU tests for generated RVV helper kernels
 
-### MVP Demo: Quantized Transformer on RISC-V RVV
+---
 
-**Approach**: Fork [llama2.c](https://github.com/karpathy/llama2.c) (Karpathy's
-~700-line C inference engine) and replace its compute calls with KernelSmith's
-C API. llama2.c provides tokenizer, model loading, KV cache management, and
-sampling — we provide the optimized kernels.
+## Milestone 7: Minimal RISC-V Transformer Demo
 
-**Why llama2.c**: Pure C, no dependencies, freestanding-compatible, proven with
-small models. Matches KernelSmith's "no runtime dependencies" philosophy. The
-alternative (writing a custom runtime) duplicates work for no added value at
-the MVP stage.
+**Goal**: Demonstrate a quantized llama-style transformer running end-to-end on
+RISC-V RVV using KernelSmith-generated kernels.
 
-**Demo model**: TinyStories-15M (~8MB quantized W4A8). Small enough for QEMU,
-generates coherent English text, proves the full pipeline works.
+**Why this demo first**: A minimal llama2.c-style runner is small, auditable,
+QEMU-friendly, and aligned with KernelSmith's static C library objective. It
+proves the C ABI, workspace model, quantized layouts, and RVV generated kernels
+without taking on the full llama.cpp/GGML runtime surface.
 
-**Integration points** — replace these llama2.c functions with `ks_*` calls:
+**Design**: [DES-011](docs/design/DES-011-riscv-first-transformer-demo.md)
+
+**Deliverables**:
+- Minimal `examples/runner.c` inspired by llama2.c
+- KernelSmith-specific quantized model format for the demo
+- `scripts/quantize_model.py` for W4A8 conversion
+- `scripts/demo_rvv.sh` for cross-compilation and QEMU execution
+- Deterministic prompt validation
+- Correctness and benchmark comparison against scalar generic kernels
+
+**Integration points**:
 
 ```
-llama2.c function     →  KernelSmith C API
-─────────────────────    ─────────────────────────────
-matmul()              →  ks_matmul_w4a8()  (INT4 weights × INT8 activations)
-rmsnorm()             →  ks_rms_norm_f32()
-softmax()             →  ks_softmax_f32()
-silu activation       →  ks_silu_f32()
-residual add          →  ks_add_f32()
+runner component       -> KernelSmith C API
+--------------------      --------------------------------------------
+attention/FFN matvec   -> ks_matvec_w4a8() / ks_dot_w4a8()
+prefill matmul         -> ks_matmul_w4a8()
+rmsnorm                -> ks_rms_norm_f32()
+softmax                -> ks_softmax_f32()
+silu activation        -> ks_silu_f32()
+residual add           -> ks_add_f32()
 ```
 
-**New artifacts** (in `examples/`):
+**Demo model**: TinyStories-class model, quantized to W4A8 with group/block
+scales. The model should be small enough for QEMU correctness runs and useful
+enough to produce recognizable text on RVV hardware.
 
-| File | Lines | Purpose |
-|------|-------|---------|
-| `examples/runner.c` | ~500 | llama2.c fork with KernelSmith kernel calls |
-| `scripts/quantize_model.py` | ~200 | Convert llama2.c .bin weights to W4A8 .ksmodel |
-| `scripts/demo_rvv.sh` | ~20 | Cross-compile + QEMU run script |
+**Tasks**:
+1. Define the demo model container and W4A8 packing format
+2. Add quantization script for weights and scale metadata
+3. Implement the minimal runner with static workspace planning
+4. Replace decode-path compute with KernelSmith C API calls
+5. Add deterministic prompt/token validation
+6. Add QEMU run script and benchmark output
+7. Document limitations and follow-on llama.cpp/GGML integration path
 
 **Demo invocation**:
 
@@ -314,52 +305,51 @@ qemu-riscv64 -cpu rv64,v=true,vlen=256 \
   -p "Once upon a time" -n 128
 ```
 
-**Validation**: Compare token-by-token output against the original llama2.c
-running with f32 weights on the same model. Allow tolerance for quantization
-error (expect ~95%+ token match on greedy decoding for a 15M model).
+**Validation**: Compare deterministic greedy output against a Python or scalar C
+reference using the same quantized model. Track tokens/sec separately for QEMU
+and real RVV hardware; QEMU is primarily a correctness target.
 
 ---
 
-## Milestone 8: ARM NEON Target (Secondary)
+## Milestone 8: llama.cpp / GGML Integration Proof
 
-**Goal**: Same C API, optimized for ARMv8-A NEON. Covers phones, Raspberry Pi,
-Jetson, and similar SBCs — the widest deployed edge hardware base. Port the
-full kernel library (including INT8/INT4) to a second architecture.
+**Goal**: Demonstrate that KernelSmith's generated RVV kernels can be consumed
+by a widely recognized LLM runtime without making llama.cpp the primary product.
 
-**Why now**: The full kernel library and quantization stack are proven on RVV.
-ARM NEON has fixed 128-bit vectors, so LLVM's autovectorizer handles it
-reasonably well. No custom lowering pass is needed — target features and
-profile-driven tile sizes are sufficient. This makes it a fast port.
+**Why after the minimal runner**: llama.cpp/GGML brings model loading, GGUF
+formats, threading, many quantization formats, and upstream churn. Integrating
+too early would obscure whether KernelSmith's own kernel ABI and codegen are
+correct. After the small runner proves the kernels, llama.cpp provides an
+industry baseline and ecosystem credibility.
 
 **Deliverables**:
-- `target/aarch64_neon.h` — ARM NEON target profile
-- NEON-optimized matmul (f32, i8, W4A8) via LLVM autovectorization + profile tuning
-- NEON-optimized activations, edge ops, and normalization
-- INT8: leverage NEON `smull`/`smlal` (widening multiply-accumulate)
-- INT4: NEON unpack + widening multiply
-- Native or cross-compiled test suite
-- Benchmark: generic vs NEON
-- Transformer demo replayed on ARM NEON target
+- Focused integration branch or example that replaces selected GGML RVV kernels
+- Mapping between KernelSmith W4A8/i8 layouts and GGML-compatible call shapes
+- Benchmarks against llama.cpp scalar and existing RVV baselines
+- Documentation of what remains outside KernelSmith's scope
 
 **Tasks**:
-1. Write `target/aarch64_neon.h` target profile:
-   - 128-bit SIMD (4xf32, 8xf16, 16xi8)
-   - 32KB L1D, 256KB-1MB L2 (device-dependent)
-   - Tile sizes tuned for Cortex-A55/A76 class cores
-2. Set LLVM target triple `aarch64-none-linux-gnu` + `+neon,+fp-armv8`
-3. Profile-driven tile sizes (no custom pass — LLVM autovectorizes)
-4. Cross-compile and test natively or on target device
-5. Port all quantized kernels (INT8 matmul, W4A8 matmul) to NEON
-6. Benchmark against generic target, compare with XNNPACK/ArmNN on same hardware
-7. Optional: `+dotprod` variant (`sdot` instruction for INT8, Cortex-A76+)
+1. Identify GGML quantized dot/GEMV/GEMM entry points that match KernelSmith kernels
+2. Add layout conversion or direct packing support where needed
+3. Replace a small set of RVV kernels behind build flags
+4. Benchmark prompt processing and decode throughput
+5. Compare accuracy/perplexity against the unmodified runtime
+6. Document upstreamability gaps and API changes needed for stable integration
 
 ---
 
-## Milestone 9: Optimization and Hardening
+## Milestone 9: RISC-V Operator Coverage and Hardening
 
-**Goal**: Production-quality library performance and robustness for edge deployment.
+**Goal**: Broaden RISC-V edge model coverage and harden the generated-kernel
+library after the transformer path is proven.
 
 **Tasks**:
+- RISC-V vision operator track:
+  - `ks.depthwise_conv2d` op (NHWC input, HW1C filter)
+  - direct depthwise lowering (no im2col for memory-constrained targets)
+  - RVV vectorization along the channel dimension
+  - `ks.avg_pool2d` / `ks.max_pool2d`
+  - regular `ks.conv2d` lowering (direct or im2col + matmul based on profile)
 - Double buffering pass (`--ks-double-buffer`) for memory-bound kernels
 - Software prefetch hints for RVV and ARM
 - Kernel fusion (matmul + bias + activation, conv + bn + relu)
@@ -378,6 +368,7 @@ These targets may be added after the core edge pipeline is proven:
 
 | Target | Notes |
 |--------|-------|
+| ARM NEON | Secondary production port for phones, Raspberry Pi, and Arm SBCs after RVV transformer kernels are proven. |
 | ARM SVE | Scalable vectors, similar to RVV. Relevant for server ARM (Graviton). |
 | x86 AVX2/AVX-512 | Server/desktop. Existing `target/x86_avx2.h` profile can be used. |
 | ARM Cortex-M | MCU/RTOS. Scalar only, validates freestanding story for TinyML. |
@@ -390,6 +381,7 @@ These targets may be added after the core edge pipeline is proven:
 | ID | Title | Scope |
 |----|-------|-------|
 | [DES-006](docs/design/DES-006-kernel-library-architecture.md) | Kernel Library Architecture | C API, memory mgmt, tiling, packing, target profiles |
+| [DES-011](docs/design/DES-011-riscv-first-transformer-demo.md) | RISC-V First Transformer Demo Strategy | Minimal llama2.c-style demo first; llama.cpp/GGML integration later |
 | [DES-002](docs/design/DES-002-matmul-kernel.md) | MatMul Kernel (TDD) | MLIR pipeline design (partially superseded by DES-006) |
 | [DES-001](docs/design/DES-001-vector-operations-lowering.md) | Vector → RVV Lowering | RVV-specific intrinsic mapping |
 | ~~DES-005~~ | ~~Library Packaging (v1)~~ | Deleted — was superseded by DES-006 |

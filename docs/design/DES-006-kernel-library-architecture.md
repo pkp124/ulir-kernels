@@ -21,17 +21,31 @@ This requires users to understand MLIR, build LLVM, and operate the `ks-opt` too
 a barrier to adoption for the actual consumers of optimized kernels: firmware engineers,
 RTOS integrators, ML framework authors, and embedded developers.
 
-The project should instead produce a **C kernel library** — precompiled static libraries
-with stable C headers that any toolchain can link against. The MLIR compiler becomes an
-internal build-time tool, not a user-facing product.
+The project should instead produce a **RISC-V-first C kernel library** —
+precompiled static libraries with stable C headers that any toolchain can link
+against. The MLIR compiler becomes an internal build-time tool, not a
+user-facing product.
 
 ### Goals
 
 1. Ship `libkernelsmith.a` + headers that work with any C99 toolchain
 2. Zero runtime dependencies — no malloc, no OS calls, no init/shutdown
-3. Multi-target from a single set of MLIR lowering passes
+3. Prove RISC-V RVV as the first optimized target
 4. Predictable memory usage via caller-provided workspace buffers
 5. RTOS-compatible: reentrant, no global state, freestanding
+6. Keep the design portable enough for later Arm NEON and other targets
+
+### Strategic Positioning
+
+KernelSmith is a **kernel backend**, not a full inference runtime. Its primary
+artifact is a static C library that can be called from embedded applications,
+test harnesses, and future integrations with runtimes such as llama.cpp/GGML,
+ExecuTorch, TFLite Micro, IREE, or ONNX Runtime.
+
+The first optimized product wedge is RISC-V RVV because RVV-capable edge
+hardware is growing while the software kernel ecosystem is less mature than Arm.
+Arm NEON remains an important secondary target, but it follows the RISC-V
+quantized kernel and transformer-demo path.
 
 ### Non-Goals
 
@@ -39,6 +53,8 @@ internal build-time tool, not a user-facing product.
 - Dynamic dispatch between targets at runtime
 - Autotuning (tile sizes are fixed per target profile at build time)
 - Graph-level optimization or operator fusion (single-kernel scope)
+- Owning a full LLM or graph runtime
+- Maintaining llama.cpp/GGML as the primary product surface
 
 ### Background
 
@@ -139,9 +155,9 @@ Plain C header, included at build time. No JSON, no parsing, no runtime overhead
 ```
 target/
   generic.h            -- Portable C, no SIMD, conservative tile sizes (reference)
-  riscv_rvv_256.h      -- RISC-V RVV with VLEN=256 (primary target)
-  riscv_rvv_512.h      -- RISC-V RVV with VLEN=512
-  aarch64_neon.h       -- ARMv8-A NEON, 128-bit (secondary target)
+  riscv_rvv_256.h      -- RISC-V RVV with VLEN=256 (first optimized target)
+  riscv_rvv_512.h      -- RISC-V RVV with VLEN=512 (future RVV profile)
+  aarch64_neon.h       -- ARMv8-A NEON, 128-bit (secondary target after RVV)
   x86_avx2.h           -- x86-64 with AVX2 + FMA (future)
 ```
 
@@ -824,7 +840,7 @@ Shipped artifact:
 
 ## Implementation Plan
 
-### Stage 1: API and Reference (Week 1)
+### Stage 1: API and Reference
 
 Establish the C interface and a working library with no MLIR involvement.
 
@@ -837,7 +853,7 @@ Establish the C interface and a working library with no MLIR involvement.
 - [ ] Verify numerical correctness vs numpy
 - [ ] Ship: users can `#include` and link today
 
-### Stage 2: MLIR Pipeline Basics (Week 2)
+### Stage 2: MLIR Pipeline Basics
 
 Replace the handwritten reference with MLIR-generated code for the generic target.
 
@@ -848,7 +864,7 @@ Replace the handwritten reference with MLIR-generated code for the generic targe
 - [ ] Verify: same tests pass, same numerical results
 - [ ] Lit tests for each pass in isolation
 
-### Stage 3: Packing + Multi-Level Tiling + RVV Lowering (Week 3)
+### Stage 3: Packing + Multi-Level Tiling + RVV Lowering
 
 Performance-critical optimizations, targeting RISC-V RVV as primary.
 
@@ -857,28 +873,42 @@ Performance-critical optimizations, targeting RISC-V RVV as primary.
 - [ ] Implement `--ks-tile-l1` pass (L1 tiling, MR/NR micro-kernel)
 - [ ] Update workspace query to account for pack buffers
 - [ ] Implement `--ks-vectorize` pass (SIMD using profile width)
-- [ ] Implement `--ks-lower-to-rvv` pass (custom RVV intrinsics, vsetvl management)
+- [ ] Implement `--ks-lower-to-rvv` pass (vector/tensor pipeline to LLVM dialect
+      for the RISC-V backend)
 - [ ] Cross-compile for riscv64, test on QEMU with multiple VLEN configs
 - [ ] Benchmark: generic vs RVV profile, show speedup
 - [ ] Stride tests: non-contiguous input matrices
 
-### Stage 4: Quantization (Week 3-4)
+### Stage 4: RISC-V Quantization
 
-INT8 quantized matmul — the core edge inference operation.
+INT8 and W4A8 quantized kernels for RISC-V edge inference. Prioritize
+dot/GEMV for batch-1 transformer decode before large GEMM.
 
 - [ ] Add `ks.quantize` / `ks.dequantize` ops
 - [ ] Add quantization attributes to ks.matmul (scale, zero_point)
 - [ ] Implement INT8 lowering: i8 -> i32 accumulate -> requantize -> i8
+- [ ] Add quantized dot/GEMV APIs and lowering
+- [ ] Add W4A8 fused unpack/dequantize + compute kernels
 - [ ] RVV INT8 path: `vwmul.vv` (widening multiply), `vnsra.wi` (narrowing shift)
 - [ ] Tighten TableGen type constraints (replace AnyTensor)
-- [ ] Test all type variants (f32, i8)
+- [ ] Test all type variants (f32, i8, W4A8)
 
-### Stage 5: ARM NEON Target (Week 4+)
+### Stage 5: Minimal RISC-V Transformer Demo
 
-Port proven RVV pipeline to ARM NEON as secondary target.
+Prove the generated quantized RVV kernels in a small llama2.c-style runner.
 
+- [ ] Add `examples/runner.c`
+- [ ] Add W4A8 model quantization script
+- [ ] Add QEMU demo script
+- [ ] Validate deterministic prompt output against a reference
+
+### Stage 6: Ecosystem and Secondary Target Follow-Ons
+
+Use the proven C kernels in broader environments.
+
+- [ ] Add focused llama.cpp/GGML integration proof for selected RVV kernels
 - [ ] Write `target/aarch64_neon.h` profile
-- [ ] Profile-driven tile sizes (no custom pass — LLVM autovectorizes NEON)
+- [ ] Profile-driven Arm NEON tile sizes
 - [ ] Cross-compile and test natively or on target device
 
 ---
@@ -887,6 +917,7 @@ Port proven RVV pipeline to ARM NEON as secondary target.
 
 - [DES-001: Vector Operations Lowering](DES-001-vector-operations-lowering.md)
 - [DES-002: MatMul Kernel (TDD)](DES-002-matmul-kernel.md) — pipeline design, partially superseded
+- [DES-011: RISC-V First Transformer Demo Strategy](DES-011-riscv-first-transformer-demo.md)
 - ~~DES-005~~ — deleted, was superseded by this document
 - [MatMul Specification](../../specs/kernels/matmul.md)
 - [RVV Target Specification](../../specs/targets/riscv-rvv.md)
