@@ -109,3 +109,52 @@ make verify
 - QEMU/Spike tooling may not exist on all developer machines; use
   `scripts/setup-rvv-sim.sh` when needed.
 - Keep generated or build artifacts out of commits.
+
+## Cursor Cloud specific instructions
+
+KernelSmith is a **CLI compiler**, not a server. There are no background
+services to start — validation is `cmake --build` + `ctest` + invoking `ks-opt`.
+
+### First-time VM bootstrap
+
+On a bare Ubuntu 24.04 cloud VM, `./scripts/setup.sh` may fail until these apt
+packages are present (they are baked into the Cloud Agent snapshot after initial
+setup):
+
+```bash
+sudo apt-get install -y python3.12-venv build-essential libstdc++-14-dev
+```
+
+Then run `./scripts/setup.sh` once. It adds the LLVM 21 apt repo, installs
+`mlir-21-tools` / `libmlir-21-dev` / `llvm-21-dev` / `ninja-build` /
+`libgtest-dev`, creates `.venv`, configures CMake, builds, and runs CTest.
+
+### Daily workflow (after snapshot / update script)
+
+```bash
+source .venv/bin/activate
+cmake --build build --parallel          # after C++ changes
+ctest --test-dir build --output-on-failure
+build/bin/ks-opt input.mlir --ks-lower-to-linalg --ks-tile
+```
+
+### Key paths
+
+| Artifact | Path |
+|---|---|
+| Optimizer CLI | `build/bin/ks-opt` |
+| C kernel library | `build/lib/kernelsmith/libkernelsmith.a` |
+| Lit tests | `tests/lit/` (run via CTest target `kernelsmith-lit`) |
+| MLIR/FileCheck | `/usr/lib/llvm-21/bin/` |
+
+### Lint
+
+Native CI lint is **ruff only** (`ruff check .`, `ruff format --check .`).
+`clang-format` enforcement requires Docker (`./scripts/docker-verify.sh`) or a
+local `clang-format` install.
+
+### Optional tooling (not required for standard `ctest`)
+
+- **Docker**: `./scripts/docker-verify.sh` for container parity before push.
+- **RVV/QEMU**: `./scripts/setup-rvv-sim.sh` then `scripts/compile-rvv.sh` for
+  cross-compiled RISC-V simulation (separate from main CTest).
