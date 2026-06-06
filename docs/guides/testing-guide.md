@@ -245,10 +245,9 @@ print(f"Passed: {summary['passed']}/{summary['total']}")
 Test kernels with different vector lengths:
 
 ```bash
-# Run integration tests on QEMU with different VLEN values
-./scripts/run-tests.sh --integration --qemu-vlen 128
-./scripts/run-tests.sh --integration --qemu-vlen 256
-./scripts/run-tests.sh --integration --qemu-vlen 512
+# Run RISC-V functional tests on QEMU with supported VLEN values
+./scripts/run-tests.sh --riscv-functional --qemu-vlen 256
+./scripts/run-tests.sh --riscv-functional --qemu-vlen 512
 ```
 
 ### QEMU Configuration
