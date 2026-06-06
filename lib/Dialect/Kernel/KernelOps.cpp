@@ -9,9 +9,70 @@
 #include "mlir/IR/PatternMatch.h"
 
 #include "llvm/ADT/SmallSet.h"
+#include "llvm/ADT/STLExtras.h"
+
+#include <cmath>
 
 using namespace mlir;
 using namespace kernelsmith::ks;
+
+static bool compatibleShapes(RankedTensorType inputType,
+                             RankedTensorType resultType) {
+  if (inputType.getRank() != resultType.getRank())
+    return false;
+
+  for (auto [inputDim, resultDim] :
+       llvm::zip(inputType.getShape(), resultType.getShape())) {
+    if (inputDim != ShapedType::kDynamic &&
+        resultDim != ShapedType::kDynamic && inputDim != resultDim) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+static LogicalResult verifyPositiveFiniteScale(Operation *op,
+                                               FloatAttr scaleAttr) {
+  double scale = scaleAttr.getValueAsDouble();
+  if (!std::isfinite(scale) || scale <= 0.0)
+    return op->emitOpError("scale must be positive and finite");
+
+  return success();
+}
+
+static LogicalResult verifyZeroPointFits(Operation *op,
+                                         IntegerType integerType,
+                                         int64_t zeroPoint) {
+  unsigned width = integerType.getWidth();
+
+  if (integerType.isUnsigned()) {
+    if (zeroPoint < 0)
+      return op->emitOpError("zero_point ")
+             << zeroPoint << " does not fit in integer element type '"
+             << integerType << "'";
+
+    if (width < 64 && static_cast<uint64_t>(zeroPoint) >= (1ULL << width)) {
+      return op->emitOpError("zero_point ")
+             << zeroPoint << " does not fit in integer element type '"
+             << integerType << "'";
+    }
+    return success();
+  }
+
+  if (width >= 64)
+    return success();
+
+  int64_t min = -(1LL << (width - 1));
+  int64_t max = (1LL << (width - 1)) - 1;
+  if (zeroPoint < min || zeroPoint > max) {
+    return op->emitOpError("zero_point ")
+           << zeroPoint << " does not fit in integer element type '"
+           << integerType << "'";
+  }
+
+  return success();
+}
 
 //===----------------------------------------------------------------------===//
 // MatmulOp
@@ -207,6 +268,60 @@ LogicalResult SoftmaxOp::verify() {
   }
 
   return success();
+}
+
+//===----------------------------------------------------------------------===//
+// QuantizeOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult QuantizeOp::verify() {
+  auto inputType = dyn_cast<RankedTensorType>(getInput().getType());
+  auto outputType = dyn_cast<RankedTensorType>(getOutput().getType());
+
+  if (!inputType || !outputType)
+    return emitOpError("input and result must be ranked tensors");
+
+  if (!isa<FloatType>(inputType.getElementType()))
+    return emitOpError("input element type must be floating-point");
+
+  auto integerType = dyn_cast<IntegerType>(outputType.getElementType());
+  if (!integerType)
+    return emitOpError("result element type must be integer");
+
+  if (!compatibleShapes(inputType, outputType))
+    return emitOpError("input and result shapes must match");
+
+  if (failed(verifyPositiveFiniteScale(getOperation(), getScaleAttr())))
+    return failure();
+
+  return verifyZeroPointFits(getOperation(), integerType, getZeroPoint());
+}
+
+//===----------------------------------------------------------------------===//
+// DequantizeOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult DequantizeOp::verify() {
+  auto inputType = dyn_cast<RankedTensorType>(getInput().getType());
+  auto outputType = dyn_cast<RankedTensorType>(getOutput().getType());
+
+  if (!inputType || !outputType)
+    return emitOpError("input and result must be ranked tensors");
+
+  auto integerType = dyn_cast<IntegerType>(inputType.getElementType());
+  if (!integerType)
+    return emitOpError("input element type must be integer");
+
+  if (!isa<FloatType>(outputType.getElementType()))
+    return emitOpError("result element type must be floating-point");
+
+  if (!compatibleShapes(inputType, outputType))
+    return emitOpError("input and result shapes must match");
+
+  if (failed(verifyPositiveFiniteScale(getOperation(), getScaleAttr())))
+    return failure();
+
+  return verifyZeroPointFits(getOperation(), integerType, getZeroPoint());
 }
 
 //===----------------------------------------------------------------------===//

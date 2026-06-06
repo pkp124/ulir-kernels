@@ -200,7 +200,7 @@ bound.
 - NumPy references for i8 and W4A8 dot/GEMV/GEMM
 
 **Tasks**:
-1. Add `ks.quantize` and `ks.dequantize` ops (TableGen + verifier + lit tests)
+1. ✓ Add `ks.quantize` and `ks.dequantize` ops (TableGen + verifier + lit tests)
 2. Add accumulator/quantization metadata needed for i8 and W4A8 lowering
 3. Define C APIs and packed layouts for i8 and W4A8 dot/GEMV
 4. Implement INT8 lowering: i8 -> i32 accumulate -> requantize where needed
