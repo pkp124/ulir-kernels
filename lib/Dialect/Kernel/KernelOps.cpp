@@ -142,6 +142,9 @@ LogicalResult MatmulOp::verify() {
   if (lhsType.getElementType() != rhsType.getElementType())
     return emitOpError("operand element types must match");
 
+  if (resultType.getElementType() != lhsType.getElementType())
+    return emitOpError("result element type must match operand element type");
+
   int64_t lhsK = lhsType.getDimSize(1);
   int64_t rhsK = rhsType.getDimSize(0);
 
@@ -149,6 +152,25 @@ LogicalResult MatmulOp::verify() {
       lhsK != rhsK) {
     return emitOpError("inner dimensions must match: lhs has ")
            << lhsK << ", rhs has " << rhsK;
+  }
+
+  int64_t lhsM = lhsType.getDimSize(0);
+  int64_t rhsN = rhsType.getDimSize(1);
+  int64_t resultM = resultType.getDimSize(0);
+  int64_t resultN = resultType.getDimSize(1);
+
+  if (resultM != ShapedType::kDynamic && lhsM != ShapedType::kDynamic &&
+      resultM != lhsM) {
+    return emitOpError(
+               "result row dimension must match lhs row dimension: result has ")
+           << resultM << ", lhs has " << lhsM;
+  }
+
+  if (resultN != ShapedType::kDynamic && rhsN != ShapedType::kDynamic &&
+      resultN != rhsN) {
+    return emitOpError("result column dimension must match rhs column "
+                       "dimension: result has ")
+           << resultN << ", rhs has " << rhsN;
   }
 
   return success();
