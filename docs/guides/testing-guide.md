@@ -179,6 +179,50 @@ python3 tests/test_data_generator.py
 # - matmul_small_A.meta, etc. (metadata files)
 ```
 
+### Golden-reference bundles
+
+Golden-reference cases use a target-neutral JSON descriptor plus generated
+NumPy artifacts:
+
+```bash
+python tests/golden/generate.py \
+  --case tests/golden/cases/matmul_f32_smoke.json \
+  --print-manifest
+```
+
+The generator writes a small bundle under `tests/golden/generated/<case>/`:
+
+```text
+manifest.json
+input_<name>.npy
+expected_<name>.npy
+```
+
+Each descriptor records:
+
+- `name`, `kernel`, and optional source program path;
+- deterministic NumPy generator backend, function, seed, and distribution;
+- input and output tensor names, shapes, and dtypes;
+- comparison mode and tolerance;
+- target names and optional RVV VLENs.
+
+Each manifest records the schema version, generator backend/version, seed,
+distribution, tensor metadata, comparison policy, quantization policy fields,
+and SHA-256 hash for every generated `.npy` file.
+
+To add a new f32 smoke case:
+
+1. Add a descriptor in `tests/golden/cases/`.
+2. Use `kernel` and `generator.function` values supported by
+   `tests/golden/generate.py`.
+3. Use `mode: allclose` for f32 outputs with explicit `rtol` and `atol`.
+4. Generate the bundle and inspect `manifest.json`.
+5. Add or update pytest coverage in `tests/test_golden_verify.py`.
+
+Quantized cases must include explicit `rounding` and `saturation` fields in the
+comparison policy. Use `quantized_exact` for integer equality and
+`dequantized_allclose` when diagnostics should be reported in real values.
+
 ### Using Test Data
 
 ```python
@@ -209,6 +253,18 @@ python3 tests/functional_validator.py
 # Validates MatMul, Conv2D, Attention, Activations
 # Generates report in validation_report.json
 ```
+
+Golden-reference comparators are available through
+`tests.functional_validator.compare_arrays`:
+
+- `exact`: exact value comparison with optional strict shape/dtype checks.
+- `allclose`: NumPy-style tolerance comparison for f32/f16 results.
+- `quantized_exact`: exact integer comparison for quantized outputs.
+- `dequantized_allclose`: dequantizes integer arrays with manifest scale and
+  zero-point fields, then applies allclose.
+
+Comparison reports include pass/fail, max and mean absolute error, max relative
+error, mismatch count, and the first failing indices.
 
 ### Validation Workflow
 

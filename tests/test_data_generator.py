@@ -31,16 +31,56 @@ class TestDataGenerator:
 
     def generate_tensor(self, config: TensorConfig) -> np.ndarray:
         """Generate a random tensor according to config"""
-        np.random.seed(config.seed)
+        rng = np.random.default_rng(config.seed)
 
         if np.issubdtype(config.dtype, np.floating):
-            data = np.random.uniform(config.range_min, config.range_max, config.shape)
+            data = rng.uniform(config.range_min, config.range_max, config.shape)
             return data.astype(config.dtype)
         elif np.issubdtype(config.dtype, np.integer):
-            data = np.random.randint(int(config.range_min), int(config.range_max), config.shape)
+            data = rng.integers(int(config.range_min), int(config.range_max), config.shape)
             return data.astype(config.dtype)
         else:
             raise ValueError(f"Unsupported dtype: {config.dtype}")
+
+    def generate_relu_f32_golden(
+        self,
+        shape: tuple[int, ...] = (16,),
+        *,
+        seed: int = 42,
+        range_min: float = -2.0,
+        range_max: float = 2.0,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Generate deterministic f32 ReLU input and NumPy golden output."""
+        input_tensor = self.generate_tensor(
+            TensorConfig(shape, np.float32, seed=seed, range_min=range_min, range_max=range_max)
+        )
+        return input_tensor, np.maximum(input_tensor, 0).astype(np.float32)
+
+    def generate_matmul_f32_golden(
+        self,
+        lhs_shape: tuple[int, int] = (4, 5),
+        rhs_shape: tuple[int, int] = (5, 3),
+        *,
+        seed: int = 42,
+        range_min: float = -1.0,
+        range_max: float = 1.0,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Generate deterministic f32 matmul inputs and NumPy golden output."""
+        if lhs_shape[1] != rhs_shape[0]:
+            raise ValueError("matmul inner dimensions must match")
+        lhs = self.generate_tensor(
+            TensorConfig(lhs_shape, np.float32, seed=seed, range_min=range_min, range_max=range_max)
+        )
+        rhs = self.generate_tensor(
+            TensorConfig(
+                rhs_shape,
+                np.float32,
+                seed=seed + 1009,
+                range_min=range_min,
+                range_max=range_max,
+            )
+        )
+        return lhs, rhs, np.matmul(lhs, rhs).astype(np.float32)
 
     def save_tensor(self, tensor: np.ndarray, name: str) -> str:
         """Save tensor to binary file and return path"""

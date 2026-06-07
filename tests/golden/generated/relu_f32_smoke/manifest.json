@@ -1,0 +1,57 @@
+{
+  "case": "relu_f32_smoke",
+  "compare": {
+    "atol": 1e-06,
+    "mode": "allclose",
+    "rtol": 1e-06,
+    "strict_dtype": true,
+    "strict_shape": true
+  },
+  "descriptor": "tests/golden/cases/relu_f32_smoke.json",
+  "descriptor_sha256": "f004d8ec1a2b221e9cb4d482e119f3f2c4e0326f82564b3c9977aeb6b28f270f",
+  "generator": {
+    "backend": "numpy",
+    "backend_version": "2.4.4",
+    "distribution": {
+      "high": 3.0,
+      "kind": "uniform",
+      "low": -3.0
+    },
+    "function": "relu",
+    "seed": 17
+  },
+  "kernel": "relu",
+  "quantization_policy": {},
+  "schema_version": 1,
+  "targets": [
+    "host_reference",
+    "riscv_rvv_256"
+  ],
+  "tensors": [
+    {
+      "dtype": "float32",
+      "filename": "input_X.npy",
+      "name": "X",
+      "role": "input",
+      "sha256": "91c628e0edb5247b8b48275de5d654dcabf52f874ddf3ad38ce0c87485d97b28",
+      "shape": [
+        16
+      ],
+      "size_bytes": 64
+    },
+    {
+      "dtype": "float32",
+      "filename": "expected_Y.npy",
+      "name": "Y",
+      "role": "expected_output",
+      "sha256": "2987f3c9cc3869be2d0926706aef37f90f2e3c24238251fa6fedf7c7b4ef7425",
+      "shape": [
+        16
+      ],
+      "size_bytes": 64
+    }
+  ],
+  "vlens": [
+    256
+  ]
+}
