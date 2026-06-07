@@ -185,7 +185,7 @@ Golden-reference cases use a target-neutral JSON descriptor plus generated
 NumPy artifacts:
 
 ```bash
-python tests/golden/generate.py \
+python3 tests/golden/generate.py \
   --case tests/golden/cases/matmul_f32_smoke.json \
   --print-manifest
 ```
