@@ -14,7 +14,6 @@ from tests.golden.schema import (
 )
 from tests.test_data_generator import TestDataGenerator
 
-
 CASES_DIR = Path(__file__).parent / "golden" / "cases"
 
 
