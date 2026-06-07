@@ -13,8 +13,14 @@ from typing import Any
 
 import numpy as np
 
-from tests.functional_validator import compare_arrays
-from tests.golden.schema import (
+REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+# Direct CTest execution starts from the build tree, so local imports need the
+# source root on sys.path before these module-level imports run.
+from tests.functional_validator import compare_arrays  # noqa: E402
+from tests.golden.schema import (  # noqa: E402
     CaseDescriptor,
     canonical_json_sha256,
     load_case_descriptor,
@@ -28,7 +34,7 @@ class VerifyError(RuntimeError):
 
 
 def _repo_root() -> Path:
-    return Path(__file__).resolve().parent.parent
+    return REPO_ROOT
 
 
 def _json_safe(value: Any) -> Any:
@@ -170,8 +176,7 @@ def _run_host_reference(
     completed = subprocess.run(command, check=False, capture_output=True, text=True)
     if completed.returncode != 0:
         raise VerifyError(
-            "host runner failed with exit code "
-            f"{completed.returncode}: {completed.stderr.strip()}"
+            f"host runner failed with exit code {completed.returncode}: {completed.stderr.strip()}"
         )
 
     actual = np.fromfile(raw_output, dtype=np.float32)
