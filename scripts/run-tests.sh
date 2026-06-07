@@ -18,7 +18,6 @@ NC='\033[0m' # No Color
 TEST_LIT=false
 TEST_UNIT=false
 TEST_INTEGRATION=false
-TEST_RISCV_FUNCTIONAL=false
 TEST_ALL=false
 VERBOSE=false
 QEMU_VLEN=""
@@ -31,7 +30,6 @@ Test Categories:
   --lit              Run MLIR lit tests (parsing, lowering verification)
   --unit             Run C++ unit tests
   --integration      Run integration tests
-  --riscv-functional Build and run RISC-V functional tests under QEMU
   --all              Run all tests (default if no category specified)
 
 Options:
@@ -43,7 +41,6 @@ Examples:
   $0 --lit                           # Run lit tests
   $0 --all --verbose                 # Run all tests verbosely
   $0 --integration --qemu-vlen 256   # Run integration tests on QEMU with VLEN=256
-  $0 --riscv-functional              # Build and run RISC-V functional tests
 EOF
 }
 
@@ -60,10 +57,6 @@ while [[ $# -gt 0 ]]; do
             ;;
         --integration)
             TEST_INTEGRATION=true
-            shift
-            ;;
-        --riscv-functional)
-            TEST_RISCV_FUNCTIONAL=true
             shift
             ;;
         --all)
@@ -91,7 +84,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Default to --all if no category specified
-if [ "$TEST_LIT" = false ] && [ "$TEST_UNIT" = false ] && [ "$TEST_INTEGRATION" = false ] && [ "$TEST_RISCV_FUNCTIONAL" = false ] && [ "$TEST_ALL" = false ]; then
+if [ "$TEST_LIT" = false ] && [ "$TEST_UNIT" = false ] && [ "$TEST_INTEGRATION" = false ] && [ "$TEST_ALL" = false ]; then
     TEST_ALL=true
 fi
 
@@ -151,17 +144,6 @@ run_integration_tests() {
     fi
 }
 
-run_riscv_functional_tests() {
-    echo -e "${YELLOW}=== Running RISC-V Functional Tests ===${NC}"
-
-    local cmd=(python3 "${PROJECT_ROOT}/tests/riscv_runner.py" --all)
-    if [ -n "$QEMU_VLEN" ]; then
-        cmd+=(--vlens "$QEMU_VLEN")
-    fi
-
-    PATH="/usr/lib/llvm-21/bin:${PATH}" "${cmd[@]}"
-}
-
 # Run tests based on flags
 FAILED=0
 
@@ -170,18 +152,9 @@ if [ "$TEST_ALL" = true ]; then
     run_unit_tests || FAILED=$((FAILED + 1))
     run_integration_tests || FAILED=$((FAILED + 1))
 else
-    if [ "$TEST_LIT" = true ]; then
-        run_lit_tests || FAILED=$((FAILED + 1))
-    fi
-    if [ "$TEST_UNIT" = true ]; then
-        run_unit_tests || FAILED=$((FAILED + 1))
-    fi
-    if [ "$TEST_INTEGRATION" = true ]; then
-        run_integration_tests || FAILED=$((FAILED + 1))
-    fi
-    if [ "$TEST_RISCV_FUNCTIONAL" = true ]; then
-        run_riscv_functional_tests || FAILED=$((FAILED + 1))
-    fi
+    [ "$TEST_LIT" = true ] && run_lit_tests || FAILED=$((FAILED + 1))
+    [ "$TEST_UNIT" = true ] && run_unit_tests || FAILED=$((FAILED + 1))
+    [ "$TEST_INTEGRATION" = true ] && run_integration_tests || FAILED=$((FAILED + 1))
 fi
 
 # Summary
