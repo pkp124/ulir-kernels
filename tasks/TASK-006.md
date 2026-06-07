@@ -4,7 +4,7 @@
 [~] In Progress
 
 ## Priority
-P1 (High)
+P0 (Milestone Blocking)
 
 ## Milestone
 M4 — RISC-V RVV Target
@@ -19,8 +19,13 @@ vectorize, and lower-to-RVV compiler pipeline is implemented.
 
 ## Acceptance Criteria
 
+- [ ] Golden-reference infrastructure exists for deterministic NumPy/framework
+      inputs, expected outputs, metadata, and comparison policy.
+- [ ] Host/x86 output is verified against the golden reference for at least one
+      representative kernel.
 - [ ] Generated RVV matmul binary runs under QEMU for at least one supported VLEN.
-- [ ] QEMU correctness compares generated output against the C or NumPy reference.
+- [ ] QEMU correctness compares generated RVV output against the NumPy/framework
+      golden reference or a golden-validated host output.
 - [ ] Benchmark reports generic/reference vs RVV path results in a reproducible format.
 - [ ] Non-divisible `N` or tail behavior is either supported with tests or rejected
       with clear diagnostics.
@@ -34,6 +39,10 @@ vectorize, and lower-to-RVV compiler pipeline is implemented.
 - `specs/targets/riscv-rvv.md`
 - `docs/design/DES-009-m4-rvv-lowering.md`
 - `docs/design/DES-012-riscv-simulation-verification.md`
+- `docs/design/DES-013-golden-reference-verification-infrastructure.md`
+- `TASK-010`: Build golden reference verification infrastructure
+- `TASK-011`: Add host reference execution comparator
+- `TASK-012`: Compare RISC-V RVV outputs against golden references
 
 ## Verification
 
@@ -65,3 +74,9 @@ available. If unavailable, record the missing tools in the task log and PR body.
   `tests/riscv_runner.py` builds generated RVV objects, links them with a C
   max-error harness, rejects VLENs below the `riscv_rvv_256` baseline, and runs
   QEMU user-mode cases that print `PASS`, `MAX_ABS_ERROR`, and `TIME_NS`.
+
+### 2026-06-07
+- Raised priority to P0 because M4/M5 correctness depends on golden-reference
+  validation before adding more RVV or fixed-point kernels.
+- Split scalable verification work into `TASK-010`, `TASK-011`, and `TASK-012`
+  following `DES-013`.

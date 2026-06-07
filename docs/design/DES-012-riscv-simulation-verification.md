@@ -7,7 +7,7 @@
 | **Status** | Draft |
 | **Author** | KernelSmith Team |
 | **Created** | 2026-06-06 |
-| **Related** | DES-006, DES-007, DES-009, DES-011, TASK-006 |
+| **Related** | DES-006, DES-007, DES-009, DES-011, DES-013, TASK-006 |
 
 ## Context
 
@@ -85,7 +85,9 @@ proxy kernel, platform HAL, or RTOS memory map.
 ### Simulator Runner Interface
 
 `tests/qemu_runner.py` should evolve into a generic simulator runner rather than
-embedding QEMU-only assumptions in test orchestration.
+embedding QEMU-only assumptions in test orchestration. `DES-013` defines the
+golden-reference data contract that simulator runners should consume when
+comparing RISC-V outputs against NumPy/framework references.
 
 Initial command shape:
 
@@ -218,6 +220,7 @@ fast generated-kernel correctness.
 ## Dependencies
 
 - `TASK-006`: M4 RVV correctness and benchmark validation.
+- `DES-013`: golden-reference descriptors, manifests, and comparison policies.
 - `scripts/compile-rvv.sh`: generated RVV object pipeline.
 - `tests/qemu_runner.py`: current QEMU-only runner.
 - `scripts/setup-rvv-sim.sh`: local simulator dependency setup.

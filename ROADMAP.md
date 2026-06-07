@@ -149,6 +149,9 @@ insufficient for high-performance VLA code.
 
 **Design**: [DES-009](docs/design/DES-009-m4-rvv-lowering.md)
 
+**Verification design**:
+[DES-013](docs/design/DES-013-golden-reference-verification-infrastructure.md)
+
 **Deliverables** (completed ✓ / pending …):
 - ✓ `target/riscv_rvv_256.h` — RVV target profile (VLEN=256, LMUL=4, f32)
 - ✓ `KSPackPass` (`--ks-pack`) — B operand packing into `[N/NR, K, NR]` layout
@@ -158,6 +161,8 @@ insufficient for high-performance VLA code.
 - ✓ `scripts/compile-rvv.sh` — driver script (ks-opt + mlir-translate + llc)
 - ✓ Lit tests: pack, vectorize, lower-to-rvv
 - ✓ QEMU runner updated for multi-VLEN correctness + benchmark
+- … Golden-reference verification infrastructure (NumPy/framework expected
+  outputs, host comparison, RISC-V comparison)
 - … QEMU correctness validation (requires cross-compiler + qemu-user in CI)
 - … Benchmark: generic vs RVV (demonstrating speedup on QEMU)
 - … Stride and tail handling (non-divisible N)
@@ -171,8 +176,10 @@ insufficient for high-performance VLA code.
 6. ✓ Set up cross-compilation: `scripts/compile-rvv.sh` driver
 7. ✓ QEMU test runner: multi-VLEN correctness and benchmark support
 8. ✓ Lit tests for all three new passes
-9. … Run QEMU correctness tests on actual RISC-V binary (needs CI cross-compiler)
-10. … Benchmark speedup measurement (QEMU VLEN=256 vs generic)
+9. … Build golden-reference verification infrastructure
+10. … Verify host/x86 output against NumPy/framework golden references
+11. … Verify RISC-V RVV QEMU output against the same golden references
+12. … Benchmark speedup measurement (QEMU VLEN=256 vs generic)
 
 ---
 
