@@ -78,7 +78,7 @@ class TensorSpec:
     dtype: str
 
     @classmethod
-    def from_json(cls, value: Any, context: str) -> "TensorSpec":
+    def from_json(cls, value: Any, context: str) -> TensorSpec:
         data = _require_mapping(value, context)
         dtype = _require_non_empty_string(data.get("dtype"), f"{context}.dtype")
         if dtype not in SUPPORTED_DTYPES:
@@ -103,7 +103,7 @@ class GeneratorSpec:
     distribution: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
-    def from_json(cls, value: Any) -> "GeneratorSpec":
+    def from_json(cls, value: Any) -> GeneratorSpec:
         data = _require_mapping(value, "generator")
         kind = _require_non_empty_string(data.get("kind"), "generator.kind")
         if kind != GENERATOR_BACKEND:
@@ -140,7 +140,7 @@ class ComparePolicy:
     quantization: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
-    def from_json(cls, value: Any) -> "ComparePolicy":
+    def from_json(cls, value: Any) -> ComparePolicy:
         data = _require_mapping(value, "compare")
         mode = _require_non_empty_string(data.get("mode"), "compare.mode")
         if mode not in SUPPORTED_COMPARE_MODES:
@@ -201,7 +201,7 @@ class CaseDescriptor:
     vlens: tuple[int, ...] = ()
 
     @classmethod
-    def from_json(cls, value: Any) -> "CaseDescriptor":
+    def from_json(cls, value: Any) -> CaseDescriptor:
         data = _require_mapping(value, "descriptor")
         inputs = data.get("inputs")
         outputs = data.get("outputs")
