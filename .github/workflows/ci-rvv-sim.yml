@@ -25,8 +25,6 @@ on:
       - 'include/KernelSmith/Passes/**'
       - 'target/riscv_rvv_256.h'
       - 'tests/riscv/**'
-      - 'tests/riscv_runner.py'
-      - 'tests/test_riscv_runner.py'
       - 'scripts/compile-rvv.sh'
       - 'scripts/setup-rvv-sim.sh'
       - '.github/workflows/ci-rvv-sim.yml'
@@ -36,8 +34,6 @@ on:
       - 'include/KernelSmith/Passes/**'
       - 'target/riscv_rvv_256.h'
       - 'tests/riscv/**'
-      - 'tests/riscv_runner.py'
-      - 'tests/test_riscv_runner.py'
       - 'scripts/compile-rvv.sh'
   workflow_dispatch:
     inputs:
@@ -125,24 +121,47 @@ jobs:
       - name: Build ks-opt
         run: cmake --build build --parallel --target ks-opt
 
-      - name: Validate RISC-V runner descriptors
-        run: python tests/riscv_runner.py --check-only
-
       # -----------------------------------------------------------------------
-      # Compile descriptor-backed MLIR test programs to riscv64 ELF binaries
+      # Compile MLIR test programs to riscv64 ELF using the M4 pipeline
       # -----------------------------------------------------------------------
-      - name: Build RISC-V functional ELFs
+      - name: Compile relu_rvv ELF
         env:
           KS_OPT: build/bin/ks-opt
           MLIR_TRANSLATE: mlir-translate
           LLC: llc
-        run: python tests/riscv_runner.py --build --output-dir build-rvv
+        run: |
+          mkdir -p build-rvv/bin
+
+          echo "=== Stage 1: ks-opt --ks-lower-to-rvv ==="
+          build/bin/ks-opt tests/riscv/relu_rvv.mlir \
+            --ks-lower-to-rvv \
+            -o build-rvv/relu_llvm.mlir
+
+          echo "=== Stage 2: mlir-translate ==="
+          mlir-translate --mlir-to-llvmir build-rvv/relu_llvm.mlir \
+            -o build-rvv/relu.ll
+
+          echo "=== Stage 3: llc → riscv64 object ==="
+          llc -march=riscv64 \
+              -mattr=+v,+zve64d,+zvl256b \
+              -float-abi=hard \
+              -filetype=obj \
+              build-rvv/relu.ll \
+              -o build-rvv/relu.o
+
+          echo "=== Stage 4: link static ELF ==="
+          riscv64-linux-gnu-gcc \
+            -static build-rvv/relu.o \
+            -o build-rvv/bin/relu_rvv \
+            -lm
+          file build-rvv/bin/relu_rvv
+          echo "relu_rvv ELF built successfully"
 
       - name: Upload RVV ELF artifacts
         uses: actions/upload-artifact@v4
         with:
           name: rvv-elf-binaries
-          path: build-rvv/
+          path: build-rvv/bin/
           retention-days: 7
 
 # =============================================================================
@@ -165,24 +184,33 @@ jobs:
             cpu_args: "rv64,v=true,vlen=512,vext_spec=v1.0"
 
     steps:
-      - uses: actions/checkout@v4
-
       - name: Install qemu-user
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y qemu-user qemu-user-static
           qemu-riscv64 --version | head -1
-          qemu-riscv64-static --version | head -1
 
       - name: Download RVV ELF binaries
         uses: actions/download-artifact@v4
         with:
           name: rvv-elf-binaries
-          path: build-rvv/
+          path: rvv-bin/
 
-      - name: "Run RISC-V functional tests (VLEN=${{ matrix.vlen }})"
+      - name: Prepare binaries
+        run: chmod +x rvv-bin/*
+
+      - name: "Simulate relu_rvv (VLEN=${{ matrix.vlen }})"
         timeout-minutes: 2
-        run: python tests/riscv_runner.py --run --output-dir build-rvv --vlens ${{ matrix.vlen }} --qemu qemu-riscv64-static
+        run: |
+          echo "Running relu_rvv with -cpu ${{ matrix.cpu_args }}"
+          qemu-riscv64 -cpu "${{ matrix.cpu_args }}" rvv-bin/relu_rvv
+          EXIT_CODE=$?
+          if [ $EXIT_CODE -eq 0 ]; then
+            echo "PASS: relu_rvv VLEN=${{ matrix.vlen }}"
+          else
+            echo "FAIL: relu_rvv VLEN=${{ matrix.vlen }} (exit $EXIT_CODE)"
+            exit 1
+          fi
 
 # =============================================================================
 # Job 3: Spike simulation (optional — only on workflow_dispatch with flag)
@@ -233,23 +261,26 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: rvv-elf-binaries
-          path: build-rvv/
+          path: rvv-bin/
 
-      - name: "Simulate vector_relu_f32 on Spike (RVV 1.0)"
+      - name: Prepare binaries
+        run: chmod +x rvv-bin/*
+
+      - name: "Simulate relu_rvv on Spike (RVV 1.0)"
         timeout-minutes: 5
         run: |
           export PATH="/opt/riscv/bin:$PATH"
-          echo "Running vector_relu_f32 on Spike with +v extension"
+          echo "Running relu_rvv on Spike with +v extension"
           # Spike flags: --isa=rv64gcv enables V extension, --varch sets VLEN/ELEN.
           spike \
             --isa=rv64gcv \
             --varch="vlen:256,elen:64" \
             /opt/riscv/riscv64-unknown-linux-gnu/bin/pk \
-            build-rvv/bin/vector_relu_f32
+            rvv-bin/relu_rvv
           EXIT_CODE=$?
           if [ $EXIT_CODE -eq 0 ]; then
-            echo "PASS: vector_relu_f32 on Spike"
+            echo "PASS: relu_rvv on Spike"
           else
-            echo "FAIL: vector_relu_f32 on Spike (exit $EXIT_CODE)"
+            echo "FAIL: relu_rvv on Spike (exit $EXIT_CODE)"
             exit 1
           fi

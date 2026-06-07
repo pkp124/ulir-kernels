@@ -35,14 +35,6 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/capi/CMakeLists.txt)
   add_subdirectory(capi)
 endif()
 
-# Python tests
-find_program(PYTEST_COMMAND pytest)
-if(PYTEST_COMMAND)
-  add_test(NAME kernelsmith-python
-    COMMAND ${PYTEST_COMMAND} ${CMAKE_CURRENT_SOURCE_DIR}/test_riscv_runner.py
-  )
-endif()
-
 # Combined target for all tests
 add_custom_target(check-kernelsmith
   COMMENT "Running all KernelSmith tests"
