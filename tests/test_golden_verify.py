@@ -13,6 +13,7 @@ from tests.golden.schema import (
     validate_manifest,
 )
 from tests.test_data_generator import TestDataGenerator
+from tests.verify import VerifyError, _json_safe, verify_case
 
 CASES_DIR = Path(__file__).parent / "golden" / "cases"
 
@@ -118,3 +119,21 @@ def test_comparator_quantized_modes() -> None:
         },
     )
     assert dequantized.passed
+
+
+def test_verify_json_sanitizes_non_finite_metrics() -> None:
+    assert _json_safe({"max_error": float("inf"), "nested": [float("nan")]}) == {
+        "max_error": None,
+        "nested": [None],
+    }
+
+
+def test_verify_rejects_undeclared_target(tmp_path: Path) -> None:
+    with pytest.raises(VerifyError, match="target missing_target is not declared"):
+        verify_case(
+            case_path=CASES_DIR / "relu_f32_smoke.json",
+            target="missing_target",
+            manifest_dir=Path("tests/golden/generated"),
+            output_dir=tmp_path,
+            host_runner=None,
+        )

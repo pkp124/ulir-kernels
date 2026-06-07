@@ -67,6 +67,9 @@ jobs:
       - name: Build
         run: cmake --build build --parallel
 
+      - name: Host golden verification
+        run: ctest --test-dir build -R kernelsmith-host-golden --output-on-failure
+
       - name: Test
         run: ctest --test-dir build --output-on-failure
 

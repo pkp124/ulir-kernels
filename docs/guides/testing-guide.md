@@ -210,6 +210,21 @@ Each manifest records the schema version, generator backend/version, seed,
 distribution, tensor metadata, comparison policy, quantization policy fields,
 and SHA-256 hash for every generated `.npy` file.
 
+Run host/reference KernelSmith outputs against the committed golden data:
+
+```bash
+python3 tests/verify.py \
+  --case tests/golden/cases/relu_f32_smoke.json \
+  --target host_reference \
+  --host-runner build/tests/host_reference/host-reference-runner
+```
+
+`tests/verify.py` validates manifest hashes, stages descriptor inputs for the
+host runner, captures `actual_<name>.npy` outputs under `build/golden-actual/`,
+compares them with the manifest comparison policy, and emits JSON result lines.
+CTest runs the smoke cases through `kernelsmith-host-golden-relu` and
+`kernelsmith-host-golden-matmul`.
+
 To add a new f32 smoke case:
 
 1. Add a descriptor in `tests/golden/cases/`.
