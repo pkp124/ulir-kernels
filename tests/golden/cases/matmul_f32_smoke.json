@@ -1,0 +1,57 @@
+{
+  "compare": {
+    "atol": 0.00001,
+    "mode": "allclose",
+    "rtol": 0.00001,
+    "strict_dtype": true,
+    "strict_shape": true
+  },
+  "generator": {
+    "distribution": {
+      "high": 1.0,
+      "kind": "uniform",
+      "low": -1.0
+    },
+    "function": "matmul",
+    "kind": "numpy",
+    "seed": 42
+  },
+  "inputs": [
+    {
+      "dtype": "float32",
+      "name": "A",
+      "shape": [
+        4,
+        5
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "B",
+      "shape": [
+        5,
+        3
+      ]
+    }
+  ],
+  "kernel": "matmul",
+  "name": "matmul_f32_smoke",
+  "outputs": [
+    {
+      "dtype": "float32",
+      "name": "C",
+      "shape": [
+        4,
+        3
+      ]
+    }
+  ],
+  "source": "tests/functional/mlir/matmul_f32_smoke.mlir",
+  "targets": [
+    "host_reference",
+    "riscv_rvv_256"
+  ],
+  "vlens": [
+    256
+  ]
+}

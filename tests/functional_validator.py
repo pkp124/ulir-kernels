@@ -23,6 +23,211 @@ class ValidationResult:
     details: str
 
 
+@dataclass(frozen=True)
+class ComparatorPolicy:
+    """Policy for comparing a produced tensor with a golden tensor."""
+
+    mode: str
+    rtol: float = 0.0
+    atol: float = 0.0
+    strict_shape: bool = True
+    strict_dtype: bool = True
+    quantization: dict | None = None
+
+    @classmethod
+    def from_dict(cls, value: dict) -> "ComparatorPolicy":
+        """Build a comparator policy from descriptor or manifest JSON."""
+        mode = value.get("mode")
+        if mode not in {"exact", "allclose", "quantized_exact", "dequantized_allclose"}:
+            raise ValueError(f"Unsupported compare mode: {mode}")
+        quantization = {
+            key: item
+            for key, item in value.items()
+            if key not in {"mode", "rtol", "atol", "strict_shape", "strict_dtype"}
+        }
+        return cls(
+            mode=mode,
+            rtol=float(value.get("rtol", 0.0)),
+            atol=float(value.get("atol", 0.0)),
+            strict_shape=bool(value.get("strict_shape", True)),
+            strict_dtype=bool(value.get("strict_dtype", True)),
+            quantization=quantization,
+        )
+
+
+@dataclass
+class TensorComparisonResult:
+    """Machine-parseable tensor comparison report."""
+
+    mode: str
+    passed: bool
+    max_error: float
+    mean_error: float
+    max_relative_error: float
+    mismatch_count: int
+    first_mismatches: list[dict]
+    details: str
+
+    def to_dict(self) -> dict:
+        """Return JSON-serializable comparison diagnostics."""
+        return {
+            "mode": self.mode,
+            "passed": self.passed,
+            "max_error": self.max_error,
+            "mean_error": self.mean_error,
+            "max_relative_error": self.max_relative_error,
+            "mismatch_count": self.mismatch_count,
+            "first_mismatches": self.first_mismatches,
+            "details": self.details,
+        }
+
+
+def _as_policy(policy: ComparatorPolicy | dict) -> ComparatorPolicy:
+    if isinstance(policy, ComparatorPolicy):
+        return policy
+    return ComparatorPolicy.from_dict(policy)
+
+
+def _failure_result(mode: str, details: str) -> TensorComparisonResult:
+    return TensorComparisonResult(
+        mode=mode,
+        passed=False,
+        max_error=float("inf"),
+        mean_error=float("inf"),
+        max_relative_error=float("inf"),
+        mismatch_count=1,
+        first_mismatches=[],
+        details=details,
+    )
+
+
+def _numeric_metrics(actual: np.ndarray, expected: np.ndarray) -> tuple[float, float, float]:
+    actual_f64 = actual.astype(np.float64, copy=False)
+    expected_f64 = expected.astype(np.float64, copy=False)
+    diff = np.abs(actual_f64 - expected_f64)
+    if diff.size == 0:
+        return 0.0, 0.0, 0.0
+    denom = np.maximum(np.abs(expected_f64), 1e-12)
+    rel_diff = diff / denom
+    return float(np.max(diff)), float(np.mean(diff)), float(np.max(rel_diff))
+
+
+def _first_mismatches(
+    actual: np.ndarray,
+    expected: np.ndarray,
+    mismatch_mask: np.ndarray,
+    *,
+    limit: int = 5,
+) -> list[dict]:
+    mismatches = []
+    for index in np.argwhere(mismatch_mask)[:limit]:
+        index_tuple = tuple(int(item) for item in index)
+        mismatches.append(
+            {
+                "index": list(index_tuple),
+                "actual": actual[index_tuple].item(),
+                "expected": expected[index_tuple].item(),
+            }
+        )
+    return mismatches
+
+
+def _dequantize(array: np.ndarray, *, scale: float, zero_point: int) -> np.ndarray:
+    return (array.astype(np.float64) - zero_point) * scale
+
+
+def compare_arrays(
+    actual: np.ndarray,
+    expected: np.ndarray,
+    policy: ComparatorPolicy | dict,
+) -> TensorComparisonResult:
+    """Compare tensors using exact, floating, or quantized descriptor modes."""
+    policy = _as_policy(policy)
+    if policy.strict_shape and actual.shape != expected.shape:
+        return _failure_result(
+            policy.mode,
+            f"shape mismatch: actual {actual.shape}, expected {expected.shape}",
+        )
+    if policy.strict_dtype and actual.dtype != expected.dtype:
+        return _failure_result(
+            policy.mode,
+            f"dtype mismatch: actual {actual.dtype}, expected {expected.dtype}",
+        )
+    if actual.shape != expected.shape:
+        return _failure_result(
+            policy.mode,
+            f"shape mismatch: actual {actual.shape}, expected {expected.shape}",
+        )
+
+    compare_actual = actual
+    compare_expected = expected
+    if actual.dtype != expected.dtype and not policy.strict_dtype:
+        compare_actual = actual.astype(expected.dtype)
+
+    if policy.mode in {"exact", "quantized_exact"}:
+        if policy.mode == "quantized_exact" and (
+            not np.issubdtype(compare_actual.dtype, np.integer)
+            or not np.issubdtype(compare_expected.dtype, np.integer)
+        ):
+            return _failure_result("quantized_exact", "quantized_exact requires integer tensors")
+        mismatch_mask = compare_actual != compare_expected
+    elif policy.mode == "allclose":
+        mismatch_mask = ~np.isclose(
+            compare_actual,
+            compare_expected,
+            rtol=policy.rtol,
+            atol=policy.atol,
+            equal_nan=False,
+        )
+    elif policy.mode == "dequantized_allclose":
+        quantization = policy.quantization or {}
+        actual_scale = float(quantization.get("actual_scale", quantization.get("scale", 1.0)))
+        expected_scale = float(quantization.get("expected_scale", quantization.get("scale", 1.0)))
+        actual_zero_point = int(
+            quantization.get("actual_zero_point", quantization.get("zero_point", 0))
+        )
+        expected_zero_point = int(
+            quantization.get("expected_zero_point", quantization.get("zero_point", 0))
+        )
+        compare_actual = _dequantize(
+            compare_actual,
+            scale=actual_scale,
+            zero_point=actual_zero_point,
+        )
+        compare_expected = _dequantize(
+            compare_expected,
+            scale=expected_scale,
+            zero_point=expected_zero_point,
+        )
+        mismatch_mask = ~np.isclose(
+            compare_actual,
+            compare_expected,
+            rtol=policy.rtol,
+            atol=policy.atol,
+            equal_nan=False,
+        )
+    else:
+        raise ValueError(f"Unsupported compare mode: {policy.mode}")
+
+    max_error, mean_error, max_relative_error = _numeric_metrics(compare_actual, compare_expected)
+    mismatch_count = int(np.count_nonzero(mismatch_mask))
+    first_mismatches = _first_mismatches(compare_actual, compare_expected, mismatch_mask)
+    passed = mismatch_count == 0
+    details = "PASS" if passed else f"FAIL: {mismatch_count} mismatches"
+    if first_mismatches:
+        details += f"; first mismatch at {first_mismatches[0]['index']}"
+    return TensorComparisonResult(
+        mode=policy.mode,
+        passed=passed,
+        max_error=max_error,
+        mean_error=mean_error,
+        max_relative_error=max_relative_error,
+        mismatch_count=mismatch_count,
+        first_mismatches=first_mismatches,
+        details=details,
+    )
+
+
 class FunctionalValidator:
     """Validate kernel correctness by comparing against reference implementations"""
 

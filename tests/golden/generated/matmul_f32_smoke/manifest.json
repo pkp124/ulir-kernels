@@ -1,0 +1,71 @@
+{
+  "case": "matmul_f32_smoke",
+  "compare": {
+    "atol": 1e-05,
+    "mode": "allclose",
+    "rtol": 1e-05,
+    "strict_dtype": true,
+    "strict_shape": true
+  },
+  "descriptor": "tests/golden/cases/matmul_f32_smoke.json",
+  "descriptor_sha256": "a02087b701ceeb5f1241f7d3a595589e490ccf9b25f41a9dba2da3a79beab120",
+  "generator": {
+    "backend": "numpy",
+    "backend_version": "2.4.4",
+    "distribution": {
+      "high": 1.0,
+      "kind": "uniform",
+      "low": -1.0
+    },
+    "function": "matmul",
+    "seed": 42
+  },
+  "kernel": "matmul",
+  "quantization_policy": {},
+  "schema_version": 1,
+  "targets": [
+    "host_reference",
+    "riscv_rvv_256"
+  ],
+  "tensors": [
+    {
+      "dtype": "float32",
+      "filename": "input_A.npy",
+      "name": "A",
+      "role": "input",
+      "sha256": "5361fe40722b93aa3f2b86f73313fa92411e7d3e1c7234dd2f9bb42d97202248",
+      "shape": [
+        4,
+        5
+      ],
+      "size_bytes": 80
+    },
+    {
+      "dtype": "float32",
+      "filename": "input_B.npy",
+      "name": "B",
+      "role": "input",
+      "sha256": "273932ddfef55a203804b6652fda66ba3c323acaa1c319d12a7fff968a8b5871",
+      "shape": [
+        5,
+        3
+      ],
+      "size_bytes": 60
+    },
+    {
+      "dtype": "float32",
+      "filename": "expected_C.npy",
+      "name": "C",
+      "role": "expected_output",
+      "sha256": "6203b54a4a759185cdc643411ab75d7f878eaa40d7251a49b2b13c81abcf1b8c",
+      "shape": [
+        4,
+        3
+      ],
+      "size_bytes": 48
+    }
+  ],
+  "vlens": [
+    256
+  ]
+}
