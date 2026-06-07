@@ -25,6 +25,8 @@ class TensorConfig:
 class TestDataGenerator:
     """Generate test data for kernel validation"""
 
+    __test__ = False
+
     def __init__(self, output_dir: str = "test_data"):
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
