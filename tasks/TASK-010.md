@@ -1,7 +1,7 @@
 # TASK-010: Build Golden Reference Verification Infrastructure
 
 ## Status
-[~] In Progress
+[x] Complete
 
 ## Priority
 P0 (Milestone Blocking)
@@ -21,17 +21,17 @@ host and RISC-V executions are judged against the same source of truth.
 
 ## Acceptance Criteria
 
-- [ ] Add a descriptor schema for functional cases, including kernel name,
+- [x] Add a descriptor schema for functional cases, including kernel name,
       inputs, outputs, target list, and compare policy.
-- [ ] Add a manifest format that records shape, dtype, seed, generator backend,
+- [x] Add a manifest format that records shape, dtype, seed, generator backend,
       tolerance, quantization policy fields, and SHA-256 hashes.
-- [ ] Add deterministic NumPy golden generators for at least f32 ReLU and f32
+- [x] Add deterministic NumPy golden generators for at least f32 ReLU and f32
       matmul smoke cases.
-- [ ] Add comparator support for exact, allclose, quantized exact, and
+- [x] Add comparator support for exact, allclose, quantized exact, and
       dequantized allclose modes.
-- [ ] Add focused unit tests for schema validation, hash validation, comparator
+- [x] Add focused unit tests for schema validation, hash validation, comparator
       pass/fail behavior, and diagnostic output.
-- [ ] Update docs to explain how to add a new golden-reference case.
+- [x] Update docs to explain how to add a new golden-reference case.
 
 ## Dependencies
 
@@ -48,6 +48,17 @@ pytest tests/test_*golden*.py tests/test_*verify*.py
 ctest --test-dir build --output-on-failure
 ```
 
+Verified on 2026-06-07:
+
+```bash
+.venv/bin/ruff check .
+.venv/bin/ruff format --check .
+.venv/bin/pytest tests/test_*golden*.py tests/test_*verify*.py
+./scripts/setup.sh
+cmake --build build --parallel
+ctest --test-dir build --output-on-failure
+```
+
 ## Notes
 
 - This is now the blocking validation task for M4/M5 because quantized kernels
@@ -59,3 +70,7 @@ ctest --test-dir build --output-on-failure
 
 ### 2026-06-07
 - Created as the P0 foundation for scalable golden-reference verification.
+- Implemented descriptor/manifest helpers, deterministic f32 ReLU and matmul
+  golden generation, comparator modes, pytest coverage, CTest wiring, committed
+  smoke bundles, and testing-guide documentation.
+- Verification passed with ruff, pytest, build, and full CTest.
