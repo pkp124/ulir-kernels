@@ -8,7 +8,7 @@
     "strict_shape": true
   },
   "descriptor": "tests/golden/cases/relu_f32_smoke.json",
-  "descriptor_sha256": "f004d8ec1a2b221e9cb4d482e119f3f2c4e0326f82564b3c9977aeb6b28f270f",
+  "descriptor_sha256": "dad9760244bac2cd037383da1af4fbfc8c4d321fe920c15146bea7d7aae78047",
   "generator": {
     "backend": "numpy",
     "backend_version": "2.4.4",
@@ -52,6 +52,7 @@
     }
   ],
   "vlens": [
-    256
+    256,
+    512
   ]
 }

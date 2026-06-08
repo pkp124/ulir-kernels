@@ -8,7 +8,7 @@
     "strict_shape": true
   },
   "descriptor": "tests/golden/cases/matmul_f32_smoke.json",
-  "descriptor_sha256": "a02087b701ceeb5f1241f7d3a595589e490ccf9b25f41a9dba2da3a79beab120",
+  "descriptor_sha256": "ab6df8f0b22fc9c710f49f3a832d302b6d47150fcecbd94b8266e675ba87aa0f",
   "generator": {
     "backend": "numpy",
     "backend_version": "2.4.4",
@@ -66,6 +66,7 @@
     }
   ],
   "vlens": [
-    256
+    256,
+    512
   ]
 }

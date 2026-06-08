@@ -31,7 +31,14 @@
 
 // ===--- Architecture ID -------------------------------------------------===//
 
-#define KS_TARGET_ARCH        "riscv64"
+#define KS_ARCH_GENERIC       0
+#define KS_ARCH_X86_64        1
+#define KS_ARCH_AARCH64       2
+#define KS_ARCH_RISCV64       3
+#define KS_ARCH_CORTEX_M      4
+
+#define KS_TARGET_NAME        "riscv-rvv-256"
+#define KS_TARGET_ARCH        KS_ARCH_RISCV64
 #define KS_TARGET_ABI         "lp64d"
 #define KS_TARGET_MARCH       "rv64gcv"
 #define KS_TARGET_FEATURES    "+v,+zve64d,+zvl256b"
@@ -72,16 +79,52 @@
 #define KS_RVV_TILE_L2_N      128
 #define KS_RVV_TILE_L2_K      256
 
+#define KS_MATMUL_TILE_M_L2   KS_RVV_TILE_L2_M
+#define KS_MATMUL_TILE_N_L2   KS_RVV_TILE_L2_N
+#define KS_MATMUL_TILE_K_L2   KS_RVV_TILE_L2_K
+
+#define KS_MATMUL_TILE_M_L1   KS_RVV_TILE_MR
+#define KS_MATMUL_TILE_N_L1   KS_RVV_TILE_NR
+#define KS_MATMUL_TILE_K_L1   KS_RVV_TILE_L2_K
+
+#define KS_MATMUL_MR          KS_RVV_TILE_MR
+#define KS_MATMUL_NR          KS_RVV_TILE_NR
+
 // ===--- Memory / cache parameters ----------------------------------------===//
 #define KS_L1D_SIZE_BYTES     (32 * 1024)    // 32 KB L1 data cache
 #define KS_L2_SIZE_BYTES      (512 * 1024)   // 512 KB L2 unified cache
 #define KS_CACHELINE_BYTES    64
+
+#define KS_L1D_SIZE_KB        32
+#define KS_L2_SIZE_KB         512
+#define KS_L3_SIZE_KB         0
+#define KS_PREFERRED_ALIGN    KS_RVV_PACK_ALIGN
+#define KS_REQUIRED_ALIGN     1
 
 // ===--- Pack (B operand layout) ------------------------------------------===//
 // B is packed into column-major panels of width NR to enable stride-free
 // vector loads in the inner loop. Panel shape: [K/KR, NR, KR] → [K, NR].
 #define KS_RVV_PACK_FACTOR    KS_RVV_TILE_NR   // = NR = 32 elements
 #define KS_RVV_PACK_ALIGN     64               // bytes (cacheline aligned)
+
+#define KS_MATMUL_PACK_B      1
+#define KS_MATMUL_PACK_A      0
+
+#define KS_SIMD_WIDTH_BITS    KS_RVV_VLEN
+#define KS_SIMD_WIDTH_F32     KS_RVV_VLMAX_F32_LMUL1
+#define KS_SIMD_WIDTH_F16     16
+#define KS_SIMD_WIDTH_I8      32
+
+#define KS_HAS_FMA            1
+#define KS_HAS_F16C           0
+#define KS_HAS_VNNI           0
+#define KS_HAS_AVX512         0
+#define KS_HAS_SVE            0
+#define KS_HAS_DOTPROD        0
+#define KS_HAS_RVV            1
+
+#define KS_MATMUL_DOUBLE_BUFFER  0
+#define KS_ELEMENTWISE_TILE   64
 
 // ===--- Workspace size query macro ---------------------------------------===//
 // Returns the number of bytes needed to pack a K×N B-matrix.

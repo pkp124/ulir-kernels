@@ -225,6 +225,22 @@ compares them with the manifest comparison policy, and emits JSON result lines.
 CTest runs the smoke cases through `kernelsmith-host-golden-relu` and
 `kernelsmith-host-golden-matmul`.
 
+Run RISC-V RVV outputs under QEMU against the same golden bundle:
+
+```bash
+python3 tests/verify.py \
+  --case tests/golden/cases/relu_f32_smoke.json \
+  --target riscv_rvv_256 \
+  --riscv-runner build-rvv/bin/riscv-golden-runner \
+  --host-runner build/tests/host_reference/host-reference-runner \
+  --vlens 256 512
+```
+
+The RISC-V path rejects VLENs below the profile baseline, restores executable
+bits on downloaded runner artifacts, writes per-VLEN `actual_<name>.npy`
+outputs, and emits JSON lines with case name, VLEN, pass/fail status, max error,
+and mismatch count.
+
 To add a new f32 smoke case:
 
 1. Add a descriptor in `tests/golden/cases/`.

@@ -1,7 +1,7 @@
 # TASK-012: Compare RISC-V RVV Outputs Against Golden References
 
 ## Status
-[ ] Not Started
+[~] In Progress
 
 ## Priority
 P1 (High)
