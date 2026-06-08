@@ -1,18 +1,17 @@
 # =============================================================================
 # CI: RISC-V RVV Simulation Tests
 # =============================================================================
-# Tests the M4 RVV lowering pipeline end-to-end:
-#   1. build-rvv-kernels — compiles MLIR tests to riscv64 ELF binaries
-#      using ks-opt + mlir-translate + llc + riscv64-linux-gnu-gcc
-#   2. simulate-qemu    — runs each ELF on qemu-riscv64 with VLEN=256/512
+# Tests the M4 RVV verification path end-to-end:
+#   1. build-rvv-kernels — builds host and riscv64 descriptor runners
+#   2. simulate-qemu    — runs golden-backed verification at VLEN=256/512
 #   3. simulate-spike   — runs on Spike ISA simulator (optional, better RVV 1.0)
 #
 # Adapted from: https://github.com/pkp124/riscv (ci-build.yml patterns)
 #
 # Key differences from pkp124/riscv:
 #   - Uses qemu-user (user-mode) instead of qemu-system (bare-metal).
-#   - ks-opt pipeline: ks.mlir → LLVM dialect → llc (riscv64) → ELF.
-#   - Tests M4 RVV passes: --ks-lower-to-rvv with vector.maximumf, etc.
+#   - Uses descriptor-defined golden inputs and NumPy comparison policy.
+#   - Tests both f32 ReLU and f32 matmul smoke cases under RVV QEMU.
 # =============================================================================
 
 name: CI - RVV Simulation
@@ -25,6 +24,10 @@ on:
       - 'include/KernelSmith/Passes/**'
       - 'target/riscv_rvv_256.h'
       - 'tests/riscv/**'
+      - 'tests/golden/**'
+      - 'tests/host_reference/**'
+      - 'tests/riscv_runner.py'
+      - 'tests/verify.py'
       - 'scripts/compile-rvv.sh'
       - 'scripts/setup-rvv-sim.sh'
       - '.github/workflows/ci-rvv-sim.yml'
@@ -34,6 +37,10 @@ on:
       - 'include/KernelSmith/Passes/**'
       - 'target/riscv_rvv_256.h'
       - 'tests/riscv/**'
+      - 'tests/golden/**'
+      - 'tests/host_reference/**'
+      - 'tests/riscv_runner.py'
+      - 'tests/verify.py'
       - 'scripts/compile-rvv.sh'
   workflow_dispatch:
     inputs:
@@ -48,7 +55,7 @@ concurrency:
   cancel-in-progress: true
 
 # =============================================================================
-# Job 1: Build ks-opt and compile RVV ELF binaries
+# Job 1: Build ks-opt and descriptor runner binaries
 # =============================================================================
 jobs:
   build-rvv-kernels:
@@ -118,49 +125,42 @@ jobs:
             -DLLVM_DIR=/usr/lib/llvm-21/lib/cmake/llvm \
             -DMLIR_DIR=/usr/lib/llvm-21/lib/cmake/mlir
 
-      - name: Build ks-opt
-        run: cmake --build build --parallel --target ks-opt
+      - name: Build ks-opt and host runner
+        run: cmake --build build --parallel --target ks-opt host-reference-runner
 
       # -----------------------------------------------------------------------
-      # Compile MLIR test programs to riscv64 ELF using the M4 pipeline
+      # Build descriptor-backed runners used by tests/verify.py
       # -----------------------------------------------------------------------
-      - name: Compile relu_rvv ELF
-        env:
-          KS_OPT: build/bin/ks-opt
-          MLIR_TRANSLATE: mlir-translate
-          LLC: llc
+      - name: Build descriptor runner artifacts
         run: |
           mkdir -p build-rvv/bin
 
-          echo "=== Stage 1: ks-opt --ks-lower-to-rvv ==="
-          build/bin/ks-opt tests/riscv/relu_rvv.mlir \
-            --ks-lower-to-rvv \
-            -o build-rvv/relu_llvm.mlir
+          echo "=== Host descriptor runner ==="
+          cp build/tests/host_reference/host-reference-runner \
+            build-rvv/bin/host-reference-runner
 
-          echo "=== Stage 2: mlir-translate ==="
-          mlir-translate --mlir-to-llvmir build-rvv/relu_llvm.mlir \
-            -o build-rvv/relu.ll
-
-          echo "=== Stage 3: llc → riscv64 object ==="
-          llc -march=riscv64 \
-              -mattr=+v,+zve64d,+zvl256b \
-              -float-abi=hard \
-              -filetype=obj \
-              build-rvv/relu.ll \
-              -o build-rvv/relu.o
-
-          echo "=== Stage 4: link static ELF ==="
+          echo "=== RISC-V descriptor runner ==="
           riscv64-linux-gnu-gcc \
-            -static build-rvv/relu.o \
-            -o build-rvv/bin/relu_rvv \
+            -std=c99 \
+            -O2 \
+            -static \
+            -march=rv64gcv \
+            -mabi=lp64d \
+            -I include \
+            -include target/riscv_rvv_256.h \
+            tests/host_reference/host_reference_runner.c \
+            lib/kernelsmith/ks_common.c \
+            lib/kernelsmith/ks_matmul.c \
+            lib/kernelsmith/ks_activations.c \
+            -o build-rvv/bin/riscv-golden-runner \
             -lm
-          file build-rvv/bin/relu_rvv
-          echo "relu_rvv ELF built successfully"
+          file build-rvv/bin/riscv-golden-runner
+          echo "descriptor runner artifacts built successfully"
 
-      - name: Upload RVV ELF artifacts
+      - name: Upload RVV runner artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: rvv-elf-binaries
+          name: rvv-golden-runners
           path: build-rvv/bin/
           retention-days: 7
 
@@ -190,27 +190,57 @@ jobs:
           sudo apt-get install -y qemu-user qemu-user-static
           qemu-riscv64 --version | head -1
 
-      - name: Download RVV ELF binaries
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Download RVV runner artifacts
         uses: actions/download-artifact@v4
         with:
-          name: rvv-elf-binaries
+          name: rvv-golden-runners
           path: rvv-bin/
 
       - name: Prepare binaries
         run: chmod +x rvv-bin/*
 
-      - name: "Simulate relu_rvv (VLEN=${{ matrix.vlen }})"
+      - name: "Verify golden cases (VLEN=${{ matrix.vlen }})"
         timeout-minutes: 2
         run: |
-          echo "Running relu_rvv with -cpu ${{ matrix.cpu_args }}"
-          qemu-riscv64 -cpu "${{ matrix.cpu_args }}" rvv-bin/relu_rvv
-          EXIT_CODE=$?
-          if [ $EXIT_CODE -eq 0 ]; then
-            echo "PASS: relu_rvv VLEN=${{ matrix.vlen }}"
-          else
-            echo "FAIL: relu_rvv VLEN=${{ matrix.vlen }} (exit $EXIT_CODE)"
-            exit 1
-          fi
+          mkdir -p build/golden-rvv
+
+          python tests/verify.py \
+            --case tests/golden/cases/relu_f32_smoke.json \
+            --target riscv_rvv_256 \
+            --riscv-runner rvv-bin/riscv-golden-runner \
+            --host-runner rvv-bin/host-reference-runner \
+            --qemu qemu-riscv64 \
+            --vlens ${{ matrix.vlen }} \
+            --output-dir build/golden-rvv \
+            --report build/golden-rvv/relu_vlen_${{ matrix.vlen }}.json
+
+          python tests/verify.py \
+            --case tests/golden/cases/matmul_f32_smoke.json \
+            --target riscv_rvv_256 \
+            --riscv-runner rvv-bin/riscv-golden-runner \
+            --host-runner rvv-bin/host-reference-runner \
+            --qemu qemu-riscv64 \
+            --vlens ${{ matrix.vlen }} \
+            --output-dir build/golden-rvv \
+            --report build/golden-rvv/matmul_vlen_${{ matrix.vlen }}.json
+
+      - name: Upload RVV verification reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rvv-golden-reports-${{ matrix.vlen }}
+          path: build/golden-rvv/
+          retention-days: 7
 
 # =============================================================================
 # Job 3: Spike simulation (optional — only on workflow_dispatch with flag)
@@ -257,30 +287,47 @@ jobs:
           make -j$(nproc)
           sudo make install
 
-      - name: Download RVV ELF binaries
+      - name: Download RVV runner artifacts
         uses: actions/download-artifact@v4
         with:
-          name: rvv-elf-binaries
+          name: rvv-golden-runners
           path: rvv-bin/
 
       - name: Prepare binaries
         run: chmod +x rvv-bin/*
 
-      - name: "Simulate relu_rvv on Spike (RVV 1.0)"
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: pip install -e "."
+
+      - name: "Simulate descriptor ReLU on Spike (RVV 1.0)"
         timeout-minutes: 5
         run: |
           export PATH="/opt/riscv/bin:$PATH"
-          echo "Running relu_rvv on Spike with +v extension"
+          mkdir -p spike-data
+          python - <<'PY'
+          import numpy as np
+          x = np.load("tests/golden/generated/relu_f32_smoke/input_X.npy")
+          x.astype("float32").tofile("spike-data/input_X.f32")
+          PY
+
+          echo "Running descriptor ReLU on Spike with +v extension"
           # Spike flags: --isa=rv64gcv enables V extension, --varch sets VLEN/ELEN.
           spike \
             --isa=rv64gcv \
             --varch="vlen:256,elen:64" \
             /opt/riscv/riscv64-unknown-linux-gnu/bin/pk \
-            rvv-bin/relu_rvv
-          EXIT_CODE=$?
-          if [ $EXIT_CODE -eq 0 ]; then
-            echo "PASS: relu_rvv on Spike"
-          else
-            echo "FAIL: relu_rvv on Spike (exit $EXIT_CODE)"
-            exit 1
-          fi
+            rvv-bin/riscv-golden-runner \
+            relu spike-data/input_X.f32 spike-data/actual_Y.f32 16
+
+          python - <<'PY'
+          import numpy as np
+          actual = np.fromfile("spike-data/actual_Y.f32", dtype=np.float32)
+          expected = np.load("tests/golden/generated/relu_f32_smoke/expected_Y.npy")
+          np.testing.assert_allclose(actual.reshape(expected.shape), expected, rtol=1e-6, atol=1e-6)
+          print("PASS: descriptor ReLU on Spike")
+          PY

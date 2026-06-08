@@ -4,12 +4,12 @@ QEMU Runner for Multi-VLEN Testing (M4: RISC-V RVV Target)
 
 Runs RISC-V kernels on QEMU with different vector lengths to validate
 that the KernelSmith RVV pipeline produces correct results across VLEN
-configurations (128, 256, 512 bits).
+configurations (256, 512 bits for the riscv_rvv_256 profile).
 
 Usage:
     python tests/qemu_runner.py --binary build-rvv/bin/test_matmul_rvv
     python tests/qemu_runner.py --binary build-rvv/bin/test_matmul_rvv \
-        --vlens 128 256 512 --benchmark
+        --vlens 256 512 --benchmark
 """
 
 import argparse
@@ -18,12 +18,23 @@ import sys
 import time
 from pathlib import Path
 
+REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from tests.riscv_runner import (
+    DEFAULT_RVV_VLENS,
+    RiscVRunnerError,
+    repair_executable_permission,
+    validate_vlens,
+)
+
 
 class QEMURunner:
     """Execute RISC-V binaries on QEMU with different VLEN configurations."""
 
     # Standard VLEN values to test (bits)
-    STANDARD_VLENS = [128, 256, 512]
+    STANDARD_VLENS = list(DEFAULT_RVV_VLENS)
 
     def __init__(self, qemu_binary: str = "qemu-riscv64"):
         self.qemu_binary = qemu_binary
@@ -59,6 +70,7 @@ class QEMURunner:
         """
         if not Path(binary_path).exists():
             raise FileNotFoundError(f"Binary not found: {binary_path}")
+        repair_executable_permission(Path(binary_path))
 
         # QEMU user-mode with RVV enabled.
         # -cpu rv64,v=true,vlen=<N>  enables the V extension at the given VLEN.
@@ -241,7 +253,12 @@ def main() -> int:
         nargs="+",
         type=int,
         default=QEMURunner.STANDARD_VLENS,
-        help="VLEN values to test (default: 128 256 512).",
+        help="VLEN values to test (default: 256 512).",
+    )
+    parser.add_argument(
+        "--profile",
+        default="riscv_rvv_256",
+        help="Target profile used to validate legal VLEN values.",
     )
     parser.add_argument(
         "--benchmark", action="store_true", help="Run benchmark in addition to correctness test."
@@ -252,15 +269,16 @@ def main() -> int:
     args = parser.parse_args()
 
     try:
+        vlens = validate_vlens(args.profile, args.vlens)
         runner = QEMURunner(args.qemu)
-    except RuntimeError as e:
+    except (RuntimeError, RiscVRunnerError) as e:
         print(f"ERROR: {e}", file=sys.stderr)
         return 1
 
-    passed = run_matmul_correctness_test(runner, args.binary, args.vlens)
+    passed = run_matmul_correctness_test(runner, args.binary, list(vlens))
 
     if args.benchmark:
-        run_benchmark(runner, args.binary, args.vlens)
+        run_benchmark(runner, args.binary, list(vlens))
 
     return 0 if passed else 1
 

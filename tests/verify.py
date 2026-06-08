@@ -27,6 +27,12 @@ from tests.golden.schema import (  # noqa: E402
     sha256_file,
     validate_manifest,
 )
+from tests.riscv_runner import (  # noqa: E402
+    DEFAULT_RVV_VLENS,
+    RiscVRunner,
+    RiscVRunnerError,
+    validate_vlens,
+)
 
 
 class VerifyError(RuntimeError):
@@ -98,6 +104,17 @@ def _write_raw_input(
     return raw_path
 
 
+def _load_expected_output(
+    *,
+    manifest: dict[str, Any],
+    bundle_dir: Path,
+    output_name: str,
+) -> tuple[np.ndarray, Path, dict[str, Any]]:
+    expected_entry = _tensor_entry(manifest, role="expected_output", name=output_name)
+    expected_path = bundle_dir / expected_entry["filename"]
+    return np.load(expected_path), expected_path, expected_entry
+
+
 def _find_default_host_runner() -> Path | None:
     root = _repo_root()
     candidates = [
@@ -108,6 +125,71 @@ def _find_default_host_runner() -> Path | None:
         if candidate.exists():
             return candidate
     return None
+
+
+def _find_default_riscv_runner() -> Path | None:
+    root = _repo_root()
+    candidates = [
+        root / "build-rvv" / "bin" / "riscv-golden-runner",
+        root / "build" / "tests" / "riscv" / "riscv-golden-runner",
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def _case_runner_args(
+    *,
+    case: CaseDescriptor,
+    manifest: dict[str, Any],
+    bundle_dir: Path,
+    raw_dir: Path,
+    raw_output: Path,
+) -> list[str]:
+    if case.kernel == "relu":
+        raw_input = _write_raw_input(
+            bundle_dir=bundle_dir,
+            raw_dir=raw_dir,
+            manifest=manifest,
+            tensor_name=case.inputs[0].name,
+        )
+        return [
+            "relu",
+            str(raw_input),
+            str(raw_output),
+            str(_product(case.inputs[0].shape)),
+        ]
+
+    if case.kernel == "matmul":
+        lhs, rhs = case.inputs
+        raw_lhs = _write_raw_input(
+            bundle_dir=bundle_dir,
+            raw_dir=raw_dir,
+            manifest=manifest,
+            tensor_name=lhs.name,
+        )
+        raw_rhs = _write_raw_input(
+            bundle_dir=bundle_dir,
+            raw_dir=raw_dir,
+            manifest=manifest,
+            tensor_name=rhs.name,
+        )
+        m, k = lhs.shape
+        rhs_k, n = rhs.shape
+        if k != rhs_k:
+            raise VerifyError("matmul descriptor has mismatched inner dimensions")
+        return [
+            "matmul",
+            str(raw_lhs),
+            str(raw_rhs),
+            str(raw_output),
+            str(m),
+            str(n),
+            str(k),
+        ]
+
+    raise VerifyError(f"target runner does not support kernel {case.kernel}")
 
 
 def _run_host_reference(
@@ -128,50 +210,16 @@ def _run_host_reference(
 
     output = case.outputs[0]
     raw_output = raw_dir / f"actual_{output.name}.f32"
-    if case.kernel == "relu":
-        raw_input = _write_raw_input(
+    command = [
+        str(host_runner),
+        *_case_runner_args(
+            case=case,
+            manifest=manifest,
             bundle_dir=bundle_dir,
             raw_dir=raw_dir,
-            manifest=manifest,
-            tensor_name=case.inputs[0].name,
-        )
-        command = [
-            str(host_runner),
-            "relu",
-            str(raw_input),
-            str(raw_output),
-            str(_product(case.inputs[0].shape)),
-        ]
-    elif case.kernel == "matmul":
-        lhs, rhs = case.inputs
-        raw_lhs = _write_raw_input(
-            bundle_dir=bundle_dir,
-            raw_dir=raw_dir,
-            manifest=manifest,
-            tensor_name=lhs.name,
-        )
-        raw_rhs = _write_raw_input(
-            bundle_dir=bundle_dir,
-            raw_dir=raw_dir,
-            manifest=manifest,
-            tensor_name=rhs.name,
-        )
-        m, k = lhs.shape
-        rhs_k, n = rhs.shape
-        if k != rhs_k:
-            raise VerifyError("matmul descriptor has mismatched inner dimensions")
-        command = [
-            str(host_runner),
-            "matmul",
-            str(raw_lhs),
-            str(raw_rhs),
-            str(raw_output),
-            str(m),
-            str(n),
-            str(k),
-        ]
-    else:
-        raise VerifyError(f"host_reference does not support kernel {case.kernel}")
+            raw_output=raw_output,
+        ),
+    ]
 
     completed = subprocess.run(command, check=False, capture_output=True, text=True)
     if completed.returncode != 0:
@@ -190,9 +238,11 @@ def _run_host_reference(
     actual_path = case_dir / f"actual_{output.name}.npy"
     np.save(actual_path, actual)
 
-    expected_entry = _tensor_entry(manifest, role="expected_output", name=output.name)
-    expected_path = bundle_dir / expected_entry["filename"]
-    expected = np.load(expected_path)
+    expected, expected_path, expected_entry = _load_expected_output(
+        manifest=manifest,
+        bundle_dir=bundle_dir,
+        output_name=output.name,
+    )
     comparison = compare_arrays(actual, expected, manifest["compare"])
 
     return [
@@ -215,6 +265,194 @@ def _run_host_reference(
     ]
 
 
+def _failure_result(
+    *,
+    case: CaseDescriptor,
+    target: str,
+    output_name: str,
+    vlen: int,
+    details: str,
+    return_code: int | None = None,
+    stdout: str = "",
+    stderr: str = "",
+) -> dict[str, Any]:
+    return {
+        "kind": "kernelsmith_result",
+        "case": case.name,
+        "target": target,
+        "kernel": case.kernel,
+        "output": output_name,
+        "vlen": vlen,
+        "status": "FAIL",
+        "passed": False,
+        "compare": {
+            "passed": False,
+            "max_error": float("inf"),
+            "mean_error": float("inf"),
+            "max_relative_error": float("inf"),
+            "mismatch_count": 1,
+            "details": details,
+        },
+        "qemu": {
+            "return_code": return_code,
+            "stdout": stdout,
+            "stderr": stderr,
+        },
+    }
+
+
+def _run_riscv_reference(
+    *,
+    case: CaseDescriptor,
+    target: str,
+    manifest: dict[str, Any],
+    bundle_dir: Path,
+    output_dir: Path,
+    riscv_runner: Path,
+    qemu_binary: str,
+    vlens: tuple[int, ...],
+    timeout: int,
+    host_runner: Path | None,
+) -> list[dict[str, Any]]:
+    if not riscv_runner.exists():
+        raise VerifyError(f"RISC-V runner not found: {riscv_runner}")
+
+    host_results: dict[str, dict[str, Any]] = {}
+    if host_runner is not None:
+        for host_result in _run_host_reference(
+            case=case,
+            manifest=manifest,
+            bundle_dir=bundle_dir,
+            output_dir=output_dir,
+            host_runner=host_runner,
+        ):
+            if not host_result["passed"]:
+                raise VerifyError(
+                    f"host_reference failed for {case.name}; refusing RISC-V comparison"
+                )
+            host_results[host_result["output"]] = host_result
+
+    try:
+        runner = RiscVRunner(qemu_binary)
+    except RiscVRunnerError as error:
+        raise VerifyError(str(error)) from error
+
+    results = []
+    output = case.outputs[0]
+    expected, expected_path, expected_entry = _load_expected_output(
+        manifest=manifest,
+        bundle_dir=bundle_dir,
+        output_name=output.name,
+    )
+
+    for vlen in vlens:
+        case_dir = output_dir / case.name / target / f"vlen_{vlen}"
+        raw_dir = case_dir / "raw"
+        case_dir.mkdir(parents=True, exist_ok=True)
+        raw_dir.mkdir(parents=True, exist_ok=True)
+
+        raw_output = raw_dir / f"actual_{output.name}.f32"
+        args = _case_runner_args(
+            case=case,
+            manifest=manifest,
+            bundle_dir=bundle_dir,
+            raw_dir=raw_dir,
+            raw_output=raw_output,
+        )
+        run_result = runner.run(riscv_runner, vlen=vlen, args=args, timeout=timeout)
+        if not run_result.success:
+            results.append(
+                _failure_result(
+                    case=case,
+                    target=target,
+                    output_name=output.name,
+                    vlen=vlen,
+                    details=f"qemu failed with exit code {run_result.return_code}",
+                    return_code=run_result.return_code,
+                    stdout=run_result.stdout,
+                    stderr=run_result.stderr,
+                )
+            )
+            continue
+
+        if not raw_output.exists():
+            results.append(
+                _failure_result(
+                    case=case,
+                    target=target,
+                    output_name=output.name,
+                    vlen=vlen,
+                    details=f"runner did not write expected output: {raw_output}",
+                    return_code=run_result.return_code,
+                    stdout=run_result.stdout,
+                    stderr=run_result.stderr,
+                )
+            )
+            continue
+
+        actual = np.fromfile(raw_output, dtype=np.float32)
+        expected_size = _product(output.shape)
+        if actual.size != expected_size:
+            results.append(
+                _failure_result(
+                    case=case,
+                    target=target,
+                    output_name=output.name,
+                    vlen=vlen,
+                    details=(
+                        f"RISC-V output size mismatch for {output.name}: "
+                        f"got {actual.size}, expected {expected_size}"
+                    ),
+                    return_code=run_result.return_code,
+                    stdout=run_result.stdout,
+                    stderr=run_result.stderr,
+                )
+            )
+            continue
+
+        actual = actual.reshape(output.shape).astype(np.dtype(output.dtype), copy=False)
+        actual_path = case_dir / f"actual_{output.name}.npy"
+        np.save(actual_path, actual)
+
+        comparison = compare_arrays(actual, expected, manifest["compare"])
+        host_comparison = None
+        if output.name in host_results:
+            host_actual = np.load(host_results[output.name]["actual_path"])
+            host_comparison = compare_arrays(actual, host_actual, manifest["compare"])
+
+        passed = comparison.passed and (
+            host_comparison is None or host_comparison.passed
+        )
+        result = {
+            "kind": "kernelsmith_result",
+            "case": case.name,
+            "target": target,
+            "kernel": case.kernel,
+            "output": output.name,
+            "vlen": vlen,
+            "status": "PASS" if passed else "FAIL",
+            "passed": passed,
+            "actual_path": str(actual_path),
+            "actual_sha256": sha256_file(actual_path),
+            "expected_path": str(expected_path),
+            "expected_sha256": expected_entry["sha256"],
+            "shape": list(output.shape),
+            "dtype": output.dtype,
+            "compare": comparison.to_dict(),
+            "qemu": {
+                "return_code": run_result.return_code,
+                "stdout": run_result.stdout,
+                "stderr": run_result.stderr,
+            },
+        }
+        if host_comparison is not None:
+            result["host_compare"] = host_comparison.to_dict()
+            result["host_actual_path"] = host_results[output.name]["actual_path"]
+        results.append(result)
+
+    return results
+
+
 def verify_case(
     *,
     case_path: Path,
@@ -222,6 +460,10 @@ def verify_case(
     manifest_dir: Path,
     output_dir: Path,
     host_runner: Path | None,
+    riscv_runner: Path | None = None,
+    qemu_binary: str = "qemu-riscv64",
+    vlens: tuple[int, ...] | list[int] | None = None,
+    timeout: int = 60,
 ) -> list[dict[str, Any]]:
     case = load_case_descriptor(case_path)
     if target not in case.targets:
@@ -242,6 +484,29 @@ def verify_case(
             bundle_dir=bundle_dir,
             output_dir=output_dir,
             host_runner=runner,
+        )
+
+    if target.startswith("riscv_rvv_"):
+        selected_vlens = tuple(vlens or case.vlens or manifest.get("vlens") or DEFAULT_RVV_VLENS)
+        try:
+            selected_vlens = validate_vlens(target, selected_vlens)
+        except RiscVRunnerError as error:
+            raise VerifyError(str(error)) from error
+
+        runner = riscv_runner or _find_default_riscv_runner()
+        if runner is None:
+            raise VerifyError("RISC-V runner not found; pass --riscv-runner or build CI artifacts")
+        return _run_riscv_reference(
+            case=case,
+            target=target,
+            manifest=manifest,
+            bundle_dir=bundle_dir,
+            output_dir=output_dir,
+            riscv_runner=runner,
+            qemu_binary=qemu_binary,
+            vlens=selected_vlens,
+            timeout=timeout,
+            host_runner=host_runner,
         )
 
     raise VerifyError(f"unsupported target: {target}")
@@ -269,6 +534,14 @@ def main(argv: list[str] | None = None) -> int:
         help="Path to host-reference-runner for --target host_reference",
     )
     parser.add_argument(
+        "--riscv-runner",
+        type=Path,
+        help="Path to riscv-golden-runner for --target riscv_rvv_*",
+    )
+    parser.add_argument("--qemu", default="qemu-riscv64", help="QEMU user-mode binary")
+    parser.add_argument("--vlens", nargs="+", type=int, help="RVV VLEN values to run")
+    parser.add_argument("--timeout", type=int, default=60, help="Per-QEMU-run timeout seconds")
+    parser.add_argument(
         "--report",
         type=Path,
         help="Optional JSON report path; defaults under --output-dir",
@@ -282,6 +555,10 @@ def main(argv: list[str] | None = None) -> int:
             manifest_dir=args.manifest_dir,
             output_dir=args.output_dir,
             host_runner=args.host_runner,
+            riscv_runner=args.riscv_runner,
+            qemu_binary=args.qemu,
+            vlens=args.vlens,
+            timeout=args.timeout,
         )
     except Exception as error:
         result = {
