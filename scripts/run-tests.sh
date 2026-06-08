@@ -18,6 +18,7 @@ NC='\033[0m' # No Color
 TEST_LIT=false
 TEST_UNIT=false
 TEST_INTEGRATION=false
+TEST_RISCV_FUNCTIONAL=false
 TEST_ALL=false
 VERBOSE=false
 QEMU_VLEN=""
@@ -30,6 +31,7 @@ Test Categories:
   --lit              Run MLIR lit tests (parsing, lowering verification)
   --unit             Run C++ unit tests
   --integration      Run integration tests
+  --riscv-functional Run golden-backed RISC-V QEMU functional tests
   --all              Run all tests (default if no category specified)
 
 Options:
@@ -41,6 +43,7 @@ Examples:
   $0 --lit                           # Run lit tests
   $0 --all --verbose                 # Run all tests verbosely
   $0 --integration --qemu-vlen 256   # Run integration tests on QEMU with VLEN=256
+  $0 --riscv-functional              # Run RVV golden checks at VLEN=256/512
 EOF
 }
 
@@ -57,6 +60,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --integration)
             TEST_INTEGRATION=true
+            shift
+            ;;
+        --riscv-functional)
+            TEST_RISCV_FUNCTIONAL=true
             shift
             ;;
         --all)
@@ -84,7 +91,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Default to --all if no category specified
-if [ "$TEST_LIT" = false ] && [ "$TEST_UNIT" = false ] && [ "$TEST_INTEGRATION" = false ] && [ "$TEST_ALL" = false ]; then
+if [ "$TEST_LIT" = false ] && [ "$TEST_UNIT" = false ] && [ "$TEST_INTEGRATION" = false ] && [ "$TEST_RISCV_FUNCTIONAL" = false ] && [ "$TEST_ALL" = false ]; then
     TEST_ALL=true
 fi
 
@@ -144,6 +151,73 @@ run_integration_tests() {
     fi
 }
 
+run_riscv_functional_tests() {
+    echo -e "${YELLOW}=== Running RISC-V Golden Functional Tests ===${NC}"
+
+    if ! command -v qemu-riscv64 &> /dev/null; then
+        echo -e "${RED}Error: qemu-riscv64 not found. Run: ./scripts/setup-rvv-sim.sh${NC}"
+        return 1
+    fi
+    if ! command -v riscv64-linux-gnu-gcc &> /dev/null; then
+        echo -e "${RED}Error: riscv64-linux-gnu-gcc not found. Run: ./scripts/setup-rvv-sim.sh${NC}"
+        return 1
+    fi
+
+    local python_bin="${PYTHON:-python3}"
+    if [[ "${python_bin}" != /* && -x "${PROJECT_ROOT}/${python_bin}" ]]; then
+        python_bin="${PROJECT_ROOT}/${python_bin}"
+    fi
+    local runner_dir="${BUILD_DIR}/rvv-functional/bin"
+    local output_dir="${BUILD_DIR}/rvv-functional/actual"
+    local vlen_args=()
+    mkdir -p "${runner_dir}" "${output_dir}"
+
+    cmake --build . --target host-reference-runner
+    cp "${BUILD_DIR}/tests/host_reference/host-reference-runner" \
+       "${runner_dir}/host-reference-runner"
+
+    riscv64-linux-gnu-gcc \
+        -std=c99 \
+        -O2 \
+        -static \
+        -march=rv64gcv \
+        -mabi=lp64d \
+        -I "${PROJECT_ROOT}/include" \
+        -include "${PROJECT_ROOT}/target/riscv_rvv_256.h" \
+        "${PROJECT_ROOT}/tests/host_reference/host_reference_runner.c" \
+        "${PROJECT_ROOT}/lib/kernelsmith/ks_common.c" \
+        "${PROJECT_ROOT}/lib/kernelsmith/ks_matmul.c" \
+        "${PROJECT_ROOT}/lib/kernelsmith/ks_activations.c" \
+        -o "${runner_dir}/riscv-golden-runner" \
+        -lm
+
+    if [ -n "$QEMU_VLEN" ]; then
+        vlen_args=("$QEMU_VLEN")
+    else
+        vlen_args=(256 512)
+    fi
+
+    "${python_bin}" "${PROJECT_ROOT}/tests/verify.py" \
+        --case "${PROJECT_ROOT}/tests/golden/cases/relu_f32_smoke.json" \
+        --target riscv_rvv_256 \
+        --riscv-runner "${runner_dir}/riscv-golden-runner" \
+        --host-runner "${runner_dir}/host-reference-runner" \
+        --qemu qemu-riscv64 \
+        --vlens "${vlen_args[@]}" \
+        --output-dir "${output_dir}" \
+        --report "${output_dir}/relu_riscv_report.json"
+
+    "${python_bin}" "${PROJECT_ROOT}/tests/verify.py" \
+        --case "${PROJECT_ROOT}/tests/golden/cases/matmul_f32_smoke.json" \
+        --target riscv_rvv_256 \
+        --riscv-runner "${runner_dir}/riscv-golden-runner" \
+        --host-runner "${runner_dir}/host-reference-runner" \
+        --qemu qemu-riscv64 \
+        --vlens "${vlen_args[@]}" \
+        --output-dir "${output_dir}" \
+        --report "${output_dir}/matmul_riscv_report.json"
+}
+
 # Run tests based on flags
 FAILED=0
 
@@ -152,9 +226,18 @@ if [ "$TEST_ALL" = true ]; then
     run_unit_tests || FAILED=$((FAILED + 1))
     run_integration_tests || FAILED=$((FAILED + 1))
 else
-    [ "$TEST_LIT" = true ] && run_lit_tests || FAILED=$((FAILED + 1))
-    [ "$TEST_UNIT" = true ] && run_unit_tests || FAILED=$((FAILED + 1))
-    [ "$TEST_INTEGRATION" = true ] && run_integration_tests || FAILED=$((FAILED + 1))
+    if [ "$TEST_LIT" = true ]; then
+        run_lit_tests || FAILED=$((FAILED + 1))
+    fi
+    if [ "$TEST_UNIT" = true ]; then
+        run_unit_tests || FAILED=$((FAILED + 1))
+    fi
+    if [ "$TEST_INTEGRATION" = true ]; then
+        run_integration_tests || FAILED=$((FAILED + 1))
+    fi
+    if [ "$TEST_RISCV_FUNCTIONAL" = true ]; then
+        run_riscv_functional_tests || FAILED=$((FAILED + 1))
+    fi
 fi
 
 # Summary

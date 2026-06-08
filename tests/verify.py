@@ -420,9 +420,7 @@ def _run_riscv_reference(
             host_actual = np.load(host_results[output.name]["actual_path"])
             host_comparison = compare_arrays(actual, host_actual, manifest["compare"])
 
-        passed = comparison.passed and (
-            host_comparison is None or host_comparison.passed
-        )
+        passed = comparison.passed and (host_comparison is None or host_comparison.passed)
         result = {
             "kind": "kernelsmith_result",
             "case": case.name,
