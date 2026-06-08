@@ -1,7 +1,7 @@
 # TASK-012: Compare RISC-V RVV Outputs Against Golden References
 
 ## Status
-[~] In Progress
+[x] Complete
 
 ## Priority
 P1 (High)
@@ -21,17 +21,17 @@ host/x86 outputs.
 
 ## Acceptance Criteria
 
-- [ ] Update the RISC-V runner or harness contract to consume descriptor-defined
+- [x] Update the RISC-V runner or harness contract to consume descriptor-defined
       inputs from the golden bundle.
-- [ ] Capture actual RVV outputs or complete comparison metrics for at least f32
+- [x] Capture actual RVV outputs or complete comparison metrics for at least f32
       ReLU and f32 matmul smoke cases.
-- [ ] Compare RVV output against NumPy golden output at VLEN 256 and 512.
-- [ ] Optionally compare RVV output against host output for the same case.
-- [ ] Preserve profile-aware VLEN validation and executable-bit repair for
+- [x] Compare RVV output against NumPy golden output at VLEN 256 and 512.
+- [x] Optionally compare RVV output against host output for the same case.
+- [x] Preserve profile-aware VLEN validation and executable-bit repair for
       downloaded CI artifacts.
-- [ ] Emit stable result lines with pass/fail, max error, mismatch count, VLEN,
+- [x] Emit stable result lines with pass/fail, max error, mismatch count, VLEN,
       and case name.
-- [ ] Update `.github/workflows/ci-rvv-sim.yml` to run the golden-backed RVV
+- [x] Update `.github/workflows/ci-rvv-sim.yml` to run the golden-backed RVV
       verification cases.
 
 ## Dependencies
@@ -52,6 +52,21 @@ python tests/verify.py --target riscv_rvv_256 --case <case> --vlens 256 512
 ctest --test-dir build --output-on-failure
 ```
 
+Verified on 2026-06-08:
+
+```bash
+.venv/bin/pytest tests/test_golden_verify.py
+.venv/bin/ruff check .
+.venv/bin/ruff format --check .
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DLLVM_DIR=/usr/lib/llvm-21/lib/cmake/llvm -DMLIR_DIR=/usr/lib/llvm-21/lib/cmake/mlir -DLIT_COMMAND=/workspace/.venv/bin/lit
+cmake --build build --parallel
+ctest --test-dir build --output-on-failure
+./scripts/setup-rvv-sim.sh
+python3 tests/verify.py --case tests/golden/cases/relu_f32_smoke.json --target riscv_rvv_256 --riscv-runner build-rvv/bin/riscv-golden-runner --host-runner build-rvv/bin/host-reference-runner --qemu qemu-riscv64 --vlens 256 512 --output-dir build/golden-rvv --report build/golden-rvv/relu_riscv_report.json
+python3 tests/verify.py --case tests/golden/cases/matmul_f32_smoke.json --target riscv_rvv_256 --riscv-runner build-rvv/bin/riscv-golden-runner --host-runner build-rvv/bin/host-reference-runner --qemu qemu-riscv64 --vlens 256 512 --output-dir build/golden-rvv --report build/golden-rvv/matmul_riscv_report.json
+PYTHON=.venv/bin/python ./scripts/run-tests.sh --riscv-functional
+```
+
 ## Notes
 
 - This task replaces handwritten embedded expected constants with generated
@@ -63,3 +78,11 @@ ctest --test-dir build --output-on-failure
 
 ### 2026-06-07
 - Created as the RISC-V execution leg of the DES-013 verification design.
+
+### 2026-06-08
+- Implemented descriptor-backed RISC-V golden verification through
+  `tests/riscv_runner.py` and `tests/verify.py`, including VLEN 256/512 QEMU
+  runs, NumPy golden comparison, optional host comparison, executable-bit
+  repair, and stable JSON result lines.
+- Updated RVV CI and `./scripts/run-tests.sh --riscv-functional` to build the
+  runner artifacts and execute the f32 ReLU and f32 matmul smoke cases.

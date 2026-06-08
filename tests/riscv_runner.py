@@ -53,9 +53,7 @@ def validate_vlens(profile: str, vlens: tuple[int, ...] | list[int] | None) -> t
     minimum = profile_min_vlen(profile)
     for vlen in selected:
         if vlen < minimum:
-            raise RiscVRunnerError(
-                f"VLEN {vlen} is below {profile} minimum VLEN {minimum}"
-            )
+            raise RiscVRunnerError(f"VLEN {vlen} is below {profile} minimum VLEN {minimum}")
     return selected
 
 
