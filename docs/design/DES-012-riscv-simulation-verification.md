@@ -4,10 +4,10 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Draft |
+| **Status** | Accepted |
 | **Author** | KernelSmith Team |
 | **Created** | 2026-06-06 |
-| **Related** | DES-006, DES-007, DES-009, DES-011, DES-013, TASK-006 |
+| **Related** | DES-006, DES-007, DES-009, DES-011, DES-013, TASK-006, TASK-009 |
 
 ## Context
 
@@ -230,18 +230,18 @@ fast generated-kernel correctness.
 
 ### Phase 1: QEMU User-Mode Correctness
 
-- [ ] Rename or replace `tests/qemu_runner.py` with a profile-aware
+- [x] Rename or replace `tests/qemu_runner.py` with a profile-aware
       `tests/riscv_runner.py`.
-- [ ] Change default `riscv_rvv_256` VLEN coverage to 256 and 512.
-- [ ] Add a generated matmul RVV harness with scalar reference comparison.
-- [ ] Link the generated object and harness into a static RISC-V Linux ELF.
-- [ ] Run the harness under QEMU user-mode in CI.
+- [x] Change default `riscv_rvv_256` VLEN coverage to 256 and 512.
+- [x] Add a generated matmul RVV harness with scalar reference comparison.
+- [x] Link the generated object and harness into a static RISC-V Linux ELF.
+- [x] Run the harness under QEMU user-mode in CI.
 
 ### Phase 2: Benchmark Reporting
 
-- [ ] Standardize `TIME_NS`, `MAX_ABS_ERROR`, and `PASS` output markers.
-- [ ] Add benchmark mode to the runner.
-- [ ] Upload benchmark logs as CI artifacts.
+- [x] Standardize machine-readable correctness and benchmark report fields.
+- [x] Add benchmark mode to descriptor-backed verification.
+- [x] Upload benchmark reports as CI artifacts.
 
 ### Phase 3: Spike Reference Path
 
@@ -259,13 +259,20 @@ fast generated-kernel correctness.
 
 ## Review History
 
-### Review 1 (pending)
+### Review 1 (2026-06-09)
 
-**Reviewer**: TBD
-**Decision**: Pending
+**Reviewer**: KernelSmith task review
+**Decision**: Accepted
 
 **Feedback**:
-- Pending review.
+- QEMU user-mode remains the required simulator tier for PR-scale generated
+  kernel correctness.
+- The golden-reference flow from `DES-013` now supplies the comparison contract
+  for both host and RISC-V executions.
+- Benchmark output should be treated as reproducible reporting, not hardware
+  performance truth.
 
 **Resolution**:
-- Pending review.
+- Accepted. `TASK-006`, `TASK-010`, `TASK-011`, and `TASK-012` implement the
+  required M4 QEMU/golden/benchmark paths. Spike, QEMU system-mode, gem5, and
+  Renode remain follow-on scopes.

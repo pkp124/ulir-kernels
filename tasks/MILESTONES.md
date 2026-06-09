@@ -20,16 +20,20 @@ milestone should show status, task links, blockers, and the next concrete work.
 | M1 — C API + Reference Library | Done | Covered by roadmap history | Add new C APIs through milestone-specific tasks. |
 | M2 — Activation Lowering | Partial | Covered by roadmap history | Track generated-object integration when resumed. |
 | M3 — Generic MatMul Lowering | Partial | `TASK-004` | Track generated matmul replacement separately if prioritized. |
-| M4 — RISC-V RVV Target | Active | `TASK-005`, `TASK-006`, `TASK-009`, `TASK-010`, `TASK-011`, `TASK-012` | Review `TASK-009` simulation plan and keep RVV validation reports green. |
-| M5 — RISC-V Quantization Foundation | Planned | `TASK-007` | Split `TASK-007` into ABI/layout, golden quantized cases, target-profile, and lowering child tasks. |
-| M6 — Transformer Minimum Kernel Set | Planned | `TASK-008` | Add elementwise ops and transformer helper C APIs. |
+| M4 — RISC-V RVV Target | Done | `TASK-005`, `TASK-006`, `TASK-009`, `TASK-010`, `TASK-011`, `TASK-012` | Keep RVV validation reports green as new kernels land. |
+| M5 — RISC-V Quantization Foundation | Active | `TASK-007`, `TASK-013`, `TASK-014`, `TASK-015`, `TASK-016`, `TASK-017` | Start `TASK-013` ABI/layout, then `TASK-014` golden quantized cases. |
+| M6 — Transformer Minimum Kernel Set | Planned | `TASK-008` | Start after M5 dot/GEMV ABI and validation policy are stable. |
 | M7 — Minimal RISC-V Transformer Demo | Planned | Not created | Create tasks after M5/M6 interfaces stabilize. |
 
 ## Active focus
 
-1. `TASK-009`: review and close the RISC-V simulation verification design.
-2. `TASK-007`: split and start M5 quantization now that `TASK-006` is complete.
-3. `TASK-008`: start M6 transformer helpers after quantized layout decisions are
+1. `TASK-013`: define i8/W4A8 public C APIs and packed layouts for dot/GEMV.
+2. `TASK-014`: extend golden-reference validation for quantized dot/GEMV/GEMM.
+3. `TASK-015`: add RVV quantized profile parameters after ABI/layout choices are
+   concrete.
+4. `TASK-016` and `TASK-017`: implement INT8 and W4A8 lowering once ABI,
+   validation, and profile inputs are ready.
+5. `TASK-008`: start M6 transformer helpers after quantized layout decisions are
    stable enough for public C APIs.
 
 ## Maintenance rules
