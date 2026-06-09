@@ -232,7 +232,10 @@ jobs:
             --qemu qemu-riscv64 \
             --vlens ${{ matrix.vlen }} \
             --output-dir build/golden-rvv \
-            --report build/golden-rvv/matmul_vlen_${{ matrix.vlen }}.json
+            --report build/golden-rvv/matmul_vlen_${{ matrix.vlen }}.json \
+            --benchmark \
+            --benchmark-runs 3 \
+            --benchmark-warmup 1
 
       - name: Upload RVV verification reports
         if: always()

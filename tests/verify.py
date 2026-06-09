@@ -8,6 +8,7 @@ import json
 import math
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -265,6 +266,162 @@ def _run_host_reference(
     ]
 
 
+def _summarize_timing(
+    *,
+    case: CaseDescriptor,
+    target: str,
+    samples_ns: list[int],
+    command: list[str],
+    warmup_runs: int,
+    vlen: int | None = None,
+) -> dict[str, Any]:
+    sorted_samples = sorted(samples_ns)
+    midpoint = len(sorted_samples) // 2
+    if len(sorted_samples) % 2 == 0:
+        median_ns = (sorted_samples[midpoint - 1] + sorted_samples[midpoint]) // 2
+    else:
+        median_ns = sorted_samples[midpoint]
+
+    benchmark = {
+        "kind": "kernelsmith_benchmark",
+        "case": case.name,
+        "target": target,
+        "kernel": case.kernel,
+        "warmup_runs": warmup_runs,
+        "timed_runs": len(samples_ns),
+        "samples_ns": samples_ns,
+        "min_ns": min(samples_ns),
+        "median_ns": median_ns,
+        "avg_ns": sum(samples_ns) // len(samples_ns),
+        "max_ns": max(samples_ns),
+        "command": command,
+    }
+    if vlen is not None:
+        benchmark["vlen"] = vlen
+    return benchmark
+
+
+def _benchmark_host_reference(
+    *,
+    case: CaseDescriptor,
+    manifest: dict[str, Any],
+    bundle_dir: Path,
+    output_dir: Path,
+    host_runner: Path,
+    runs: int,
+    warmup: int,
+) -> dict[str, Any]:
+    if not host_runner.exists():
+        raise VerifyError(f"host runner not found: {host_runner}")
+
+    case_dir = output_dir / case.name / "host_reference" / "benchmark"
+    raw_dir = case_dir / "raw"
+    case_dir.mkdir(parents=True, exist_ok=True)
+    raw_dir.mkdir(parents=True, exist_ok=True)
+
+    output = case.outputs[0]
+    raw_output = raw_dir / f"actual_{output.name}.f32"
+    command = [
+        str(host_runner),
+        *_case_runner_args(
+            case=case,
+            manifest=manifest,
+            bundle_dir=bundle_dir,
+            raw_dir=raw_dir,
+            raw_output=raw_output,
+        ),
+    ]
+
+    samples_ns: list[int] = []
+    for iteration in range(warmup + runs):
+        start_ns = time.perf_counter_ns()
+        completed = subprocess.run(command, check=False, capture_output=True, text=True)
+        elapsed_ns = time.perf_counter_ns() - start_ns
+        if completed.returncode != 0:
+            raise VerifyError(
+                "host benchmark failed with exit code "
+                f"{completed.returncode}: {completed.stderr.strip()}"
+            )
+        if iteration >= warmup:
+            samples_ns.append(elapsed_ns)
+
+    return _summarize_timing(
+        case=case,
+        target="host_reference",
+        samples_ns=samples_ns,
+        command=command,
+        warmup_runs=warmup,
+    )
+
+
+def _benchmark_riscv_reference(
+    *,
+    case: CaseDescriptor,
+    target: str,
+    manifest: dict[str, Any],
+    bundle_dir: Path,
+    output_dir: Path,
+    riscv_runner: Path,
+    qemu_binary: str,
+    vlens: tuple[int, ...],
+    timeout: int,
+    runs: int,
+    warmup: int,
+) -> list[dict[str, Any]]:
+    if not riscv_runner.exists():
+        raise VerifyError(f"RISC-V runner not found: {riscv_runner}")
+
+    try:
+        runner = RiscVRunner(qemu_binary)
+    except RiscVRunnerError as error:
+        raise VerifyError(str(error)) from error
+
+    benchmarks = []
+    output = case.outputs[0]
+    for vlen in vlens:
+        case_dir = output_dir / case.name / target / f"vlen_{vlen}" / "benchmark"
+        raw_dir = case_dir / "raw"
+        case_dir.mkdir(parents=True, exist_ok=True)
+        raw_dir.mkdir(parents=True, exist_ok=True)
+
+        raw_output = raw_dir / f"actual_{output.name}.f32"
+        args = _case_runner_args(
+            case=case,
+            manifest=manifest,
+            bundle_dir=bundle_dir,
+            raw_dir=raw_dir,
+            raw_output=raw_output,
+        )
+
+        samples_ns: list[int] = []
+        command: list[str] = []
+        for iteration in range(warmup + runs):
+            start_ns = time.perf_counter_ns()
+            run_result = runner.run(riscv_runner, vlen=vlen, args=args, timeout=timeout)
+            elapsed_ns = time.perf_counter_ns() - start_ns
+            command = run_result.command
+            if not run_result.success:
+                raise VerifyError(
+                    "RISC-V benchmark failed with exit code "
+                    f"{run_result.return_code}: {run_result.stderr.strip()}"
+                )
+            if iteration >= warmup:
+                samples_ns.append(elapsed_ns)
+
+        benchmarks.append(
+            _summarize_timing(
+                case=case,
+                target=target,
+                samples_ns=samples_ns,
+                command=command,
+                warmup_runs=warmup,
+                vlen=vlen,
+            )
+        )
+
+    return benchmarks
+
+
 def _failure_result(
     *,
     case: CaseDescriptor,
@@ -510,6 +667,97 @@ def verify_case(
     raise VerifyError(f"unsupported target: {target}")
 
 
+def benchmark_case(
+    *,
+    case_path: Path,
+    target: str,
+    manifest_dir: Path,
+    output_dir: Path,
+    host_runner: Path | None,
+    riscv_runner: Path | None = None,
+    qemu_binary: str = "qemu-riscv64",
+    vlens: tuple[int, ...] | list[int] | None = None,
+    timeout: int = 60,
+    runs: int = 5,
+    warmup: int = 2,
+) -> list[dict[str, Any]]:
+    if runs <= 0:
+        raise VerifyError("benchmark runs must be positive")
+    if warmup < 0:
+        raise VerifyError("benchmark warmup must be non-negative")
+
+    case = load_case_descriptor(case_path)
+    if target not in case.targets:
+        raise VerifyError(f"target {target} is not declared by case {case.name}")
+
+    manifest_path = _manifest_path(case, manifest_dir)
+    manifest = validate_manifest(manifest_path)
+    _validate_descriptor_hash(case, manifest)
+    bundle_dir = manifest_path.parent
+
+    if target == "host_reference":
+        runner = host_runner or _find_default_host_runner()
+        if runner is None:
+            raise VerifyError("host runner not found; pass --host-runner or build CTest targets")
+        return [
+            _benchmark_host_reference(
+                case=case,
+                manifest=manifest,
+                bundle_dir=bundle_dir,
+                output_dir=output_dir,
+                host_runner=runner,
+                runs=runs,
+                warmup=warmup,
+            )
+        ]
+
+    if target.startswith("riscv_rvv_"):
+        selected_vlens = tuple(vlens or case.vlens or manifest.get("vlens") or DEFAULT_RVV_VLENS)
+        try:
+            selected_vlens = validate_vlens(target, selected_vlens)
+        except RiscVRunnerError as error:
+            raise VerifyError(str(error)) from error
+
+        resolved_host_runner = host_runner or _find_default_host_runner()
+        if resolved_host_runner is None:
+            raise VerifyError(
+                "host runner not found; benchmark reports require a generic/reference baseline"
+            )
+        runner = riscv_runner or _find_default_riscv_runner()
+        if runner is None:
+            raise VerifyError("RISC-V runner not found; pass --riscv-runner or build CI artifacts")
+
+        benchmarks = [
+            _benchmark_host_reference(
+                case=case,
+                manifest=manifest,
+                bundle_dir=bundle_dir,
+                output_dir=output_dir,
+                host_runner=resolved_host_runner,
+                runs=runs,
+                warmup=warmup,
+            )
+        ]
+        benchmarks.extend(
+            _benchmark_riscv_reference(
+                case=case,
+                target=target,
+                manifest=manifest,
+                bundle_dir=bundle_dir,
+                output_dir=output_dir,
+                riscv_runner=runner,
+                qemu_binary=qemu_binary,
+                vlens=selected_vlens,
+                timeout=timeout,
+                runs=runs,
+                warmup=warmup,
+            )
+        )
+        return benchmarks
+
+    raise VerifyError(f"unsupported target: {target}")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--case", required=True, type=Path, help="Path to a case descriptor JSON")
@@ -540,6 +788,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--vlens", nargs="+", type=int, help="RVV VLEN values to run")
     parser.add_argument("--timeout", type=int, default=60, help="Per-QEMU-run timeout seconds")
     parser.add_argument(
+        "--benchmark",
+        action="store_true",
+        help="Record generic/reference and target timing samples in the JSON report",
+    )
+    parser.add_argument("--benchmark-runs", type=int, default=5, help="Timed benchmark repetitions")
+    parser.add_argument("--benchmark-warmup", type=int, default=2, help="Untimed warmup repetitions")
+    parser.add_argument(
         "--report",
         type=Path,
         help="Optional JSON report path; defaults under --output-dir",
@@ -558,6 +813,21 @@ def main(argv: list[str] | None = None) -> int:
             vlens=args.vlens,
             timeout=args.timeout,
         )
+        benchmarks = []
+        if args.benchmark and all(result["passed"] for result in results):
+            benchmarks = benchmark_case(
+                case_path=args.case,
+                target=args.target,
+                manifest_dir=args.manifest_dir,
+                output_dir=args.output_dir,
+                host_runner=args.host_runner,
+                riscv_runner=args.riscv_runner,
+                qemu_binary=args.qemu,
+                vlens=args.vlens,
+                timeout=args.timeout,
+                runs=args.benchmark_runs,
+                warmup=args.benchmark_warmup,
+            )
     except Exception as error:
         result = {
             "kind": "kernelsmith_result",
@@ -576,6 +846,8 @@ def main(argv: list[str] | None = None) -> int:
         "passed": all(result["passed"] for result in results),
         "results": results,
     }
+    if args.benchmark:
+        report["benchmarks"] = benchmarks
     report_path = args.report or args.output_dir / f"{args.case.stem}_{args.target}_report.json"
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text(json.dumps(_json_safe(report), indent=2, sort_keys=True) + "\n")

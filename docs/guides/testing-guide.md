@@ -241,6 +241,11 @@ bits on downloaded runner artifacts, writes per-VLEN `actual_<name>.npy`
 outputs, and emits JSON lines with case name, VLEN, pass/fail status, max error,
 and mismatch count.
 
+Add `--benchmark --benchmark-runs 3 --benchmark-warmup 1` to record
+`benchmarks` in the JSON report. For RISC-V targets, benchmark reports include
+the host/reference runner plus each selected RVV VLEN so generic/reference and
+RVV path timings are captured in one reproducible artifact.
+
 To add a new f32 smoke case:
 
 1. Add a descriptor in `tests/golden/cases/`.
