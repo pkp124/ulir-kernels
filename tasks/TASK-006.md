@@ -1,7 +1,7 @@
 # TASK-006: Validate RVV Correctness and Benchmark Path
 
 ## Status
-[~] In Progress
+[x] Complete
 
 ## Priority
 P0 (Milestone Blocking)
@@ -26,7 +26,7 @@ vectorize, and lower-to-RVV compiler pipeline is implemented.
 - [x] Generated RVV matmul binary runs under QEMU for at least one supported VLEN.
 - [x] QEMU correctness compares generated RVV output against the NumPy/framework
       golden reference or a golden-validated host output.
-- [ ] Benchmark reports generic/reference vs RVV path results in a reproducible format.
+- [x] Benchmark reports generic/reference vs RVV path results in a reproducible format.
 - [x] Non-divisible `N` or tail behavior is either supported with tests or rejected
       with clear diagnostics.
 - [x] Documentation records required local tooling when QEMU/cross-compiler is not
@@ -47,13 +47,18 @@ vectorize, and lower-to-RVV compiler pipeline is implemented.
 ## Verification
 
 ```bash
+.venv/bin/pytest tests/test_golden_verify.py
+.venv/bin/ruff check .
+.venv/bin/ruff format --check .
+./scripts/setup.sh
+cmake --build build --parallel
 ctest --test-dir build --output-on-failure
-./scripts/compile-rvv.sh <input.mlir> <output.o>
-python tests/qemu_runner.py --help
+python3 tests/verify.py --case tests/golden/cases/matmul_f32_smoke.json --target host_reference --host-runner build/tests/host_reference/host-reference-runner --output-dir build/golden-benchmark-check --report build/golden-benchmark-check/matmul_host_benchmark_report.json --benchmark --benchmark-runs 3 --benchmark-warmup 1
+./scripts/setup-rvv-sim.sh
+PYTHON=.venv/bin/python ./scripts/run-tests.sh --riscv-functional
 ```
 
-Run QEMU execution tests when `qemu-riscv64` and a RISC-V cross toolchain are
-available. If unavailable, record the missing tools in the task log and PR body.
+Docker parity remains optional when `docker` is unavailable.
 
 ## Notes
 
@@ -95,3 +100,18 @@ available. If unavailable, record the missing tools in the task log and PR body.
 - Docker parity was not run because `docker` is not installed in this VM.
 - Remaining open `TASK-006` item: benchmark reports for generic/reference vs
   RVV paths in a reproducible format.
+
+### 2026-06-09
+- Added opt-in benchmark reporting to `tests/verify.py`; JSON reports now include
+  `kernelsmith_benchmark` entries with command, warmup/timed run counts,
+  per-run `samples_ns`, and min/median/avg/max timing summaries.
+- Updated `./scripts/run-tests.sh --riscv-functional` and RVV CI matmul
+  verification to emit one reproducible report containing the host/reference
+  baseline and RVV VLEN 256/512 benchmark samples.
+- Verified the real RISC-V path with QEMU after `./scripts/setup-rvv-sim.sh`;
+  `build/rvv-functional/actual/matmul_riscv_report.json` contains host,
+  VLEN 256, and VLEN 512 benchmark entries and passing golden comparisons.
+- Verified with focused pytest, ruff lint/format, setup/build, full CTest, host
+  benchmark report generation, and `PYTHON=.venv/bin/python ./scripts/run-tests.sh
+  --riscv-functional`.
+- Docker parity was not run because `docker` is not installed in this VM.

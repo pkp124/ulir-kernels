@@ -80,7 +80,7 @@ Progress updates with dates.
 | TASK-003 | M0/M3 | Implement matmul operation | Complete | P1 |
 | TASK-004 | M3/M4 | Implement tiling and vectorization passes | Complete | P1 |
 | TASK-005 | M4 | Implement RVV lowering pipeline | Complete | P1 |
-| TASK-006 | M4 | Validate RVV correctness and benchmark path | In Progress | P0 |
+| TASK-006 | M4 | Validate RVV correctness and benchmark path | Complete | P0 |
 | TASK-009 | M4 | Plan RISC-V simulation verification | Needs Review | P1 |
 | TASK-010 | M4 | Build golden reference verification infrastructure | Complete | P0 |
 | TASK-011 | M4 | Add host reference execution comparator | Complete | P1 |

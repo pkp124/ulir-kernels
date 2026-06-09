@@ -793,7 +793,9 @@ def main(argv: list[str] | None = None) -> int:
         help="Record generic/reference and target timing samples in the JSON report",
     )
     parser.add_argument("--benchmark-runs", type=int, default=5, help="Timed benchmark repetitions")
-    parser.add_argument("--benchmark-warmup", type=int, default=2, help="Untimed warmup repetitions")
+    parser.add_argument(
+        "--benchmark-warmup", type=int, default=2, help="Untimed warmup repetitions"
+    )
     parser.add_argument(
         "--report",
         type=Path,
