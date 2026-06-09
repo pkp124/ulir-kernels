@@ -19,17 +19,17 @@ vectorize, and lower-to-RVV compiler pipeline is implemented.
 
 ## Acceptance Criteria
 
-- [ ] Golden-reference infrastructure exists for deterministic NumPy/framework
+- [x] Golden-reference infrastructure exists for deterministic NumPy/framework
       inputs, expected outputs, metadata, and comparison policy.
-- [ ] Host/x86 output is verified against the golden reference for at least one
+- [x] Host/x86 output is verified against the golden reference for at least one
       representative kernel.
-- [ ] Generated RVV matmul binary runs under QEMU for at least one supported VLEN.
-- [ ] QEMU correctness compares generated RVV output against the NumPy/framework
+- [x] Generated RVV matmul binary runs under QEMU for at least one supported VLEN.
+- [x] QEMU correctness compares generated RVV output against the NumPy/framework
       golden reference or a golden-validated host output.
 - [ ] Benchmark reports generic/reference vs RVV path results in a reproducible format.
-- [ ] Non-divisible `N` or tail behavior is either supported with tests or rejected
+- [x] Non-divisible `N` or tail behavior is either supported with tests or rejected
       with clear diagnostics.
-- [ ] Documentation records required local tooling when QEMU/cross-compiler is not
+- [x] Documentation records required local tooling when QEMU/cross-compiler is not
       available by default.
 
 ## Dependencies
@@ -80,3 +80,18 @@ available. If unavailable, record the missing tools in the task log and PR body.
   validation before adding more RVV or fixed-point kernels.
 - Split scalable verification work into `TASK-010`, `TASK-011`, and `TASK-012`
   following `DES-013`.
+
+### 2026-06-09
+- Selected the remaining `TASK-006` tail-validation slice after `TASK-010`,
+  `TASK-011`, and `TASK-012` completed the golden, host, and RVV correctness
+  criteria.
+- Added an explicit `--ks-pack` diagnostic for static matmul RHS dimensions
+  where `N` is not divisible by `pack-factor`; unsupported packed tails are now
+  rejected instead of silently leaving `linalg.matmul` unpacked.
+- Verified with:
+  `build/bin/ks-opt tests/lit/Passes/pack-invalid.mlir --ks-pack -split-input-file -verify-diagnostics`,
+  `cmake --build build --parallel`, and
+  `ctest --test-dir build --output-on-failure`.
+- Docker parity was not run because `docker` is not installed in this VM.
+- Remaining open `TASK-006` item: benchmark reports for generic/reference vs
+  RVV paths in a reproducible format.
