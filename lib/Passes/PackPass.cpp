@@ -106,8 +106,6 @@ struct PackMatmulBPattern : public OpRewritePattern<linalg::MatmulOp> {
                                         /*paddingValue=*/std::optional<Value>{},
                                         /*outerDimsPerm=*/outerDimsPerm);
 
-    int64_t M = cType.getDimSize(0);
-
     // === Packed matmul as linalg.generic ===
     //
     // Indexing maps for packed GEMM with B in [numPanels, K, NR] layout:
@@ -194,7 +192,8 @@ struct KSPackPass : impl::KSPackPassBase<KSPackPass> {
   using KSPackPassBase::KSPackPassBase;
 
   void runOnOperation() override {
-    if (packFactor == 0)
+    int64_t factor = packFactor.getValue();
+    if (factor == 0)
       return; // no-op
 
     bool hasUnsupportedTail = false;
@@ -204,10 +203,10 @@ struct KSPackPass : impl::KSPackPassBase<KSPackPass> {
         return;
 
       int64_t N = bType.getDimSize(1);
-      if (N % packFactor != 0) {
+      if (N % factor != 0) {
         matmul.emitOpError()
             << "requires rhs N dimension (" << N
-            << ") to be divisible by pack-factor (" << packFactor
+            << ") to be divisible by pack-factor (" << factor
             << "); tail handling is not supported by --ks-pack";
         hasUnsupportedTail = true;
       }
@@ -218,7 +217,7 @@ struct KSPackPass : impl::KSPackPassBase<KSPackPass> {
     }
 
     RewritePatternSet patterns(&getContext());
-    patterns.add<PackMatmulBPattern>(&getContext(), packFactor);
+    patterns.add<PackMatmulBPattern>(&getContext(), factor);
 
     if (failed(applyPatternsGreedily(getOperation(), std::move(patterns))))
       signalPassFailure();
