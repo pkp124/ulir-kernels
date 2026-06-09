@@ -197,6 +197,26 @@ struct KSPackPass : impl::KSPackPassBase<KSPackPass> {
     if (packFactor == 0)
       return; // no-op
 
+    bool hasUnsupportedTail = false;
+    getOperation()->walk([&](linalg::MatmulOp matmul) {
+      auto bType = dyn_cast<RankedTensorType>(matmul.getOperand(1).getType());
+      if (!bType || !bType.hasStaticShape())
+        return;
+
+      int64_t N = bType.getDimSize(1);
+      if (N % packFactor != 0) {
+        matmul.emitOpError()
+            << "requires rhs N dimension (" << N
+            << ") to be divisible by pack-factor (" << packFactor
+            << "); tail handling is not supported by --ks-pack";
+        hasUnsupportedTail = true;
+      }
+    });
+    if (hasUnsupportedTail) {
+      signalPassFailure();
+      return;
+    }
+
     RewritePatternSet patterns(&getContext());
     patterns.add<PackMatmulBPattern>(&getContext(), packFactor);
 
