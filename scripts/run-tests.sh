@@ -215,7 +215,10 @@ run_riscv_functional_tests() {
         --qemu qemu-riscv64 \
         --vlens "${vlen_args[@]}" \
         --output-dir "${output_dir}" \
-        --report "${output_dir}/matmul_riscv_report.json"
+        --report "${output_dir}/matmul_riscv_report.json" \
+        --benchmark \
+        --benchmark-runs 3 \
+        --benchmark-warmup 1
 }
 
 # Run tests based on flags

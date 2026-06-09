@@ -14,7 +14,7 @@ from tests.golden.schema import (
     validate_manifest,
 )
 from tests.test_data_generator import TestDataGenerator
-from tests.verify import VerifyError, _json_safe, verify_case
+from tests.verify import VerifyError, _json_safe, benchmark_case, verify_case
 
 CASES_DIR = Path(__file__).parent / "golden" / "cases"
 
@@ -212,6 +212,45 @@ def test_verify_riscv_runs_qemu_vlens_and_compares_host_output(tmp_path: Path) -
     assert all(result["compare"]["mismatch_count"] == 0 for result in results)
     assert all(result["host_compare"]["mismatch_count"] == 0 for result in results)
     assert riscv_runner.stat().st_mode & stat.S_IXUSR
+
+
+def test_benchmark_case_reports_host_and_riscv_samples(tmp_path: Path) -> None:
+    descriptor_path = CASES_DIR / "matmul_f32_smoke.json"
+    descriptor = load_case_descriptor(descriptor_path)
+    manifest_path = generate_bundle(
+        descriptor,
+        tmp_path / "generated",
+        descriptor_path=descriptor_path,
+    )
+    host_runner = _write_fake_descriptor_runner(tmp_path, "fake-host-runner", executable=True)
+    riscv_runner = _write_fake_descriptor_runner(tmp_path, "fake-riscv-runner", executable=False)
+
+    benchmarks = benchmark_case(
+        case_path=descriptor_path,
+        target="riscv_rvv_256",
+        manifest_dir=manifest_path.parent.parent,
+        output_dir=tmp_path / "actual",
+        host_runner=host_runner,
+        riscv_runner=riscv_runner,
+        qemu_binary=str(_write_fake_qemu(tmp_path)),
+        vlens=(256, 512),
+        timeout=5,
+        runs=2,
+        warmup=1,
+    )
+
+    assert [benchmark["target"] for benchmark in benchmarks] == [
+        "host_reference",
+        "riscv_rvv_256",
+        "riscv_rvv_256",
+    ]
+    assert {benchmark.get("vlen") for benchmark in benchmarks[1:]} == {256, 512}
+    assert all(benchmark["kind"] == "kernelsmith_benchmark" for benchmark in benchmarks)
+    assert all(benchmark["timed_runs"] == 2 for benchmark in benchmarks)
+    assert all(len(benchmark["samples_ns"]) == 2 for benchmark in benchmarks)
+    assert all(benchmark["min_ns"] <= benchmark["median_ns"] for benchmark in benchmarks)
+    assert all(benchmark["median_ns"] <= benchmark["max_ns"] for benchmark in benchmarks)
+    assert all(benchmark["command"] for benchmark in benchmarks)
 
 
 def test_verify_riscv_rejects_vlen_below_profile(tmp_path: Path) -> None:
