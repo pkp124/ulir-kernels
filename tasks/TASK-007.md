@@ -1,7 +1,7 @@
 # TASK-007: RISC-V Quantization Foundation
 
 ## Status
-[ ] Not Started
+[~] In Progress
 
 ## Priority
 P1 (High)
@@ -14,23 +14,28 @@ General or a future quantization-focused agent.
 
 ## Description
 
-Define and implement the metadata, C APIs, layouts, validation, and lowering
-foundation needed for INT8 and W4A8 RISC-V inference kernels.
+Parent tracker for the M5 quantization foundation. M5 defines and implements
+the metadata, C APIs, layouts, validation, and lowering foundation needed for
+INT8 and W4A8 RISC-V inference kernels.
 
 ## Acceptance Criteria
 
-- [ ] Add accumulator and quantization metadata needed for i8 and W4A8 lowering.
-- [ ] Define public C APIs and packed layouts for i8 and W4A8 dot/GEMV.
-- [ ] Implement INT8 lowering with i8 input, i32 accumulation, and requantization
-      where needed.
-- [ ] Implement W4A8 fused unpack/dequantize plus i32 or f32 accumulation.
-- [ ] Add RVV i8/W4A8 tile parameters and pack factors to target profiles.
-- [ ] Add NumPy validation for quantized dot, GEMV, and GEMM.
-- [ ] Add lit tests for quantized lowering and diagnostics.
+- [x] `ks.quantize` and `ks.dequantize` ops exist with verifier and lit
+      coverage for semantic conversion tests.
+- [ ] `TASK-013`: Define public C APIs and packed layouts for i8 and W4A8
+      dot/GEMV.
+- [ ] `TASK-014`: Add NumPy/golden validation for quantized dot, GEMV, and GEMM.
+- [ ] `TASK-015`: Add RVV i8/W4A8 tile parameters and pack factors to target
+      profiles.
+- [ ] `TASK-016`: Implement INT8 dot/GEMV lowering with i8 inputs, i32
+      accumulation, and requantization where needed.
+- [ ] `TASK-017`: Implement W4A8 fused unpack/dequantize plus i32 or f32
+      accumulation for RVV.
 
 ## Dependencies
 
 - TASK-006: RVV validation baseline
+- TASK-013 through TASK-017 for implementation slices
 - `specs/kernels/quantization.md`
 - `specs/targets/riscv-rvv.md`
 
@@ -48,9 +53,18 @@ the local or CI environment.
 ## Notes
 
 - Keep public ABI and packed layout documentation in sync with implementation.
-- Split large subtopics into child tasks if one PR becomes too broad.
+- This file is now a parent tracker; implementation should land through the
+  child tasks.
 
 ## Log
 
 ### 2026-06-06
 - Created from M5 roadmap tasks.
+
+### 2026-06-09
+- Started M5 after `TASK-006` completed the RVV validation baseline.
+- Split the broad parent into PR-sized child tasks: `TASK-013` ABI/layout,
+  `TASK-014` quantized golden validation, `TASK-015` target-profile parameters,
+  `TASK-016` INT8 lowering, and `TASK-017` W4A8 lowering.
+- Recorded existing `ks.quantize`/`ks.dequantize` TableGen, verifier, and lit
+  coverage as already complete M5 semantic-op work.

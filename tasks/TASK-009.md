@@ -1,7 +1,7 @@
 # TASK-009: Plan RISC-V Simulation Verification
 
 ## Status
-[?] Needs Review
+[x] Complete
 
 ## Priority
 P1 (High)
@@ -45,6 +45,12 @@ git status --short --branch
 ctest --test-dir build --output-on-failure
 ```
 
+Verified on 2026-06-09:
+
+```bash
+ctest --test-dir build --output-on-failure
+```
+
 ## Notes
 
 - This is a planning task. Implementation work for the first simulator runner
@@ -58,3 +64,10 @@ ctest --test-dir build --output-on-failure
 - Added `DES-012` with the simulation verification architecture.
 - Marked this task as needs review because the planning artifact is ready for
   design review before runner implementation begins.
+
+### 2026-06-09
+- Reviewed `DES-012` after `TASK-006`, `TASK-010`, `TASK-011`, and `TASK-012`
+  landed the QEMU user-mode, golden-reference, and benchmark-reporting paths.
+- Accepted the QEMU-first simulator tiering as the M4 verification policy.
+- Left Spike, QEMU system-mode, gem5, and Renode as future follow-up tasks only
+  when their validation scope becomes concrete.
