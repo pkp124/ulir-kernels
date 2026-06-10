@@ -1,7 +1,7 @@
 # TASK-013: Define Quantized Dot/GEMV C APIs and Layouts
 
 ## Status
-[ ] Not Started
+[x] Complete
 
 ## Priority
 P0 (Milestone Blocking)
@@ -26,14 +26,14 @@ This task is design/API work first. Lowering and generated-kernel
 implementation are tracked by later M5 child tasks.
 
 ## Acceptance Criteria
-- [ ] Add or update public headers for i8 and W4A8 dot/GEMV APIs.
-- [ ] Document input, weight, output, scale, zero-point, and accumulator types.
-- [ ] Define W4A8 nibble packing order, group/block size policy, and scale
+- [x] Add or update public headers for i8 and W4A8 dot/GEMV APIs.
+- [x] Document input, weight, output, scale, zero-point, and accumulator types.
+- [x] Define W4A8 nibble packing order, group/block size policy, and scale
       layout.
-- [ ] Define workspace query behavior and alignment requirements.
-- [ ] Add C API smoke tests for argument validation and any reference
+- [x] Define workspace query behavior and alignment requirements.
+- [x] Add C API smoke tests for argument validation and any reference
       implementation added in this task.
-- [ ] Update docs/specs so ABI and layout decisions are discoverable before
+- [x] Update docs/specs so ABI and layout decisions are discoverable before
       lowering work starts.
 
 ## Dependencies
@@ -50,6 +50,16 @@ ruff check .
 ruff format --check .
 ```
 
+Verified on 2026-06-10:
+
+```bash
+cmake --build build --parallel
+build/tests/capi/test-quantized
+ctest --test-dir build --output-on-failure
+.venv/bin/ruff check .
+.venv/bin/ruff format --check .
+```
+
 ## Notes
 - Prefer dot/GEMV before large GEMM because batch-1 transformer decode is the
   first optimization target.
@@ -60,3 +70,11 @@ ruff format --check .
 
 ### 2026-06-09
 - Created as the first M5 child task after `TASK-006` completed RVV validation.
+
+### 2026-06-10
+- Started implementation of the public quantized dot/GEMV C API and layout
+  contract.
+- Added `include/kernelsmith/ks_quantized.h`, scalar reference implementations,
+  C API smoke tests, and documentation for i8 and W4A8 dot/GEMV layouts.
+- Marked complete after build, focused C API smoke test, full CTest, and Python
+  lint/format checks passed.

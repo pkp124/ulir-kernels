@@ -22,7 +22,7 @@ INT8 and W4A8 RISC-V inference kernels.
 
 - [x] `ks.quantize` and `ks.dequantize` ops exist with verifier and lit
       coverage for semantic conversion tests.
-- [ ] `TASK-013`: Define public C APIs and packed layouts for i8 and W4A8
+- [x] `TASK-013`: Define public C APIs and packed layouts for i8 and W4A8
       dot/GEMV.
 - [ ] `TASK-014`: Add NumPy/golden validation for quantized dot, GEMV, and GEMM.
 - [ ] `TASK-015`: Add RVV i8/W4A8 tile parameters and pack factors to target
@@ -68,3 +68,7 @@ the local or CI environment.
   `TASK-016` INT8 lowering, and `TASK-017` W4A8 lowering.
 - Recorded existing `ks.quantize`/`ks.dequantize` TableGen, verifier, and lit
   coverage as already complete M5 semantic-op work.
+
+### 2026-06-10
+- Completed `TASK-013` with public i8/W4A8 dot/GEMV APIs, scalar reference
+  symbols, W4A8 layout helpers, smoke tests, and documentation.

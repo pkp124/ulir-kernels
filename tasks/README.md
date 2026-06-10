@@ -86,7 +86,7 @@ Progress updates with dates.
 | TASK-011 | M4 | Add host reference execution comparator | Complete | P1 |
 | TASK-012 | M4 | Compare RISC-V RVV outputs against golden references | Complete | P1 |
 | TASK-007 | M5 | RISC-V quantization foundation | In Progress | P1 |
-| TASK-013 | M5 | Define quantized dot/GEMV C APIs and layouts | Not Started | P0 |
+| TASK-013 | M5 | Define quantized dot/GEMV C APIs and layouts | Complete | P0 |
 | TASK-014 | M5 | Add quantized golden validation cases | Not Started | P0 |
 | TASK-015 | M5 | Add quantized RVV target profile parameters | Not Started | P1 |
 | TASK-016 | M5 | Implement INT8 dot/GEMV lowering | Not Started | P1 |
