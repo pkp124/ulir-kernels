@@ -85,6 +85,63 @@ Initial lowering will target linalg or vector forms:
 RVV lowering can later fuse quantize/dequantize with dot, GEMV, and matmul
 patterns to avoid materializing intermediate tensors.
 
+## Public C API Foundation
+
+The first quantized C APIs prioritize batch-1 decode dot/GEMV kernels:
+
+| Function | Inputs | Output | Accumulator | Notes |
+|---|---|---|---|---|
+| `ks_dot_i8` | int8 activations, int8 weights | `int32_t` scalar | i32 | Applies input and weight zero-points before accumulation. |
+| `ks_matvec_i8` | int8 activation vector, row-major int8 weights | `int32_t[rows]` | i32 | Weight matrix layout is `[rows, cols]` with an element stride between rows. |
+| `ks_dot_w4a8` | int8 activations, packed signed int4 weights | `float` scalar | f32 | Fuses activation scale, per-group weight scale, int4 unpack, and dot. |
+| `ks_matvec_w4a8` | int8 activation vector, row-major packed int4 weights | `float[rows]` | f32 | Primary batch-1 transformer decode ABI. |
+
+### INT8 Arithmetic
+
+INT8 dot/GEMV accumulates exactly into signed 32-bit outputs:
+
+```
+acc += (input[k] - input_zero_point) * (weight[k] - weight_zero_point)
+```
+
+Both zero-points must fit in `int8_t`. Requantization is intentionally outside
+the first ABI so lowering and validation can prove the accumulator contract
+before adding output quantization policy.
+
+### W4A8 Packed Weight Layout
+
+W4A8 weights are signed int4 values stored in two's-complement form. Two weights
+are packed per byte:
+
+```
+byte[k / 2] bits 0..3 = weight[k]     for even k
+byte[k / 2] bits 4..7 = weight[k + 1] for odd k
+```
+
+Rows are stored independently. A packed row contains `ceil(cols / 2)` bytes.
+For GEMV, `packed_stride_bytes` is the byte distance between packed rows.
+
+W4A8 scales are row-major by scale group. A row contains
+`ceil(cols / group_size)` f32 scales. For element `k`, the scale index is
+`k / group_size`. The first ABI uses signed int4 weights; `weight_zero_point`
+is supported for metadata completeness but is expected to be `0` for symmetric
+W4A8 models.
+
+The W4A8 mathematical contract is:
+
+```
+acc += ((input[k] - input_zero_point) * input_scale) *
+       ((unpack_i4(weight[k]) - weight_zero_point) *
+        weight_scales[k / group_size])
+```
+
+### Workspace and Alignment
+
+The generic reference implementation returns zero workspace for all quantized
+dot/GEMV workspace queries. Optimized target implementations may require
+workspace later, but must expose that through the same query functions before
+using caller-provided scratch memory.
+
 ## Test Cases
 
 1. Parse and print `ks.quantize` for f32 to i8 tensors.

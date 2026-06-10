@@ -8,6 +8,10 @@ add_executable(test-activations test_activations.c)
 target_link_libraries(test-activations PRIVATE kernelsmith m)
 add_test(NAME capi-activations COMMAND test-activations)
 
+add_executable(test-quantized test_quantized.c)
+target_link_libraries(test-quantized PRIVATE kernelsmith m)
+add_test(NAME capi-quantized COMMAND test-quantized)
+
 # Python numpy validation
 find_package(Python3 COMPONENTS Interpreter)
 if(Python3_FOUND)

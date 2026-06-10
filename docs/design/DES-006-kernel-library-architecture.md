@@ -576,6 +576,21 @@ if (lda == K) {
 | `ks_matmul_f16` | f16 | f16 | f16 | f32 internal | Accumulate in f32, truncate |
 | `ks_matmul_i8` | i8 | i8 | i32 | i32 | Quantized inference |
 
+#### Quantized Decode Kernel APIs
+
+| Function | Activation | Weight | Output | Accumulator | Layout |
+|----------|------------|--------|--------|-------------|--------|
+| `ks_dot_i8` | i8 | i8 | i32 scalar | i32 | Contiguous vectors |
+| `ks_matvec_i8` | i8 | i8 | i32 vector | i32 | Row-major weights with row stride |
+| `ks_dot_w4a8` | i8 | signed int4 | f32 scalar | f32 | Low-nibble-first packed weights |
+| `ks_matvec_w4a8` | i8 | signed int4 | f32 vector | f32 | Row-major packed rows plus per-group f32 scales |
+
+W4A8 rows pack two signed int4 weights per byte. The low nibble stores even
+`k`, the high nibble stores odd `k`, and each row owns
+`ceil(cols / group_size)` f32 scales. The performance path fuses int4 unpack,
+dequantization, and dot/GEMV compute instead of materializing dequantized
+weights.
+
 #### How Variants Are Generated
 
 One MLIR template, stamped per type:

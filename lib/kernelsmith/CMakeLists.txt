@@ -15,6 +15,7 @@ add_library(kernelsmith STATIC
   ks_common.c
   ks_matmul.c
   ks_activations.c
+  ks_quantized.c
 )
 
 # C99 for the kernel library (independent of C++17 used by MLIR code).
