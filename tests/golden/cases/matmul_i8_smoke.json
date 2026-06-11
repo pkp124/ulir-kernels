@@ -1,0 +1,59 @@
+{
+  "compare": {
+    "accumulator_dtype": "int32",
+    "atol": 0.0,
+    "input_scale": 1.0,
+    "input_zero_point": 2,
+    "mode": "quantized_exact",
+    "rounding": "none",
+    "rtol": 0.0,
+    "saturation": "int32",
+    "strict_dtype": true,
+    "strict_shape": true,
+    "weight_scale": 1.0,
+    "weight_zero_point": -1
+  },
+  "generator": {
+    "distribution": {
+      "high": 8,
+      "kind": "integers",
+      "low": -8
+    },
+    "function": "matmul_i8",
+    "kind": "numpy",
+    "seed": 307
+  },
+  "inputs": [
+    {
+      "dtype": "int8",
+      "name": "A",
+      "shape": [
+        2,
+        4
+      ]
+    },
+    {
+      "dtype": "int8",
+      "name": "B",
+      "shape": [
+        4,
+        3
+      ]
+    }
+  ],
+  "kernel": "matmul_i8",
+  "name": "matmul_i8_smoke",
+  "outputs": [
+    {
+      "dtype": "int32",
+      "name": "C",
+      "shape": [
+        2,
+        3
+      ]
+    }
+  ],
+  "targets": [
+    "host_reference"
+  ]
+}

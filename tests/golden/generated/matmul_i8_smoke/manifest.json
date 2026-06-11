@@ -1,0 +1,87 @@
+{
+  "case": "matmul_i8_smoke",
+  "compare": {
+    "accumulator_dtype": "int32",
+    "atol": 0.0,
+    "input_scale": 1.0,
+    "input_zero_point": 2,
+    "mode": "quantized_exact",
+    "rounding": "none",
+    "rtol": 0.0,
+    "saturation": "int32",
+    "strict_dtype": true,
+    "strict_shape": true,
+    "weight_scale": 1.0,
+    "weight_zero_point": -1
+  },
+  "descriptor": "tests/golden/cases/matmul_i8_smoke.json",
+  "descriptor_sha256": "1d9fd952d906a6d8d89b3c04cf8c5ae52fe2470f458b113db61919ca414c416b",
+  "generator": {
+    "backend": "numpy",
+    "backend_version": "2.4.6",
+    "distribution": {
+      "high": 8,
+      "kind": "integers",
+      "low": -8
+    },
+    "function": "matmul_i8",
+    "seed": 307
+  },
+  "kernel": "matmul_i8",
+  "packed_layouts": [],
+  "quantization_policy": {
+    "accumulator_dtype": "int32",
+    "input_scale": 1.0,
+    "input_zero_point": 2,
+    "rounding": "none",
+    "saturation": "int32",
+    "weight_scale": 1.0,
+    "weight_zero_point": -1
+  },
+  "schema_version": 1,
+  "targets": [
+    "host_reference"
+  ],
+  "tensors": [
+    {
+      "dtype": "int8",
+      "filename": "input_A.npy",
+      "layout": {},
+      "name": "A",
+      "role": "input",
+      "sha256": "12b20edd8aeb59d2468b1c6a52f9987e6399e646462cdb39e98679951e10396f",
+      "shape": [
+        2,
+        4
+      ],
+      "size_bytes": 8
+    },
+    {
+      "dtype": "int8",
+      "filename": "input_B.npy",
+      "layout": {},
+      "name": "B",
+      "role": "input",
+      "sha256": "ec674e04d033c939f1d0a31b6ca561fc18146ac467fe7863d9a07234ad416f41",
+      "shape": [
+        4,
+        3
+      ],
+      "size_bytes": 12
+    },
+    {
+      "dtype": "int32",
+      "filename": "expected_C.npy",
+      "layout": {},
+      "name": "C",
+      "role": "expected_output",
+      "sha256": "7b0571cd28b45842723090c3d243d71ad20086242dffe8b32ef4a717d5c9d50d",
+      "shape": [
+        2,
+        3
+      ],
+      "size_bytes": 24
+    }
+  ],
+  "vlens": []
+}

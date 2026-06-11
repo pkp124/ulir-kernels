@@ -67,6 +67,15 @@ def _product(shape: tuple[int, ...]) -> int:
     return total
 
 
+def _dtype_suffix(dtype: str) -> str:
+    return {
+        "float32": "f32",
+        "int8": "i8",
+        "uint8": "u8",
+        "int32": "i32",
+    }[dtype]
+
+
 def _tensor_entry(manifest: dict[str, Any], *, role: str, name: str) -> dict[str, Any]:
     for tensor in manifest["tensors"]:
         if tensor["role"] == role and tensor["name"] == name:
@@ -100,8 +109,9 @@ def _write_raw_input(
 ) -> Path:
     entry = _tensor_entry(manifest, role="input", name=tensor_name)
     array = _load_bundle_array(bundle_dir, entry)
-    raw_path = raw_dir / f"input_{tensor_name}.f32"
-    array.astype(np.float32, copy=False).tofile(raw_path)
+    dtype = np.dtype(entry["dtype"])
+    raw_path = raw_dir / f"input_{tensor_name}.{_dtype_suffix(entry['dtype'])}"
+    array.astype(dtype, copy=False).tofile(raw_path)
     return raw_path
 
 
@@ -190,6 +200,128 @@ def _case_runner_args(
             str(k),
         ]
 
+    if case.kernel == "dot_i8":
+        lhs, rhs = case.inputs
+        raw_lhs = _write_raw_input(
+            bundle_dir=bundle_dir,
+            raw_dir=raw_dir,
+            manifest=manifest,
+            tensor_name=lhs.name,
+        )
+        raw_rhs = _write_raw_input(
+            bundle_dir=bundle_dir,
+            raw_dir=raw_dir,
+            manifest=manifest,
+            tensor_name=rhs.name,
+        )
+        policy = case.compare.quantization
+        return [
+            "dot_i8",
+            str(raw_lhs),
+            str(raw_rhs),
+            str(raw_output),
+            str(lhs.shape[0]),
+            str(policy["input_zero_point"]),
+            str(policy["weight_zero_point"]),
+        ]
+
+    if case.kernel == "matvec_i8":
+        vector, weights = case.inputs
+        raw_vector = _write_raw_input(
+            bundle_dir=bundle_dir,
+            raw_dir=raw_dir,
+            manifest=manifest,
+            tensor_name=vector.name,
+        )
+        raw_weights = _write_raw_input(
+            bundle_dir=bundle_dir,
+            raw_dir=raw_dir,
+            manifest=manifest,
+            tensor_name=weights.name,
+        )
+        rows, cols = weights.shape
+        policy = case.compare.quantization
+        return [
+            "matvec_i8",
+            str(raw_vector),
+            str(raw_weights),
+            str(raw_output),
+            str(rows),
+            str(cols),
+            str(policy["input_zero_point"]),
+            str(policy["weight_zero_point"]),
+        ]
+
+    if case.kernel == "dot_w4a8":
+        vector, packed_weight, scales = case.inputs
+        raw_vector = _write_raw_input(
+            bundle_dir=bundle_dir,
+            raw_dir=raw_dir,
+            manifest=manifest,
+            tensor_name=vector.name,
+        )
+        raw_weight = _write_raw_input(
+            bundle_dir=bundle_dir,
+            raw_dir=raw_dir,
+            manifest=manifest,
+            tensor_name=packed_weight.name,
+        )
+        raw_scales = _write_raw_input(
+            bundle_dir=bundle_dir,
+            raw_dir=raw_dir,
+            manifest=manifest,
+            tensor_name=scales.name,
+        )
+        policy = case.compare.quantization
+        return [
+            "dot_w4a8",
+            str(raw_vector),
+            str(raw_weight),
+            str(raw_scales),
+            str(raw_output),
+            str(vector.shape[0]),
+            str(packed_weight.layout["group_size"]),
+            str(policy["input_scale"]),
+            str(policy["input_zero_point"]),
+            str(policy["weight_zero_point"]),
+        ]
+
+    if case.kernel == "matvec_w4a8":
+        vector, packed_weights, scales = case.inputs
+        raw_vector = _write_raw_input(
+            bundle_dir=bundle_dir,
+            raw_dir=raw_dir,
+            manifest=manifest,
+            tensor_name=vector.name,
+        )
+        raw_weights = _write_raw_input(
+            bundle_dir=bundle_dir,
+            raw_dir=raw_dir,
+            manifest=manifest,
+            tensor_name=packed_weights.name,
+        )
+        raw_scales = _write_raw_input(
+            bundle_dir=bundle_dir,
+            raw_dir=raw_dir,
+            manifest=manifest,
+            tensor_name=scales.name,
+        )
+        rows, cols = packed_weights.layout["logical_shape"]
+        policy = case.compare.quantization
+        return [
+            "matvec_w4a8",
+            str(raw_vector),
+            str(raw_weights),
+            str(raw_scales),
+            str(raw_output),
+            str(rows),
+            str(cols),
+            str(packed_weights.layout["group_size"]),
+            str(policy["input_scale"]),
+            str(policy["input_zero_point"]),
+            str(policy["weight_zero_point"]),
+        ]
+
     raise VerifyError(f"target runner does not support kernel {case.kernel}")
 
 
@@ -210,7 +342,7 @@ def _run_host_reference(
     raw_dir.mkdir(parents=True, exist_ok=True)
 
     output = case.outputs[0]
-    raw_output = raw_dir / f"actual_{output.name}.f32"
+    raw_output = raw_dir / f"actual_{output.name}.{_dtype_suffix(output.dtype)}"
     command = [
         str(host_runner),
         *_case_runner_args(
@@ -228,7 +360,7 @@ def _run_host_reference(
             f"host runner failed with exit code {completed.returncode}: {completed.stderr.strip()}"
         )
 
-    actual = np.fromfile(raw_output, dtype=np.float32)
+    actual = np.fromfile(raw_output, dtype=np.dtype(output.dtype))
     expected_size = _product(output.shape)
     if actual.size != expected_size:
         raise VerifyError(
@@ -320,7 +452,7 @@ def _benchmark_host_reference(
     raw_dir.mkdir(parents=True, exist_ok=True)
 
     output = case.outputs[0]
-    raw_output = raw_dir / f"actual_{output.name}.f32"
+    raw_output = raw_dir / f"actual_{output.name}.{_dtype_suffix(output.dtype)}"
     command = [
         str(host_runner),
         *_case_runner_args(
@@ -384,7 +516,7 @@ def _benchmark_riscv_reference(
         case_dir.mkdir(parents=True, exist_ok=True)
         raw_dir.mkdir(parents=True, exist_ok=True)
 
-        raw_output = raw_dir / f"actual_{output.name}.f32"
+        raw_output = raw_dir / f"actual_{output.name}.{_dtype_suffix(output.dtype)}"
         args = _case_runner_args(
             case=case,
             manifest=manifest,
@@ -508,7 +640,7 @@ def _run_riscv_reference(
         case_dir.mkdir(parents=True, exist_ok=True)
         raw_dir.mkdir(parents=True, exist_ok=True)
 
-        raw_output = raw_dir / f"actual_{output.name}.f32"
+        raw_output = raw_dir / f"actual_{output.name}.{_dtype_suffix(output.dtype)}"
         args = _case_runner_args(
             case=case,
             manifest=manifest,
@@ -547,7 +679,7 @@ def _run_riscv_reference(
             )
             continue
 
-        actual = np.fromfile(raw_output, dtype=np.float32)
+        actual = np.fromfile(raw_output, dtype=np.dtype(output.dtype))
         expected_size = _product(output.shape)
         if actual.size != expected_size:
             results.append(

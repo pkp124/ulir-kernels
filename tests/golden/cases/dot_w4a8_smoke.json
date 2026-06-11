@@ -1,0 +1,81 @@
+{
+  "compare": {
+    "accumulator_dtype": "float32",
+    "atol": 0.000001,
+    "input_scale": 0.25,
+    "input_zero_point": -1,
+    "mode": "allclose",
+    "rounding": "none",
+    "rtol": 0.000001,
+    "saturation": "none",
+    "strict_dtype": true,
+    "strict_shape": true,
+    "weight_zero_point": 0
+  },
+  "generator": {
+    "distribution": {
+      "int8": {
+        "high": 8,
+        "kind": "integers",
+        "low": -8
+      },
+      "scale": {
+        "high": 0.5,
+        "kind": "uniform",
+        "low": 0.125
+      }
+    },
+    "function": "dot_w4a8",
+    "kind": "numpy",
+    "seed": 401
+  },
+  "inputs": [
+    {
+      "dtype": "int8",
+      "name": "X",
+      "shape": [
+        7
+      ]
+    },
+    {
+      "dtype": "uint8",
+      "layout": {
+        "group_size": 3,
+        "kind": "w4a8_packed",
+        "logical_shape": [
+          7
+        ],
+        "nibble_order": "low_even_high_odd"
+      },
+      "name": "W_packed",
+      "shape": [
+        4
+      ]
+    },
+    {
+      "dtype": "float32",
+      "layout": {
+        "kind": "w4a8_group_scales",
+        "scale_groups": 3
+      },
+      "name": "W_scales",
+      "shape": [
+        3
+      ]
+    }
+  ],
+  "kernel": "dot_w4a8",
+  "name": "dot_w4a8_smoke",
+  "outputs": [
+    {
+      "dtype": "float32",
+      "name": "Y",
+      "shape": [
+        1
+      ]
+    }
+  ],
+  "targets": [
+    "host_reference"
+  ]
+}

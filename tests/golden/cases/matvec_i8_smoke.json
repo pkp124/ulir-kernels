@@ -1,0 +1,61 @@
+{
+  "compare": {
+    "accumulator_dtype": "int32",
+    "atol": 0.0,
+    "input_scale": 1.0,
+    "input_zero_point": -3,
+    "mode": "quantized_exact",
+    "rounding": "none",
+    "rtol": 0.0,
+    "saturation": "int32",
+    "strict_dtype": true,
+    "strict_shape": true,
+    "weight_scale": 1.0,
+    "weight_zero_point": 2
+  },
+  "generator": {
+    "distribution": {
+      "high": 8,
+      "kind": "integers",
+      "low": -8
+    },
+    "function": "matvec_i8",
+    "kind": "numpy",
+    "seed": 211
+  },
+  "inputs": [
+    {
+      "dtype": "int8",
+      "name": "X",
+      "shape": [
+        5
+      ]
+    },
+    {
+      "dtype": "int8",
+      "layout": {
+        "kind": "row_major",
+        "weight_stride": 5
+      },
+      "name": "W",
+      "shape": [
+        3,
+        5
+      ]
+    }
+  ],
+  "kernel": "matvec_i8",
+  "name": "matvec_i8_smoke",
+  "outputs": [
+    {
+      "dtype": "int32",
+      "name": "Y",
+      "shape": [
+        3
+      ]
+    }
+  ],
+  "targets": [
+    "host_reference"
+  ]
+}

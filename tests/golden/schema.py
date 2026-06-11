@@ -19,6 +19,15 @@ SUPPORTED_COMPARE_MODES = {
     "quantized_exact",
     "dequantized_allclose",
 }
+SUPPORTED_GENERATOR_FUNCTIONS = {
+    "relu",
+    "matmul",
+    "dot_i8",
+    "matvec_i8",
+    "matmul_i8",
+    "dot_w4a8",
+    "matvec_w4a8",
+}
 
 
 class GoldenSchemaError(ValueError):
@@ -76,6 +85,7 @@ class TensorSpec:
     name: str
     shape: tuple[int, ...]
     dtype: str
+    layout: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_json(cls, value: Any, context: str) -> TensorSpec:
@@ -83,14 +93,21 @@ class TensorSpec:
         dtype = _require_non_empty_string(data.get("dtype"), f"{context}.dtype")
         if dtype not in SUPPORTED_DTYPES:
             raise GoldenSchemaError(f"{context}.dtype unsupported: {dtype}")
+        layout = data.get("layout", {})
+        if not isinstance(layout, dict):
+            raise GoldenSchemaError(f"{context}.layout must be an object")
         return cls(
             name=_require_non_empty_string(data.get("name"), f"{context}.name"),
             shape=_validate_shape(data.get("shape"), f"{context}.shape"),
             dtype=dtype,
+            layout=layout,
         )
 
     def to_json(self) -> dict[str, Any]:
-        return {"name": self.name, "shape": list(self.shape), "dtype": self.dtype}
+        value = {"name": self.name, "shape": list(self.shape), "dtype": self.dtype}
+        if self.layout:
+            value["layout"] = dict(self.layout)
+        return value
 
 
 @dataclass(frozen=True)
@@ -109,7 +126,7 @@ class GeneratorSpec:
         if kind != GENERATOR_BACKEND:
             raise GoldenSchemaError(f"generator.kind unsupported: {kind}")
         function = _require_non_empty_string(data.get("function"), "generator.function")
-        if function not in {"relu", "matmul"}:
+        if function not in SUPPORTED_GENERATOR_FUNCTIONS:
             raise GoldenSchemaError(f"generator.function unsupported: {function}")
         seed = data.get("seed")
         if not isinstance(seed, int):
@@ -162,9 +179,14 @@ class ComparePolicy:
             }
         }
         if mode.startswith("quantized") or mode == "dequantized_allclose":
-            if "rounding" not in quantization or "saturation" not in quantization:
+            if (
+                "rounding" not in quantization
+                or "saturation" not in quantization
+                or "accumulator_dtype" not in quantization
+            ):
                 raise GoldenSchemaError(
-                    "quantized compare policies require rounding and saturation fields"
+                    "quantized compare policies require rounding, saturation, "
+                    "and accumulator_dtype fields"
                 )
         return cls(
             mode=mode,
@@ -257,11 +279,150 @@ class CaseDescriptor:
                 raise GoldenSchemaError("matmul output shape must be [M, N]")
             if {lhs.dtype, rhs.dtype, out.dtype} != {"float32"}:
                 raise GoldenSchemaError("matmul smoke cases must use float32 tensors")
+        elif self.kernel == "dot_i8":
+            self._validate_dot_i8()
+        elif self.kernel == "matvec_i8":
+            self._validate_matvec_i8()
+        elif self.kernel == "matmul_i8":
+            self._validate_matmul_i8()
+        elif self.kernel == "dot_w4a8":
+            self._validate_dot_w4a8()
+        elif self.kernel == "matvec_w4a8":
+            self._validate_matvec_w4a8()
         else:
             raise GoldenSchemaError(f"kernel unsupported: {self.kernel}")
         for vlen in self.vlens:
             if not isinstance(vlen, int) or vlen <= 0:
                 raise GoldenSchemaError("vlens must contain positive integers")
+
+    def _require_quant_policy(self, *, output_dtype: str) -> None:
+        policy = self.compare.quantization
+        required = {
+            "accumulator_dtype",
+            "input_scale",
+            "input_zero_point",
+            "weight_zero_point",
+            "rounding",
+            "saturation",
+        }
+        missing = sorted(required - policy.keys())
+        if missing:
+            raise GoldenSchemaError(
+                "quantized cases require compare policy fields: " + ", ".join(missing)
+            )
+        if policy["accumulator_dtype"] != output_dtype:
+            raise GoldenSchemaError("accumulator_dtype must match quantized output dtype")
+        if not isinstance(policy["input_zero_point"], int):
+            raise GoldenSchemaError("input_zero_point must be an integer")
+        if not isinstance(policy["weight_zero_point"], int):
+            raise GoldenSchemaError("weight_zero_point must be an integer")
+        if float(policy["input_scale"]) <= 0.0:
+            raise GoldenSchemaError("input_scale must be positive")
+
+    def _require_w4_layout(self, tensor: TensorSpec, *, rank: int) -> None:
+        layout = tensor.layout
+        if layout.get("kind") != "w4a8_packed":
+            raise GoldenSchemaError(f"{tensor.name} requires w4a8_packed layout")
+        logical_shape = layout.get("logical_shape")
+        if not isinstance(logical_shape, list) or len(logical_shape) != rank:
+            raise GoldenSchemaError(f"{tensor.name}.layout.logical_shape rank mismatch")
+        if any(not isinstance(dim, int) or dim <= 0 for dim in logical_shape):
+            raise GoldenSchemaError(f"{tensor.name}.layout.logical_shape must be positive")
+        if layout.get("nibble_order") != "low_even_high_odd":
+            raise GoldenSchemaError(f"{tensor.name}.layout.nibble_order unsupported")
+        group_size = layout.get("group_size")
+        if not isinstance(group_size, int) or group_size <= 0:
+            raise GoldenSchemaError(f"{tensor.name}.layout.group_size must be positive")
+
+    def _validate_dot_i8(self) -> None:
+        if len(self.inputs) != 2 or len(self.outputs) != 1:
+            raise GoldenSchemaError("dot_i8 cases require two inputs and one output")
+        lhs, rhs = self.inputs
+        out = self.outputs[0]
+        if len(lhs.shape) != 1 or len(rhs.shape) != 1 or out.shape != (1,):
+            raise GoldenSchemaError("dot_i8 cases require rank-1 inputs and scalar output [1]")
+        if lhs.shape != rhs.shape:
+            raise GoldenSchemaError("dot_i8 input lengths must match")
+        if lhs.dtype != "int8" or rhs.dtype != "int8" or out.dtype != "int32":
+            raise GoldenSchemaError("dot_i8 cases require int8 inputs and int32 output")
+        if self.compare.mode != "quantized_exact":
+            raise GoldenSchemaError("dot_i8 cases require quantized_exact comparison")
+        self._require_quant_policy(output_dtype="int32")
+
+    def _validate_matvec_i8(self) -> None:
+        if len(self.inputs) != 2 or len(self.outputs) != 1:
+            raise GoldenSchemaError("matvec_i8 cases require two inputs and one output")
+        vector, weights = self.inputs
+        out = self.outputs[0]
+        if len(vector.shape) != 1 or len(weights.shape) != 2 or len(out.shape) != 1:
+            raise GoldenSchemaError("matvec_i8 cases require vector, matrix, vector tensors")
+        rows, cols = weights.shape
+        if vector.shape[0] != cols or out.shape != (rows,):
+            raise GoldenSchemaError(
+                "matvec_i8 shape contract is input [cols], weights [rows, cols]"
+            )
+        if vector.dtype != "int8" or weights.dtype != "int8" or out.dtype != "int32":
+            raise GoldenSchemaError("matvec_i8 cases require int8 inputs and int32 output")
+        if self.compare.mode != "quantized_exact":
+            raise GoldenSchemaError("matvec_i8 cases require quantized_exact comparison")
+        self._require_quant_policy(output_dtype="int32")
+
+    def _validate_matmul_i8(self) -> None:
+        if len(self.inputs) != 2 or len(self.outputs) != 1:
+            raise GoldenSchemaError("matmul_i8 cases require two inputs and one output")
+        lhs, rhs = self.inputs
+        out = self.outputs[0]
+        if len(lhs.shape) != 2 or len(rhs.shape) != 2 or len(out.shape) != 2:
+            raise GoldenSchemaError("matmul_i8 cases require rank-2 tensors")
+        if lhs.shape[1] != rhs.shape[0] or out.shape != (lhs.shape[0], rhs.shape[1]):
+            raise GoldenSchemaError("matmul_i8 output shape must be [M, N]")
+        if lhs.dtype != "int8" or rhs.dtype != "int8" or out.dtype != "int32":
+            raise GoldenSchemaError("matmul_i8 cases require int8 inputs and int32 output")
+        if self.compare.mode != "quantized_exact":
+            raise GoldenSchemaError("matmul_i8 cases require quantized_exact comparison")
+        self._require_quant_policy(output_dtype="int32")
+
+    def _validate_dot_w4a8(self) -> None:
+        if len(self.inputs) != 3 or len(self.outputs) != 1:
+            raise GoldenSchemaError("dot_w4a8 cases require input, packed weight, scales, output")
+        vector, packed_weight, scales = self.inputs
+        out = self.outputs[0]
+        self._require_w4_layout(packed_weight, rank=1)
+        logical_k = packed_weight.layout["logical_shape"][0]
+        groups = (logical_k + packed_weight.layout["group_size"] - 1) // packed_weight.layout[
+            "group_size"
+        ]
+        if vector.shape != (logical_k,) or packed_weight.shape != ((logical_k + 1) // 2,):
+            raise GoldenSchemaError("dot_w4a8 packed layout does not match input length")
+        if scales.shape != (groups,) or out.shape != (1,):
+            raise GoldenSchemaError("dot_w4a8 scale/output shapes are invalid")
+        if vector.dtype != "int8" or packed_weight.dtype != "uint8":
+            raise GoldenSchemaError("dot_w4a8 requires int8 input and uint8 packed weight")
+        if scales.dtype != "float32" or out.dtype != "float32":
+            raise GoldenSchemaError("dot_w4a8 requires float32 scales and output")
+        self._require_quant_policy(output_dtype="float32")
+
+    def _validate_matvec_w4a8(self) -> None:
+        if len(self.inputs) != 3 or len(self.outputs) != 1:
+            raise GoldenSchemaError(
+                "matvec_w4a8 cases require input, packed weights, scales, output"
+            )
+        vector, packed_weights, scales = self.inputs
+        out = self.outputs[0]
+        self._require_w4_layout(packed_weights, rank=2)
+        rows, logical_cols = packed_weights.layout["logical_shape"]
+        group_size = packed_weights.layout["group_size"]
+        packed_cols = (logical_cols + 1) // 2
+        groups = (logical_cols + group_size - 1) // group_size
+        if vector.shape != (logical_cols,) or packed_weights.shape != (rows, packed_cols):
+            raise GoldenSchemaError("matvec_w4a8 packed layout does not match input shape")
+        if scales.shape != (rows, groups) or out.shape != (rows,):
+            raise GoldenSchemaError("matvec_w4a8 scale/output shapes are invalid")
+        if vector.dtype != "int8" or packed_weights.dtype != "uint8":
+            raise GoldenSchemaError("matvec_w4a8 requires int8 input and uint8 packed weights")
+        if scales.dtype != "float32" or out.dtype != "float32":
+            raise GoldenSchemaError("matvec_w4a8 requires float32 scales and output")
+        self._require_quant_policy(output_dtype="float32")
 
     def to_json(self) -> dict[str, Any]:
         value = {
@@ -322,4 +483,7 @@ def validate_manifest(manifest_path: Path) -> dict[str, Any]:
             raise GoldenSchemaError(f"dtype mismatch for {filename}")
         if array.nbytes != data.get("size_bytes"):
             raise GoldenSchemaError(f"size_bytes mismatch for {filename}")
+        layout = data.get("layout", {})
+        if not isinstance(layout, dict):
+            raise GoldenSchemaError(f"layout mismatch for {filename}")
     return manifest

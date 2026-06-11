@@ -54,30 +54,159 @@ def generate_f32_tensor(
     return rng.uniform(low, high, size=spec.shape).astype(np.float32)
 
 
+def generate_i8_tensor(spec: TensorSpec, *, seed: int, distribution: dict[str, Any]) -> np.ndarray:
+    """Generate one deterministic int8 tensor."""
+    if spec.dtype != "int8":
+        raise ValueError(f"generate_i8_tensor requires int8, got {spec.dtype}")
+    bounds = distribution.get("int8", distribution)
+    if bounds.get("kind", "integers") != "integers":
+        raise ValueError("int8 tensors require an integers distribution")
+    low = int(bounds.get("low", -8))
+    high = int(bounds.get("high", 8))
+    rng = np.random.default_rng(seed)
+    return rng.integers(low, high, size=spec.shape, dtype=np.int8)
+
+
+def generate_scale_tensor(
+    spec: TensorSpec, *, seed: int, distribution: dict[str, Any]
+) -> np.ndarray:
+    """Generate one deterministic positive float32 scale tensor."""
+    if spec.dtype != "float32":
+        raise ValueError(f"generate_scale_tensor requires float32, got {spec.dtype}")
+    bounds = distribution.get("scale", {"kind": "uniform", "low": 0.125, "high": 0.5})
+    low, high = _distribution_bounds(bounds)
+    rng = np.random.default_rng(seed)
+    return rng.uniform(low, high, size=spec.shape).astype(np.float32)
+
+
+def _generate_i4_values(shape: tuple[int, ...], *, seed: int) -> np.ndarray:
+    rng = np.random.default_rng(seed)
+    return rng.integers(-8, 8, size=shape, dtype=np.int8)
+
+
+def _pack_i4_values(values: np.ndarray) -> np.ndarray:
+    flat = values.astype(np.int8, copy=False).reshape(-1)
+    packed = np.zeros((flat.size + 1) // 2, dtype=np.uint8)
+    for index, value in enumerate(flat):
+        nibble = np.uint8(int(value) & 0x0F)
+        if index & 1:
+            packed[index // 2] |= np.uint8(nibble << 4)
+        else:
+            packed[index // 2] |= nibble
+    return packed
+
+
+def _generate_w4_input(
+    spec: TensorSpec,
+    *,
+    seed: int,
+) -> tuple[np.ndarray, np.ndarray]:
+    logical_shape = tuple(spec.layout["logical_shape"])
+    values = _generate_i4_values(logical_shape, seed=seed)
+    if len(logical_shape) == 1:
+        packed = _pack_i4_values(values).reshape(spec.shape)
+    elif len(logical_shape) == 2:
+        packed = np.stack([_pack_i4_values(row) for row in values], axis=0).reshape(spec.shape)
+    else:
+        raise ValueError("W4A8 packed tensors support rank-1 or rank-2 logical shapes")
+    return packed, values
+
+
+def _quantization_value(descriptor: CaseDescriptor, key: str) -> Any:
+    return descriptor.compare.quantization[key]
+
+
+def _i8_accumulate(lhs: np.ndarray, rhs: np.ndarray, *, lhs_zp: int, rhs_zp: int) -> np.ndarray:
+    lhs_i32 = lhs.astype(np.int32) - lhs_zp
+    rhs_i32 = rhs.astype(np.int32) - rhs_zp
+    return np.sum(lhs_i32 * rhs_i32, axis=-1, dtype=np.int64).astype(np.int32)
+
+
 def generate_case_arrays(descriptor: CaseDescriptor) -> dict[str, np.ndarray]:
     """Generate descriptor inputs and expected outputs."""
     arrays: dict[str, np.ndarray] = {}
     distribution = descriptor.generator.distribution
-    for index, tensor in enumerate(descriptor.inputs):
-        arrays[f"input_{tensor.name}"] = generate_f32_tensor(
-            tensor,
-            seed=descriptor.generator.seed + index * 1009,
+
+    if descriptor.kernel in {"relu", "matmul"}:
+        for index, tensor in enumerate(descriptor.inputs):
+            arrays[f"input_{tensor.name}"] = generate_f32_tensor(
+                tensor,
+                seed=descriptor.generator.seed + index * 1009,
+                distribution=distribution,
+            )
+
+        if descriptor.kernel == "relu":
+            input_tensor = arrays[f"input_{descriptor.inputs[0].name}"]
+            arrays[f"expected_{descriptor.outputs[0].name}"] = np.maximum(input_tensor, 0).astype(
+                np.float32
+            )
+        else:
+            lhs = arrays[f"input_{descriptor.inputs[0].name}"]
+            rhs = arrays[f"input_{descriptor.inputs[1].name}"]
+            arrays[f"expected_{descriptor.outputs[0].name}"] = np.matmul(lhs, rhs).astype(
+                np.float32
+            )
+        return arrays
+
+    if descriptor.kernel in {"dot_i8", "matvec_i8", "matmul_i8"}:
+        for index, tensor in enumerate(descriptor.inputs):
+            arrays[f"input_{tensor.name}"] = generate_i8_tensor(
+                tensor,
+                seed=descriptor.generator.seed + index * 1009,
+                distribution=distribution,
+            )
+        input_zp = int(_quantization_value(descriptor, "input_zero_point"))
+        weight_zp = int(_quantization_value(descriptor, "weight_zero_point"))
+        lhs = arrays[f"input_{descriptor.inputs[0].name}"]
+        rhs = arrays[f"input_{descriptor.inputs[1].name}"]
+        if descriptor.kernel == "dot_i8":
+            expected = np.array([_i8_accumulate(lhs, rhs, lhs_zp=input_zp, rhs_zp=weight_zp)])
+        elif descriptor.kernel == "matvec_i8":
+            expected = _i8_accumulate(rhs, lhs, lhs_zp=weight_zp, rhs_zp=input_zp)
+        else:
+            lhs_i32 = lhs.astype(np.int32) - input_zp
+            rhs_i32 = rhs.astype(np.int32) - weight_zp
+            expected = np.matmul(lhs_i32, rhs_i32).astype(np.int32)
+        arrays[f"expected_{descriptor.outputs[0].name}"] = expected.astype(np.int32)
+        return arrays
+
+    if descriptor.kernel in {"dot_w4a8", "matvec_w4a8"}:
+        vector_spec, weight_spec, scale_spec = descriptor.inputs
+        arrays[f"input_{vector_spec.name}"] = generate_i8_tensor(
+            vector_spec,
+            seed=descriptor.generator.seed,
+            distribution=distribution,
+        )
+        packed, logical_weight = _generate_w4_input(
+            weight_spec,
+            seed=descriptor.generator.seed + 1009,
+        )
+        arrays[f"input_{weight_spec.name}"] = packed
+        arrays[f"input_{scale_spec.name}"] = generate_scale_tensor(
+            scale_spec,
+            seed=descriptor.generator.seed + 2018,
             distribution=distribution,
         )
 
-    if descriptor.kernel == "relu":
-        input_tensor = arrays[f"input_{descriptor.inputs[0].name}"]
-        arrays[f"expected_{descriptor.outputs[0].name}"] = np.maximum(input_tensor, 0).astype(
-            np.float32
-        )
-    elif descriptor.kernel == "matmul":
-        lhs = arrays[f"input_{descriptor.inputs[0].name}"]
-        rhs = arrays[f"input_{descriptor.inputs[1].name}"]
-        arrays[f"expected_{descriptor.outputs[0].name}"] = np.matmul(lhs, rhs).astype(np.float32)
-    else:
-        raise ValueError(f"unsupported kernel: {descriptor.kernel}")
+        input_scale = float(_quantization_value(descriptor, "input_scale"))
+        input_zp = int(_quantization_value(descriptor, "input_zero_point"))
+        weight_zp = int(_quantization_value(descriptor, "weight_zero_point"))
+        group_size = int(weight_spec.layout["group_size"])
+        vector = arrays[f"input_{vector_spec.name}"].astype(np.int32) - input_zp
+        dequantized_vector = vector.astype(np.float32) * input_scale
+        scales = arrays[f"input_{scale_spec.name}"]
+        weights = logical_weight.astype(np.int32) - weight_zp
+        group_indices = np.arange(vector_spec.shape[0]) // group_size
+        if descriptor.kernel == "dot_w4a8":
+            dequantized_weight = weights.astype(np.float32) * scales[group_indices]
+            expected = np.array([np.sum(dequantized_vector * dequantized_weight)], dtype=np.float32)
+        else:
+            dequantized_weight = weights.astype(np.float32) * scales[:, group_indices]
+            expected = np.sum(dequantized_weight * dequantized_vector, axis=1).astype(np.float32)
+        arrays[f"expected_{descriptor.outputs[0].name}"] = expected.astype(np.float32)
+        return arrays
 
-    return arrays
+    raise ValueError(f"unsupported kernel: {descriptor.kernel}")
 
 
 def _tensor_manifest_entry(
@@ -95,6 +224,7 @@ def _tensor_manifest_entry(
         "filename": filename,
         "shape": list(spec.shape),
         "dtype": spec.dtype,
+        "layout": spec.layout,
         "size_bytes": int(array.nbytes),
         "sha256": sha256_file(path),
     }
@@ -154,6 +284,11 @@ def generate_bundle(
         },
         "compare": descriptor.compare.to_json(),
         "quantization_policy": descriptor.compare.quantization,
+        "packed_layouts": [
+            {"tensor": tensor.name, **tensor.layout}
+            for tensor in descriptor.inputs
+            if tensor.layout.get("kind") == "w4a8_packed"
+        ],
         "targets": list(descriptor.targets),
         "vlens": list(descriptor.vlens),
         "tensors": tensor_entries,

@@ -17,6 +17,13 @@ from tests.test_data_generator import TestDataGenerator
 from tests.verify import VerifyError, _json_safe, benchmark_case, verify_case
 
 CASES_DIR = Path(__file__).parent / "golden" / "cases"
+QUANTIZED_CASE_NAMES = [
+    "dot_i8_smoke",
+    "matvec_i8_smoke",
+    "matmul_i8_smoke",
+    "dot_w4a8_smoke",
+    "matvec_w4a8_smoke",
+]
 
 
 def test_committed_descriptors_validate() -> None:
@@ -28,12 +35,37 @@ def test_committed_descriptors_validate() -> None:
     assert matmul.outputs[0].shape == (4, 3)
 
 
+def test_committed_quantized_descriptors_validate() -> None:
+    descriptors = [
+        load_case_descriptor(CASES_DIR / f"{case_name}.json") for case_name in QUANTIZED_CASE_NAMES
+    ]
+
+    assert [descriptor.kernel for descriptor in descriptors] == [
+        "dot_i8",
+        "matvec_i8",
+        "matmul_i8",
+        "dot_w4a8",
+        "matvec_w4a8",
+    ]
+    assert descriptors[0].compare.quantization["rounding"] == "none"
+    assert descriptors[3].inputs[1].layout["nibble_order"] == "low_even_high_odd"
+
+
 def test_descriptor_validation_rejects_bad_matmul_shape() -> None:
     with (CASES_DIR / "matmul_f32_smoke.json").open() as handle:
         descriptor = json.load(handle)
     descriptor["outputs"][0]["shape"] = [4, 4]
 
     with pytest.raises(GoldenSchemaError, match="matmul output shape"):
+        CaseDescriptor.from_json(descriptor)
+
+
+def test_quantized_descriptor_requires_explicit_policy() -> None:
+    with (CASES_DIR / "dot_i8_smoke.json").open() as handle:
+        descriptor = json.load(handle)
+    del descriptor["compare"]["rounding"]
+
+    with pytest.raises(GoldenSchemaError, match="rounding"):
         CaseDescriptor.from_json(descriptor)
 
 
@@ -51,6 +83,56 @@ def test_generator_is_deterministic_for_f32_relu_and_matmul() -> None:
     np.testing.assert_array_equal(matmul_output_a, matmul_output_b)
 
 
+def test_generator_builds_i8_quantized_references() -> None:
+    dot = load_case_descriptor(CASES_DIR / "dot_i8_smoke.json")
+    matvec = load_case_descriptor(CASES_DIR / "matvec_i8_smoke.json")
+    matmul = load_case_descriptor(CASES_DIR / "matmul_i8_smoke.json")
+
+    dot_arrays = generate_case_arrays(dot)
+    x = dot_arrays["input_X"].astype(np.int32) - dot.compare.quantization["input_zero_point"]
+    w = dot_arrays["input_W"].astype(np.int32) - dot.compare.quantization["weight_zero_point"]
+    np.testing.assert_array_equal(dot_arrays["expected_Y"], np.array([np.sum(x * w)], np.int32))
+
+    matvec_arrays = generate_case_arrays(matvec)
+    x = matvec_arrays["input_X"].astype(np.int32) - matvec.compare.quantization["input_zero_point"]
+    w = matvec_arrays["input_W"].astype(np.int32) - matvec.compare.quantization["weight_zero_point"]
+    np.testing.assert_array_equal(matvec_arrays["expected_Y"], np.sum(w * x, axis=1))
+
+    matmul_arrays = generate_case_arrays(matmul)
+    a = matmul_arrays["input_A"].astype(np.int32) - matmul.compare.quantization["input_zero_point"]
+    b = matmul_arrays["input_B"].astype(np.int32) - matmul.compare.quantization["weight_zero_point"]
+    np.testing.assert_array_equal(matmul_arrays["expected_C"], np.matmul(a, b))
+
+
+def _unpack_i4(packed: np.ndarray, logical_shape: tuple[int, ...]) -> np.ndarray:
+    rows = 1 if len(logical_shape) == 1 else logical_shape[0]
+    cols = logical_shape[0] if len(logical_shape) == 1 else logical_shape[1]
+    packed_rows = packed.reshape(rows, -1)
+    unpacked = np.zeros((rows, cols), dtype=np.int8)
+    for row in range(rows):
+        for col in range(cols):
+            byte = int(packed_rows[row, col // 2])
+            nibble = (byte >> 4) if col & 1 else byte & 0x0F
+            unpacked[row, col] = nibble - 0x10 if nibble & 0x08 else nibble
+    if len(logical_shape) == 1:
+        return unpacked.reshape(logical_shape)
+    return unpacked
+
+
+def test_generator_builds_w4a8_quantized_references() -> None:
+    descriptor = load_case_descriptor(CASES_DIR / "matvec_w4a8_smoke.json")
+    arrays = generate_case_arrays(descriptor)
+
+    x = arrays["input_X"].astype(np.int32) - descriptor.compare.quantization["input_zero_point"]
+    x_dequant = x.astype(np.float32) * descriptor.compare.quantization["input_scale"]
+    weights = _unpack_i4(arrays["input_W_packed"], (3, 5)).astype(np.int32)
+    scales = arrays["input_W_scales"]
+    group_indices = np.arange(5) // descriptor.inputs[1].layout["group_size"]
+    expected = np.sum(weights.astype(np.float32) * scales[:, group_indices] * x_dequant, axis=1)
+
+    np.testing.assert_allclose(arrays["expected_Y"], expected.astype(np.float32), rtol=1e-6)
+
+
 def test_bundle_manifest_records_and_validates_hashes(tmp_path: Path) -> None:
     descriptor = load_case_descriptor(CASES_DIR / "relu_f32_smoke.json")
     manifest_path = generate_bundle(
@@ -66,6 +148,31 @@ def test_bundle_manifest_records_and_validates_hashes(tmp_path: Path) -> None:
         generated["expected_Y"],
         np.load(manifest_path.parent / "expected_Y.npy"),
     )
+
+
+def test_quantized_manifest_records_policy_and_packed_layout(tmp_path: Path) -> None:
+    descriptor = load_case_descriptor(CASES_DIR / "matvec_w4a8_smoke.json")
+    manifest_path = generate_bundle(
+        descriptor,
+        tmp_path,
+        descriptor_path=CASES_DIR / "matvec_w4a8_smoke.json",
+    )
+
+    manifest = validate_manifest(manifest_path)
+    assert manifest["quantization_policy"]["accumulator_dtype"] == "float32"
+    assert manifest["quantization_policy"]["input_scale"] == 0.125
+    assert manifest["packed_layouts"] == [
+        {
+            "group_size": 2,
+            "kind": "w4a8_packed",
+            "logical_shape": [3, 5],
+            "nibble_order": "low_even_high_odd",
+            "packed_stride_bytes": 3,
+            "tensor": "W_packed",
+        }
+    ]
+    packed_entry = next(tensor for tensor in manifest["tensors"] if tensor["name"] == "W_packed")
+    assert packed_entry["layout"]["logical_shape"] == [3, 5]
 
 
 def test_manifest_hash_validation_reports_corruption(tmp_path: Path) -> None:
@@ -105,14 +212,23 @@ def test_comparator_quantized_modes() -> None:
     exact = np.array([0, 2, 4], dtype=np.int8)
     off_by_one = np.array([0, 3, 4], dtype=np.int8)
 
-    assert compare_arrays(exact, expected, {"mode": "quantized_exact"}).passed
-    assert not compare_arrays(off_by_one, expected, {"mode": "quantized_exact"}).passed
+    exact_policy = {
+        "accumulator_dtype": "int32",
+        "mode": "quantized_exact",
+        "rounding": "none",
+        "saturation": "int32",
+    }
+    assert compare_arrays(exact, expected, exact_policy).passed
+    assert not compare_arrays(off_by_one, expected, exact_policy).passed
 
     dequantized = compare_arrays(
         off_by_one,
         expected,
         {
+            "accumulator_dtype": "int32",
             "mode": "dequantized_allclose",
+            "rounding": "nearest_even",
+            "saturation": "int8",
             "scale": 0.5,
             "zero_point": 0,
             "rtol": 0.0,
