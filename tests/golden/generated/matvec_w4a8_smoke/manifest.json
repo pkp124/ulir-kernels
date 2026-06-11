@@ -1,0 +1,128 @@
+{
+  "case": "matvec_w4a8_smoke",
+  "compare": {
+    "accumulator_dtype": "float32",
+    "atol": 1e-06,
+    "input_scale": 0.125,
+    "input_zero_point": 1,
+    "mode": "allclose",
+    "rounding": "none",
+    "rtol": 1e-06,
+    "saturation": "none",
+    "strict_dtype": true,
+    "strict_shape": true,
+    "weight_zero_point": 0
+  },
+  "descriptor": "tests/golden/cases/matvec_w4a8_smoke.json",
+  "descriptor_sha256": "dbc4771727b0bcda6fc026350dbee7f3fbcfc285671bb2120c8ea081836ec889",
+  "generator": {
+    "backend": "numpy",
+    "backend_version": "2.4.6",
+    "distribution": {
+      "int8": {
+        "high": 8,
+        "kind": "integers",
+        "low": -8
+      },
+      "scale": {
+        "high": 0.75,
+        "kind": "uniform",
+        "low": 0.125
+      }
+    },
+    "function": "matvec_w4a8",
+    "seed": 503
+  },
+  "kernel": "matvec_w4a8",
+  "packed_layouts": [
+    {
+      "group_size": 2,
+      "kind": "w4a8_packed",
+      "logical_shape": [
+        3,
+        5
+      ],
+      "nibble_order": "low_even_high_odd",
+      "packed_stride_bytes": 3,
+      "tensor": "W_packed"
+    }
+  ],
+  "quantization_policy": {
+    "accumulator_dtype": "float32",
+    "input_scale": 0.125,
+    "input_zero_point": 1,
+    "rounding": "none",
+    "saturation": "none",
+    "weight_zero_point": 0
+  },
+  "schema_version": 1,
+  "targets": [
+    "host_reference"
+  ],
+  "tensors": [
+    {
+      "dtype": "int8",
+      "filename": "input_X.npy",
+      "layout": {},
+      "name": "X",
+      "role": "input",
+      "sha256": "c251cd08aacc884dcaabc762783a9bf4a3ade04ae897936eae5dba67d8563121",
+      "shape": [
+        5
+      ],
+      "size_bytes": 5
+    },
+    {
+      "dtype": "uint8",
+      "filename": "input_W_packed.npy",
+      "layout": {
+        "group_size": 2,
+        "kind": "w4a8_packed",
+        "logical_shape": [
+          3,
+          5
+        ],
+        "nibble_order": "low_even_high_odd",
+        "packed_stride_bytes": 3
+      },
+      "name": "W_packed",
+      "role": "input",
+      "sha256": "41637dedc2f4cacac67833046524d7927e39f9be32eb563ff43a11f60d92977c",
+      "shape": [
+        3,
+        3
+      ],
+      "size_bytes": 9
+    },
+    {
+      "dtype": "float32",
+      "filename": "input_W_scales.npy",
+      "layout": {
+        "kind": "w4a8_group_scales",
+        "scale_groups": 3,
+        "scale_stride": 3
+      },
+      "name": "W_scales",
+      "role": "input",
+      "sha256": "f8cf51208b8e139bd2717ab69ed6e1627868bd195ae671bee2b347366045258d",
+      "shape": [
+        3,
+        3
+      ],
+      "size_bytes": 36
+    },
+    {
+      "dtype": "float32",
+      "filename": "expected_Y.npy",
+      "layout": {},
+      "name": "Y",
+      "role": "expected_output",
+      "sha256": "e55d3673dd3a58021a68e8c850d0b20f9a00dc5165dd277ca119d40ca194fb09",
+      "shape": [
+        3
+      ],
+      "size_bytes": 12
+    }
+  ],
+  "vlens": []
+}

@@ -65,12 +65,32 @@ if(Python3_FOUND)
     COMMAND ${KS_GOLDEN_VERIFY_COMMAND}
       --case ${CMAKE_CURRENT_SOURCE_DIR}/golden/cases/matmul_f32_smoke.json
   )
+  set(KS_QUANTIZED_GOLDEN_CASES
+    dot_i8_smoke
+    matvec_i8_smoke
+    dot_w4a8_smoke
+    matvec_w4a8_smoke
+  )
+  foreach(KS_QUANTIZED_GOLDEN_CASE ${KS_QUANTIZED_GOLDEN_CASES})
+    add_test(NAME kernelsmith-host-golden-${KS_QUANTIZED_GOLDEN_CASE}
+      COMMAND ${KS_GOLDEN_VERIFY_COMMAND}
+        --case ${CMAKE_CURRENT_SOURCE_DIR}/golden/cases/${KS_QUANTIZED_GOLDEN_CASE}.json
+    )
+  endforeach()
 
   add_custom_target(check-kernelsmith-host-golden
     COMMAND ${KS_GOLDEN_VERIFY_COMMAND}
       --case ${CMAKE_CURRENT_SOURCE_DIR}/golden/cases/relu_f32_smoke.json
     COMMAND ${KS_GOLDEN_VERIFY_COMMAND}
       --case ${CMAKE_CURRENT_SOURCE_DIR}/golden/cases/matmul_f32_smoke.json
+    COMMAND ${KS_GOLDEN_VERIFY_COMMAND}
+      --case ${CMAKE_CURRENT_SOURCE_DIR}/golden/cases/dot_i8_smoke.json
+    COMMAND ${KS_GOLDEN_VERIFY_COMMAND}
+      --case ${CMAKE_CURRENT_SOURCE_DIR}/golden/cases/matvec_i8_smoke.json
+    COMMAND ${KS_GOLDEN_VERIFY_COMMAND}
+      --case ${CMAKE_CURRENT_SOURCE_DIR}/golden/cases/dot_w4a8_smoke.json
+    COMMAND ${KS_GOLDEN_VERIFY_COMMAND}
+      --case ${CMAKE_CURRENT_SOURCE_DIR}/golden/cases/matvec_w4a8_smoke.json
     DEPENDS host-reference-runner
     COMMENT "Running KernelSmith host golden-reference checks"
   )

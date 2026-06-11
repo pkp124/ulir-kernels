@@ -1,0 +1,84 @@
+{
+  "case": "dot_i8_smoke",
+  "compare": {
+    "accumulator_dtype": "int32",
+    "atol": 0.0,
+    "input_scale": 1.0,
+    "input_zero_point": 1,
+    "mode": "quantized_exact",
+    "rounding": "none",
+    "rtol": 0.0,
+    "saturation": "int32",
+    "strict_dtype": true,
+    "strict_shape": true,
+    "weight_scale": 1.0,
+    "weight_zero_point": -2
+  },
+  "descriptor": "tests/golden/cases/dot_i8_smoke.json",
+  "descriptor_sha256": "ccdb3b98fe0279e43efa8588e641c5c2ec6ae6ae26821ac1ec96d58cb27ff258",
+  "generator": {
+    "backend": "numpy",
+    "backend_version": "2.4.6",
+    "distribution": {
+      "high": 8,
+      "kind": "integers",
+      "low": -8
+    },
+    "function": "dot_i8",
+    "seed": 101
+  },
+  "kernel": "dot_i8",
+  "packed_layouts": [],
+  "quantization_policy": {
+    "accumulator_dtype": "int32",
+    "input_scale": 1.0,
+    "input_zero_point": 1,
+    "rounding": "none",
+    "saturation": "int32",
+    "weight_scale": 1.0,
+    "weight_zero_point": -2
+  },
+  "schema_version": 1,
+  "targets": [
+    "host_reference"
+  ],
+  "tensors": [
+    {
+      "dtype": "int8",
+      "filename": "input_X.npy",
+      "layout": {},
+      "name": "X",
+      "role": "input",
+      "sha256": "0bae7888ba41035e3c88996e8d035096e4385212ba708b221b139bddffa8b01d",
+      "shape": [
+        7
+      ],
+      "size_bytes": 7
+    },
+    {
+      "dtype": "int8",
+      "filename": "input_W.npy",
+      "layout": {},
+      "name": "W",
+      "role": "input",
+      "sha256": "87bba633d673a0eb9fcb44d42ae7604bde64f848a85a7851ef70c5c788ea6932",
+      "shape": [
+        7
+      ],
+      "size_bytes": 7
+    },
+    {
+      "dtype": "int32",
+      "filename": "expected_Y.npy",
+      "layout": {},
+      "name": "Y",
+      "role": "expected_output",
+      "sha256": "7a5536da6bed6fd87a654cea2967aa865d29202bf2708d4156e1ad88299d870f",
+      "shape": [
+        1
+      ],
+      "size_bytes": 4
+    }
+  ],
+  "vlens": []
+}
