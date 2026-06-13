@@ -8,9 +8,7 @@ import re
 import sys
 from pathlib import Path
 
-DEFINE_RE = re.compile(
-    r"^\s*#\s*define\s+([A-Za-z_][A-Za-z0-9_]*)(?:\([^)]*\))?\s*(.*)$"
-)
+DEFINE_RE = re.compile(r"^\s*#\s*define\s+([A-Za-z_][A-Za-z0-9_]*)(?:\([^)]*\))?\s*(.*)$")
 
 COMMON_REQUIRED_FIELDS = [
     "KS_TARGET_NAME",
@@ -98,7 +96,10 @@ def missing_fields(defines: dict[str, str], required_fields: list[str]) -> list[
 
 def validate_profile(profile: Path) -> list[str]:
     defines = parse_defines(profile)
-    errors = [f"missing required field: {field}" for field in missing_fields(defines, COMMON_REQUIRED_FIELDS)]
+    errors = [
+        f"missing required field: {field}"
+        for field in missing_fields(defines, COMMON_REQUIRED_FIELDS)
+    ]
 
     if is_rvv_profile(defines):
         errors.extend(
