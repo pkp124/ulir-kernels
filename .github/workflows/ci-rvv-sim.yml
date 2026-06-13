@@ -152,6 +152,7 @@ jobs:
             lib/kernelsmith/ks_common.c \
             lib/kernelsmith/ks_matmul.c \
             lib/kernelsmith/ks_activations.c \
+            lib/kernelsmith/ks_quantized.c \
             -o build-rvv/bin/riscv-golden-runner \
             -lm
           file build-rvv/bin/riscv-golden-runner
