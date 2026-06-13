@@ -121,6 +121,79 @@ MR=NR=4. Performance is not the goal; correctness is.
 
 Packing consumes workspace memory. When both are 0, workspace for matmul is 0 bytes.
 
+### Quantized Dot/GEMV/GEMM Parameters
+
+Profiles that support optimized quantized kernels define the following build-time
+values. The `KS_QUANT_*` macros are the stable interface for scripts and pass
+option generation; target-specific helper macros such as `KS_RVV_*` may derive
+them from VLEN, SEW, LMUL, cache, or ABI choices.
+
+#### INT8 dot and GEMV
+
+```c
+#define KS_QUANT_DOT_I8_TILE_K          128  /* K elements per dot tile */
+#define KS_QUANT_MATVEC_I8_TILE_ROWS    4    /* output rows per GEMV tile */
+#define KS_QUANT_MATVEC_I8_TILE_COLS    128  /* K cols per GEMV tile */
+#define KS_QUANT_I8_PACK_FACTOR         128  /* i8 elements per pack group */
+#define KS_QUANT_I8_PACK_ALIGN          64   /* packed i8 alignment in bytes */
+```
+
+`KS_QUANT_DOT_I8_TILE_K` and `KS_QUANT_MATVEC_I8_TILE_COLS` should be multiples
+of the profile's i8 vector width. On RVV, derive them from minimum VLEN, SEW,
+and LMUL instead of hardcoding a physical vector length in compiler passes.
+
+#### W4A8 dot and GEMV
+
+```c
+#define KS_QUANT_DOT_W4A8_TILE_K        64  /* logical weights per dot tile */
+#define KS_QUANT_MATVEC_W4A8_TILE_ROWS  4   /* output rows per GEMV tile */
+#define KS_QUANT_MATVEC_W4A8_TILE_COLS  64  /* K cols per GEMV tile */
+#define KS_QUANT_W4A8_GROUP_SIZE        64  /* default weights per scale */
+#define KS_QUANT_W4A8_PACK_FACTOR       64  /* logical weights per pack group */
+#define KS_QUANT_W4A8_PACKED_TILE_BYTES 32  /* packed bytes per W4A8 tile */
+#define KS_QUANT_W4A8_PACK_ALIGN        64  /* packed weight alignment */
+#define KS_QUANT_W4A8_SCALE_ALIGN       4   /* f32 scale alignment */
+```
+
+W4A8 dot/GEMV values are intentionally independent from GEMM values because
+batch-1 transformer decode is the first optimized path. The default group size
+must match the public C ABI's scale layout for generated kernels that assume a
+profile default; callers may still pass explicit group sizes to generic APIs.
+
+#### Quantized GEMM defaults
+
+```c
+#define KS_QUANT_MATMUL_I8_TILE_M_L2     128
+#define KS_QUANT_MATMUL_I8_TILE_N_L2     128
+#define KS_QUANT_MATMUL_I8_TILE_K_L2     512
+#define KS_QUANT_MATMUL_I8_TILE_M_L1     8
+#define KS_QUANT_MATMUL_I8_TILE_N_L1     16
+#define KS_QUANT_MATMUL_I8_TILE_K_L1     128
+#define KS_QUANT_MATMUL_W4A8_TILE_M_L2   64
+#define KS_QUANT_MATMUL_W4A8_TILE_N_L2   128
+#define KS_QUANT_MATMUL_W4A8_TILE_K_L2   256
+#define KS_QUANT_MATMUL_W4A8_TILE_M_L1   4
+#define KS_QUANT_MATMUL_W4A8_TILE_N_L1   16
+#define KS_QUANT_MATMUL_W4A8_TILE_K_L1   64
+```
+
+GEMM parameters are profile defaults for later prefill and small-batch kernels.
+They must not be reused blindly for dot/GEMV lowering because decode kernels have
+different register-pressure and memory-bandwidth constraints.
+
+#### Quantized workspace declarations
+
+```c
+#define KS_QUANT_DOT_I8_WORKSPACE_BYTES(K) 0u
+#define KS_QUANT_MATVEC_I8_WORKSPACE_BYTES(ROWS, COLS) 0u
+#define KS_QUANT_DOT_W4A8_WORKSPACE_BYTES(K, GROUP_SIZE) 0u
+#define KS_QUANT_MATVEC_W4A8_WORKSPACE_BYTES(ROWS, COLS, GROUP_SIZE) 0u
+```
+
+Workspace macros make scratch-buffer requirements explicit at build time. A
+profile that introduces a quantized packer must update these before generated
+kernels start consuming caller-provided workspace.
+
 ### Feature Flags (optional, target-specific)
 
 ```c
@@ -168,6 +241,8 @@ Checks:
 - NR is a multiple of SIMD width
 - PREFERRED_ALIGN is a power of 2
 - PREFERRED_ALIGN >= REQUIRED_ALIGN
+- RVV profiles define the required `KS_QUANT_*` i8/W4A8 tile, pack,
+  alignment, and workspace macros
 
 Validation errors are build failures, not runtime errors.
 
