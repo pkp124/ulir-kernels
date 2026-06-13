@@ -8,7 +8,6 @@ import re
 import sys
 from pathlib import Path
 
-
 DEFINE_RE = re.compile(
     r"^\s*#\s*define\s+([A-Za-z_][A-Za-z0-9_]*)(?:\([^)]*\))?\s*(.*)$"
 )
