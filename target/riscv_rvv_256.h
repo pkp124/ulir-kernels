@@ -52,6 +52,8 @@
 
 // Selected Element Width for f32 workloads (bits).
 #define KS_RVV_SEW_F32        32
+#define KS_RVV_SEW_I32        32
+#define KS_RVV_SEW_I8          8
 
 // LMUL: use LMUL=4 for compute-bound matmul (maximises VLMAX).
 // For memory-bound kernels (activations, norms) use LMUL=1.
@@ -61,6 +63,8 @@
 // VLMAX = VLEN * LMUL / SEW  (elements per vector register group).
 #define KS_RVV_VLMAX_F32_LMUL4  ((KS_RVV_VLEN * KS_RVV_LMUL_COMPUTE) / KS_RVV_SEW_F32)  // 32
 #define KS_RVV_VLMAX_F32_LMUL1  ((KS_RVV_VLEN * KS_RVV_LMUL_MEMORY)  / KS_RVV_SEW_F32)  // 8
+#define KS_RVV_VLMAX_I32_LMUL1  ((KS_RVV_VLEN * KS_RVV_LMUL_MEMORY)  / KS_RVV_SEW_I32)  // 8
+#define KS_RVV_VLMAX_I8_LMUL4   ((KS_RVV_VLEN * KS_RVV_LMUL_COMPUTE) / KS_RVV_SEW_I8)   // 128
 
 // ===--- Register tile (MR × NR) -----------------------------------------===//
 // Inner micro-kernel that fits entirely in vector registers.
@@ -110,6 +114,69 @@
 #define KS_MATMUL_PACK_B      1
 #define KS_MATMUL_PACK_A      0
 
+// ===--- Quantized dot/GEMV/GEMM profile parameters ----------------------===//
+//
+// INT8 kernels accumulate into i32. DOT/GEMV use a full LMUL=4 i8 vector for
+// K so decode kernels can derive --tile-k from the target profile.
+#define KS_RVV_I8_DOT_TILE_K          KS_RVV_VLMAX_I8_LMUL4
+#define KS_RVV_I8_MATVEC_TILE_ROWS    4
+#define KS_RVV_I8_MATVEC_TILE_COLS    KS_RVV_I8_DOT_TILE_K
+#define KS_RVV_I8_PACK_FACTOR         KS_RVV_I8_DOT_TILE_K
+#define KS_RVV_I8_PACK_ALIGN          64
+
+// W4A8 decode operates one scale group at a time. The default 64-weight group
+// matches the public ABI while keeping each packed tile to 32 bytes.
+#define KS_RVV_W4A8_GROUP_SIZE        64
+#define KS_RVV_W4A8_DOT_TILE_K        KS_RVV_W4A8_GROUP_SIZE
+#define KS_RVV_W4A8_MATVEC_TILE_ROWS  4
+#define KS_RVV_W4A8_MATVEC_TILE_COLS  KS_RVV_W4A8_DOT_TILE_K
+#define KS_RVV_W4A8_PACK_FACTOR       KS_RVV_W4A8_DOT_TILE_K
+#define KS_RVV_W4A8_PACKED_TILE_BYTES (KS_RVV_W4A8_DOT_TILE_K / 2)
+#define KS_RVV_W4A8_PACK_ALIGN        64
+#define KS_RVV_W4A8_SCALE_ALIGN       4
+
+// GEMM defaults are separate from decode tiles so prefill work can retune them
+// without changing the batch-1 dot/GEMV ABI.
+#define KS_RVV_I8_GEMM_TILE_M_L2      128
+#define KS_RVV_I8_GEMM_TILE_N_L2      128
+#define KS_RVV_I8_GEMM_TILE_K_L2      512
+#define KS_RVV_I8_GEMM_TILE_M_L1      8
+#define KS_RVV_I8_GEMM_TILE_N_L1      16
+#define KS_RVV_I8_GEMM_TILE_K_L1      KS_RVV_I8_DOT_TILE_K
+#define KS_RVV_W4A8_GEMM_TILE_M_L2    64
+#define KS_RVV_W4A8_GEMM_TILE_N_L2    128
+#define KS_RVV_W4A8_GEMM_TILE_K_L2    256
+#define KS_RVV_W4A8_GEMM_TILE_M_L1    4
+#define KS_RVV_W4A8_GEMM_TILE_N_L1    16
+#define KS_RVV_W4A8_GEMM_TILE_K_L1    KS_RVV_W4A8_GROUP_SIZE
+
+// Stable aliases consumed by build scripts and future pass-option plumbing.
+#define KS_QUANT_DOT_I8_TILE_K          KS_RVV_I8_DOT_TILE_K
+#define KS_QUANT_MATVEC_I8_TILE_ROWS    KS_RVV_I8_MATVEC_TILE_ROWS
+#define KS_QUANT_MATVEC_I8_TILE_COLS    KS_RVV_I8_MATVEC_TILE_COLS
+#define KS_QUANT_I8_PACK_FACTOR         KS_RVV_I8_PACK_FACTOR
+#define KS_QUANT_I8_PACK_ALIGN          KS_RVV_I8_PACK_ALIGN
+#define KS_QUANT_MATMUL_I8_TILE_M_L2    KS_RVV_I8_GEMM_TILE_M_L2
+#define KS_QUANT_MATMUL_I8_TILE_N_L2    KS_RVV_I8_GEMM_TILE_N_L2
+#define KS_QUANT_MATMUL_I8_TILE_K_L2    KS_RVV_I8_GEMM_TILE_K_L2
+#define KS_QUANT_MATMUL_I8_TILE_M_L1    KS_RVV_I8_GEMM_TILE_M_L1
+#define KS_QUANT_MATMUL_I8_TILE_N_L1    KS_RVV_I8_GEMM_TILE_N_L1
+#define KS_QUANT_MATMUL_I8_TILE_K_L1    KS_RVV_I8_GEMM_TILE_K_L1
+#define KS_QUANT_DOT_W4A8_TILE_K        KS_RVV_W4A8_DOT_TILE_K
+#define KS_QUANT_MATVEC_W4A8_TILE_ROWS  KS_RVV_W4A8_MATVEC_TILE_ROWS
+#define KS_QUANT_MATVEC_W4A8_TILE_COLS  KS_RVV_W4A8_MATVEC_TILE_COLS
+#define KS_QUANT_W4A8_GROUP_SIZE        KS_RVV_W4A8_GROUP_SIZE
+#define KS_QUANT_W4A8_PACK_FACTOR       KS_RVV_W4A8_PACK_FACTOR
+#define KS_QUANT_W4A8_PACKED_TILE_BYTES KS_RVV_W4A8_PACKED_TILE_BYTES
+#define KS_QUANT_W4A8_PACK_ALIGN        KS_RVV_W4A8_PACK_ALIGN
+#define KS_QUANT_W4A8_SCALE_ALIGN       KS_RVV_W4A8_SCALE_ALIGN
+#define KS_QUANT_MATMUL_W4A8_TILE_M_L2  KS_RVV_W4A8_GEMM_TILE_M_L2
+#define KS_QUANT_MATMUL_W4A8_TILE_N_L2  KS_RVV_W4A8_GEMM_TILE_N_L2
+#define KS_QUANT_MATMUL_W4A8_TILE_K_L2  KS_RVV_W4A8_GEMM_TILE_K_L2
+#define KS_QUANT_MATMUL_W4A8_TILE_M_L1  KS_RVV_W4A8_GEMM_TILE_M_L1
+#define KS_QUANT_MATMUL_W4A8_TILE_N_L1  KS_RVV_W4A8_GEMM_TILE_N_L1
+#define KS_QUANT_MATMUL_W4A8_TILE_K_L1  KS_RVV_W4A8_GEMM_TILE_K_L1
+
 #define KS_SIMD_WIDTH_BITS    KS_RVV_VLEN
 #define KS_SIMD_WIDTH_F32     KS_RVV_VLMAX_F32_LMUL1
 #define KS_SIMD_WIDTH_F16     16
@@ -131,6 +198,17 @@
 // Callers should round K and N up to pack-factor multiples.
 #define KS_RVV_PACK_WORKSPACE_BYTES(K, N) \
   (((size_t)(K)) * ((size_t)(N)) * 4u)
+
+// Current quantized RVV profile does not materialize packed scratch buffers.
+// Future optimized packers must update these macros before consuming workspace.
+#define KS_QUANT_DOT_I8_WORKSPACE_BYTES(K) \
+  0u
+#define KS_QUANT_MATVEC_I8_WORKSPACE_BYTES(ROWS, COLS) \
+  0u
+#define KS_QUANT_DOT_W4A8_WORKSPACE_BYTES(K, GROUP_SIZE) \
+  0u
+#define KS_QUANT_MATVEC_W4A8_WORKSPACE_BYTES(ROWS, COLS, GROUP_SIZE) \
+  0u
 
 // ===--- Derived ks-opt flags ---------------------------------------------===//
 // Convenience string macros for building ks-opt command lines in scripts.

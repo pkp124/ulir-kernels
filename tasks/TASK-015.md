@@ -1,7 +1,7 @@
 # TASK-015: Add Quantized RVV Target Profile Parameters
 
 ## Status
-[ ] Not Started
+[~] In Progress
 
 ## Priority
 P1 (High)
@@ -48,6 +48,9 @@ ruff format --check .
   inherit unsuitable GEMM defaults.
 
 ## Log
+
+### 2026-06-13
+- Started implementation of RVV quantized profile parameters and validation.
 
 ### 2026-06-09
 - Created as the quantized target-profile child task for M5.

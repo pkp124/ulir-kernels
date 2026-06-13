@@ -33,18 +33,28 @@ add_subdirectory(host_reference)
 find_program(PYTEST_COMMAND pytest)
 if(PYTEST_COMMAND)
   add_custom_target(check-kernelsmith-golden
-    COMMAND ${PYTEST_COMMAND} tests/test_golden_verify.py
+    COMMAND ${PYTEST_COMMAND}
+      tests/test_golden_verify.py
+      tests/test_validate_profile.py
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
     COMMENT "Running KernelSmith golden-reference pytest tests"
   )
 
   add_test(NAME kernelsmith-golden-pytest
-    COMMAND ${PYTEST_COMMAND} tests/test_golden_verify.py
+    COMMAND ${PYTEST_COMMAND}
+      tests/test_golden_verify.py
+      tests/test_validate_profile.py
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
   )
 endif()
 
 if(Python3_FOUND)
+  add_test(NAME kernelsmith-profile-riscv-rvv-256
+    COMMAND ${Python3_EXECUTABLE}
+      ${CMAKE_SOURCE_DIR}/scripts/validate_profile.py
+      ${CMAKE_SOURCE_DIR}/target/riscv_rvv_256.h
+  )
+
   set(KS_GOLDEN_HOST_OUTPUT_DIR
     ${CMAKE_CURRENT_BINARY_DIR}/golden-host
   )
