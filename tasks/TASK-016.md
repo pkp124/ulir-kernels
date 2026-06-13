@@ -1,7 +1,7 @@
 # TASK-016: Implement INT8 Dot/GEMV Lowering
 
 ## Status
-[~] In Progress
+[x] Complete
 
 ## Priority
 P1 (High)
@@ -19,16 +19,16 @@ i32 accumulation, and explicit requantization where the public API requires an
 integer output.
 
 ## Acceptance Criteria
-- [ ] Add or update dialect/lowering metadata for i8 accumulator and
+- [x] Add or update dialect/lowering metadata for i8 accumulator and
       quantization policy.
-- [ ] Lower i8 dot/GEMV to vectorizable or RVV-friendly IR with i32
+- [x] Lower i8 dot/GEMV to vectorizable or RVV-friendly IR with i32
       accumulation.
-- [ ] Add lit tests for supported lowering patterns and diagnostics for
+- [x] Add lit tests for supported lowering patterns and diagnostics for
       unsupported metadata/layout cases.
-- [ ] Add host/reference or generated C API tests using the ABI from
+- [x] Add host/reference or generated C API tests using the ABI from
       `TASK-013`.
-- [ ] Verify outputs against quantized golden cases from `TASK-014`.
-- [ ] Add QEMU RVV validation when the generated RISC-V binary is runnable in
+- [x] Verify outputs against quantized golden cases from `TASK-014`.
+- [x] Add QEMU RVV validation when the generated RISC-V binary is runnable in
       CI or locally.
 
 ## Dependencies
@@ -46,8 +46,18 @@ ruff check .
 ruff format --check .
 ```
 
-Run `PYTHON=.venv/bin/python ./scripts/run-tests.sh --riscv-functional` once
-RISC-V quantized runner support exists.
+Verified on 2026-06-13:
+
+```bash
+cmake --build build --parallel
+.venv/bin/lit -v build/tests/lit/Dialect/Kernel/quantized-dot-gemv.mlir build/tests/lit/Dialect/Kernel/quantized-dot-gemv-invalid.mlir build/tests/lit/Passes/lower-quantized-dot-gemv.mlir --param ks_tools_dir=/workspace/build/bin
+ctest --test-dir build --output-on-failure
+.venv/bin/ruff check .
+.venv/bin/ruff format --check .
+PYTHON=.venv/bin/python ./scripts/run-tests.sh --riscv-functional
+```
+
+Docker parity was not available on this VM (`docker: command not found`).
 
 ## Notes
 - Keep this task focused on INT8. W4A8 fused unpack/dequantize is tracked by
@@ -57,6 +67,10 @@ RISC-V quantized runner support exists.
 
 ### 2026-06-13
 - Started INT8 dot/GEMV dialect and lowering implementation.
+- Added `ks.dot_i8` and `ks.matvec_i8` ops, verifiers, lit tests, and
+  `--ks-lower-to-linalg` lowering to i32 `linalg.generic`.
+- Added INT8 dot/GEMV cases to RVV functional validation and verified them with
+  QEMU at VLEN 256 and 512.
 
 ### 2026-06-09
 - Created as the INT8 lowering child task for M5.
