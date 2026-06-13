@@ -1,7 +1,7 @@
 # TASK-016: Implement INT8 Dot/GEMV Lowering
 
 ## Status
-[ ] Not Started
+[~] In Progress
 
 ## Priority
 P1 (High)
@@ -54,6 +54,9 @@ RISC-V quantized runner support exists.
   `TASK-017`.
 
 ## Log
+
+### 2026-06-13
+- Started INT8 dot/GEMV dialect and lowering implementation.
 
 ### 2026-06-09
 - Created as the INT8 lowering child task for M5.

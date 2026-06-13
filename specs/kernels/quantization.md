@@ -17,6 +17,14 @@ lowering to target-specific integer kernels.
 
 %x = ks.dequantize %q {scale = 0.03125 : f64, zero_point = 0 : i64}
      : tensor<...xi8> -> tensor<...xf32>
+
+%acc = ks.dot_i8 %input, %weight {
+        input_zero_point = 0 : i64, weight_zero_point = 0 : i64}
+        : tensor<...xi8>, tensor<...xi8> -> tensor<i32>
+
+%out = ks.matvec_i8 %input, %weights {
+       input_zero_point = 0 : i64, weight_zero_point = 0 : i64}
+       : tensor<...xi8>, tensor<...x...xi8> -> tensor<...xi32>
 ```
 
 ## Mathematical Definition
@@ -31,6 +39,20 @@ For dequantization:
 
 ```
 x[i] = (q[i] - zero_point) * scale
+```
+
+For INT8 dot:
+
+```
+acc = sum_k ((input[k] - input_zero_point) *
+             (weight[k] - weight_zero_point))
+```
+
+For INT8 GEMV:
+
+```
+out[row] = sum_col ((input[col] - input_zero_point) *
+                    (weights[row, col] - weight_zero_point))
 ```
 
 Rounding mode and saturation details are defined by future lowering passes. At
@@ -60,6 +82,29 @@ shape compatibility.
 | `scale` | `f64` | required | Positive finite quantization scale |
 | `zero_point` | `i64` | `0` | Integer offset in the quantized domain |
 
+### `ks.dot_i8`
+
+| Name | Type | Description |
+|------|------|-------------|
+| `input` | ranked 1D i8 tensor | Activation vector |
+| `weight` | ranked 1D i8 tensor | Weight vector |
+| `output` | rank-0 i32 tensor | Exact accumulator result |
+
+### `ks.matvec_i8`
+
+| Name | Type | Description |
+|------|------|-------------|
+| `input` | ranked 1D i8 tensor | Activation vector with shape `[cols]` |
+| `weights` | ranked 2D i8 tensor | Row-major weights with shape `[rows, cols]` |
+| `output` | ranked 1D i32 tensor | Exact accumulator results with shape `[rows]` |
+
+### INT8 dot/GEMV attributes
+
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `input_zero_point` | `i64` | `0` | Integer offset subtracted from input elements |
+| `weight_zero_point` | `i64` | `0` | Integer offset subtracted from weight elements |
+
 ## Verification Rules
 
 1. Input and result must be ranked tensors.
@@ -70,6 +115,15 @@ shape compatibility.
 6. `ks.dequantize` result element type must be floating-point.
 7. `scale` must be positive and finite.
 8. `zero_point` must fit in the integer storage element type.
+9. `ks.dot_i8` input and weight must be ranked 1D i8 tensors with matching
+   static dimensions when both are known.
+10. `ks.dot_i8` result must be a rank-0 i32 tensor.
+11. `ks.matvec_i8` input must be a ranked 1D i8 tensor, weights must be a
+    ranked 2D i8 tensor, and result must be a ranked 1D i32 tensor.
+12. `ks.matvec_i8` input length must match the weights column dimension when
+    both are static; result length must match the weights row dimension when
+    both are static.
+13. INT8 dot/GEMV zero-points must fit in signed i8.
 
 ## Lowering Strategy
 
@@ -84,6 +138,20 @@ Initial lowering will target linalg or vector forms:
 
 RVV lowering can later fuse quantize/dequantize with dot, GEMV, and matmul
 patterns to avoid materializing intermediate tensors.
+
+INT8 dot/GEMV lowering starts as vectorizable linalg:
+
+```mlir
+linalg.generic {
+  %input_i32 = arith.extsi %input : i8 to i32
+  %weight_i32 = arith.extsi %weight : i8 to i32
+  %input_adj = arith.subi %input_i32, %input_zero_point : i32
+  %weight_adj = arith.subi %weight_i32, %weight_zero_point : i32
+  %product = arith.muli %input_adj, %weight_adj : i32
+  %sum = arith.addi %accumulator, %product : i32
+  linalg.yield %sum : i32
+}
+```
 
 ## Public C API Foundation
 
@@ -154,3 +222,7 @@ using caller-provided scratch memory.
 8. Reject shape mismatches.
 9. Reject non-positive scale values.
 10. Reject zero-points outside the storage range.
+11. Parse and print `ks.dot_i8` and `ks.matvec_i8`.
+12. Reject invalid INT8 dot/GEMV ranks, element types, result types, static
+    shape mismatches, and zero-points outside signed i8.
+13. Lower INT8 dot/GEMV to linalg.generic with i32 accumulation.

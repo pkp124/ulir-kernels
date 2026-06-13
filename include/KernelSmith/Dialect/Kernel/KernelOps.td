@@ -211,6 +211,57 @@ def KS_DequantizeOp : KS_Op<"dequantize", [Pure]> {
   let hasVerifier = 1;
 }
 
+def KS_DotI8Op : KS_Op<"dot_i8", [Pure]> {
+  let summary = "INT8 dot product with i32 accumulation";
+  let description = [{
+    Computes an INT8 dot product with explicit zero-point subtraction and i32
+    accumulation:
+
+      sum_k ((input[k] - input_zero_point) *
+             (weight[k] - weight_zero_point))
+
+    The result is a rank-0 i32 tensor. Requantization is intentionally not part
+    of this operation.
+  }];
+
+  let arguments = (ins
+    AnyTensor:$input,
+    AnyTensor:$weight,
+    DefaultValuedAttr<I64Attr, "0">:$input_zero_point,
+    DefaultValuedAttr<I64Attr, "0">:$weight_zero_point
+  );
+  let results = (outs AnyTensor:$output);
+
+  let assemblyFormat = [{
+    $input `,` $weight attr-dict `:` type($input) `,` type($weight) `->` type($output)
+  }];
+
+  let hasVerifier = 1;
+}
+
+def KS_MatvecI8Op : KS_Op<"matvec_i8", [Pure]> {
+  let summary = "INT8 matrix-vector product with i32 accumulation";
+  let description = [{
+    Computes an INT8 matrix-vector product with explicit zero-point subtraction
+    and i32 accumulation. The input vector has shape [cols], the row-major
+    weights tensor has shape [rows, cols], and the result has shape [rows].
+  }];
+
+  let arguments = (ins
+    AnyTensor:$input,
+    AnyTensor:$weights,
+    DefaultValuedAttr<I64Attr, "0">:$input_zero_point,
+    DefaultValuedAttr<I64Attr, "0">:$weight_zero_point
+  );
+  let results = (outs AnyTensor:$output);
+
+  let assemblyFormat = [{
+    $input `,` $weights attr-dict `:` type($input) `,` type($weights) `->` type($output)
+  }];
+
+  let hasVerifier = 1;
+}
+
 //===----------------------------------------------------------------------===//
 // Normalization Operations
 //===----------------------------------------------------------------------===//

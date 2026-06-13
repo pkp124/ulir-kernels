@@ -55,6 +55,20 @@ static LogicalResult verifyFloatingPointElementType(Operation *op,
   return success();
 }
 
+static LogicalResult verifyIntegerElementType(Operation *op,
+                                              RankedTensorType type,
+                                              StringRef tensorName,
+                                              unsigned width) {
+  auto integerType = dyn_cast<IntegerType>(type.getElementType());
+  if (!integerType || integerType.isUnsigned() ||
+      integerType.getWidth() != width) {
+    return op->emitOpError(tensorName)
+           << " element type must be i" << width;
+  }
+
+  return success();
+}
+
 static LogicalResult verifyMatchingElementTypes(Operation *op,
                                                 ArrayRef<RankedTensorType> types,
                                                 StringRef tensorNames) {
@@ -446,6 +460,120 @@ LogicalResult DequantizeOp::verify() {
     return failure();
 
   return verifyZeroPointFits(getOperation(), integerType, getZeroPoint());
+}
+
+//===----------------------------------------------------------------------===//
+// DotI8Op
+//===----------------------------------------------------------------------===//
+
+LogicalResult DotI8Op::verify() {
+  auto inputType = dyn_cast<RankedTensorType>(getInput().getType());
+  auto weightType = dyn_cast<RankedTensorType>(getWeight().getType());
+  auto outputType = dyn_cast<RankedTensorType>(getOutput().getType());
+
+  if (!inputType || !weightType || !outputType)
+    return emitOpError("input, weight, and result must be ranked tensors");
+
+  if (inputType.getRank() != 1)
+    return emitOpError("input must be a 1D tensor");
+
+  if (weightType.getRank() != 1)
+    return emitOpError("weight must be a 1D tensor");
+
+  auto outputIntegerType = dyn_cast<IntegerType>(outputType.getElementType());
+  if (outputType.getRank() != 0 || !outputIntegerType ||
+      outputIntegerType.isUnsigned() || outputIntegerType.getWidth() != 32) {
+    return emitOpError("result must be a rank-0 i32 tensor");
+  }
+
+  if (failed(
+          verifyIntegerElementType(getOperation(), inputType, "input", 8))) {
+    return failure();
+  }
+
+  if (failed(
+          verifyIntegerElementType(getOperation(), weightType, "weight", 8))) {
+    return failure();
+  }
+
+  int64_t inputK = inputType.getDimSize(0);
+  int64_t weightK = weightType.getDimSize(0);
+  if (inputK != ShapedType::kDynamic && weightK != ShapedType::kDynamic &&
+      inputK != weightK) {
+    return emitOpError("input and weight dimensions must match");
+  }
+
+  auto inputIntegerType = cast<IntegerType>(inputType.getElementType());
+  if (failed(verifyZeroPointFits(getOperation(), inputIntegerType,
+                                 getInputZeroPoint()))) {
+    return failure();
+  }
+
+  auto weightIntegerType = cast<IntegerType>(weightType.getElementType());
+  return verifyZeroPointFits(getOperation(), weightIntegerType,
+                             getWeightZeroPoint());
+}
+
+//===----------------------------------------------------------------------===//
+// MatvecI8Op
+//===----------------------------------------------------------------------===//
+
+LogicalResult MatvecI8Op::verify() {
+  auto inputType = dyn_cast<RankedTensorType>(getInput().getType());
+  auto weightsType = dyn_cast<RankedTensorType>(getWeights().getType());
+  auto outputType = dyn_cast<RankedTensorType>(getOutput().getType());
+
+  if (!inputType || !weightsType || !outputType)
+    return emitOpError("input, weights, and result must be ranked tensors");
+
+  if (inputType.getRank() != 1)
+    return emitOpError("input must be a 1D tensor");
+
+  if (weightsType.getRank() != 2)
+    return emitOpError("weights must be a 2D tensor");
+
+  auto outputIntegerType = dyn_cast<IntegerType>(outputType.getElementType());
+  if (outputType.getRank() != 1 || !outputIntegerType ||
+      outputIntegerType.isUnsigned() || outputIntegerType.getWidth() != 32) {
+    return emitOpError("result must be a 1D i32 tensor");
+  }
+
+  if (failed(
+          verifyIntegerElementType(getOperation(), inputType, "input", 8))) {
+    return failure();
+  }
+
+  if (failed(
+          verifyIntegerElementType(getOperation(), weightsType, "weights", 8))) {
+    return failure();
+  }
+
+  int64_t inputCols = inputType.getDimSize(0);
+  int64_t weightsRows = weightsType.getDimSize(0);
+  int64_t weightsCols = weightsType.getDimSize(1);
+  int64_t outputRows = outputType.getDimSize(0);
+
+  if (inputCols != ShapedType::kDynamic &&
+      weightsCols != ShapedType::kDynamic && inputCols != weightsCols) {
+    return emitOpError(
+        "input dimension must match weights column dimension");
+  }
+
+  if (outputRows != ShapedType::kDynamic &&
+      weightsRows != ShapedType::kDynamic && outputRows != weightsRows) {
+    return emitOpError(
+        "result dimension must match weights row dimension");
+  }
+
+  auto inputIntegerType = cast<IntegerType>(inputType.getElementType());
+  if (failed(verifyZeroPointFits(getOperation(), inputIntegerType,
+                                 getInputZeroPoint()))) {
+    return failure();
+  }
+
+  auto weightsIntegerType = cast<IntegerType>(weightsType.getElementType());
+  return verifyZeroPointFits(getOperation(), weightsIntegerType,
+                             getWeightZeroPoint());
 }
 
 //===----------------------------------------------------------------------===//
