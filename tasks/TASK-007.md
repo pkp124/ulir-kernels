@@ -25,7 +25,7 @@ INT8 and W4A8 RISC-V inference kernels.
 - [x] `TASK-013`: Define public C APIs and packed layouts for i8 and W4A8
       dot/GEMV.
 - [x] `TASK-014`: Add NumPy/golden validation for quantized dot, GEMV, and GEMM.
-- [ ] `TASK-015`: Add RVV i8/W4A8 tile parameters and pack factors to target
+- [x] `TASK-015`: Add RVV i8/W4A8 tile parameters and pack factors to target
       profiles.
 - [ ] `TASK-016`: Implement INT8 dot/GEMV lowering with i8 inputs, i32
       accumulation, and requantization where needed.
@@ -77,3 +77,7 @@ the local or CI environment.
 - Completed `TASK-014` with quantized golden descriptors, deterministic NumPy
   references, manifest metadata, comparator coverage, and host CTest smoke
   cases for i8 and W4A8 dot/GEMV.
+
+### 2026-06-13
+- Completed `TASK-015` with RVV quantized profile parameters, target
+  documentation, validation script coverage, and CTest integration.

@@ -1,7 +1,7 @@
 # TASK-015: Add Quantized RVV Target Profile Parameters
 
 ## Status
-[~] In Progress
+[x] Complete
 
 ## Priority
 P1 (High)
@@ -19,13 +19,13 @@ vector element widths, LMUL choices, tile sizes, pack factors, group sizes,
 alignment, and workspace implications.
 
 ## Acceptance Criteria
-- [ ] Extend `target/riscv_rvv_256.h` with i8 and W4A8 tile, pack, and
+- [x] Extend `target/riscv_rvv_256.h` with i8 and W4A8 tile, pack, and
       alignment parameters.
-- [ ] Document each new profile macro in the target profile specification.
-- [ ] Ensure future pass options can be derived from the profile without
+- [x] Document each new profile macro in the target profile specification.
+- [x] Ensure future pass options can be derived from the profile without
       hardcoding RVV VLEN.
-- [ ] Add tests or script checks that validate required profile fields exist.
-- [ ] Update docs to explain how quantized profile values affect dot/GEMV first
+- [x] Add tests or script checks that validate required profile fields exist.
+- [x] Update docs to explain how quantized profile values affect dot/GEMV first
       and GEMM later.
 
 ## Dependencies
@@ -41,6 +41,19 @@ ruff check .
 ruff format --check .
 ```
 
+Verified on 2026-06-13:
+
+```bash
+.venv/bin/python scripts/validate_profile.py target/riscv_rvv_256.h target/generic.h
+.venv/bin/pytest tests/test_validate_profile.py -q
+.venv/bin/ruff check .
+.venv/bin/ruff format --check .
+cmake --build build --parallel
+ctest --test-dir build --output-on-failure
+```
+
+Docker parity was not available on this VM (`docker: command not found`).
+
 ## Notes
 - Do not hardcode RVV VLEN in compiler code; profile values must remain
   vector-length agnostic where the ISA requires it.
@@ -51,6 +64,8 @@ ruff format --check .
 
 ### 2026-06-13
 - Started implementation of RVV quantized profile parameters and validation.
+- Completed RVV i8/W4A8 profile macros, target-profile documentation, validator
+  script, pytest coverage, and CTest integration.
 
 ### 2026-06-09
 - Created as the quantized target-profile child task for M5.
