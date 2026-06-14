@@ -115,6 +115,18 @@ static LogicalResult verifyZeroPointFits(Operation *op,
   return success();
 }
 
+static LogicalResult verifySignedI8ZeroPointFits(Operation *op,
+                                                 StringRef attrName,
+                                                 int64_t zeroPoint) {
+  constexpr int64_t minI8 = -128;
+  constexpr int64_t maxI8 = 127;
+  if (zeroPoint < minI8 || zeroPoint > maxI8)
+    return op->emitOpError(attrName)
+           << " " << zeroPoint << " does not fit in i8";
+
+  return success();
+}
+
 //===----------------------------------------------------------------------===//
 // MatmulOp
 //===----------------------------------------------------------------------===//
@@ -446,6 +458,54 @@ LogicalResult DequantizeOp::verify() {
     return failure();
 
   return verifyZeroPointFits(getOperation(), integerType, getZeroPoint());
+}
+
+//===----------------------------------------------------------------------===//
+// DotI8Op
+//===----------------------------------------------------------------------===//
+
+LogicalResult DotI8Op::verify() {
+  auto inputType = dyn_cast<RankedTensorType>(getInput().getType());
+  auto weightType = dyn_cast<RankedTensorType>(getWeight().getType());
+  auto resultType = dyn_cast<RankedTensorType>(getResult().getType());
+
+  if (!inputType || !weightType || !resultType)
+    return emitOpError("operands and result must be ranked tensors");
+
+  if (inputType.getRank() != 1)
+    return emitOpError("input must be a 1D tensor");
+
+  if (weightType.getRank() != 1)
+    return emitOpError("weight must be a 1D tensor");
+
+  auto inputElementType = dyn_cast<IntegerType>(inputType.getElementType());
+  if (!inputElementType || inputElementType.getWidth() != 8)
+    return emitOpError("input element type must be i8");
+
+  auto weightElementType = dyn_cast<IntegerType>(weightType.getElementType());
+  if (!weightElementType || weightElementType.getWidth() != 8)
+    return emitOpError("weight element type must be i8");
+
+  if (resultType.getRank() != 0)
+    return emitOpError("result must be a rank-0 tensor");
+
+  auto resultElementType = dyn_cast<IntegerType>(resultType.getElementType());
+  if (!resultElementType || resultElementType.getWidth() != 32)
+    return emitOpError("result element type must be i32");
+
+  int64_t inputDim = inputType.getDimSize(0);
+  int64_t weightDim = weightType.getDimSize(0);
+  if (inputDim != ShapedType::kDynamic &&
+      weightDim != ShapedType::kDynamic && inputDim != weightDim) {
+    return emitOpError("input and weight dimensions must match");
+  }
+
+  if (failed(verifySignedI8ZeroPointFits(getOperation(), "input_zero_point",
+                                         getInputZeroPoint())))
+    return failure();
+
+  return verifySignedI8ZeroPointFits(getOperation(), "weight_zero_point",
+                                     getWeightZeroPoint());
 }
 
 //===----------------------------------------------------------------------===//

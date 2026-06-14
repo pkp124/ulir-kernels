@@ -17,6 +17,10 @@ lowering to target-specific integer kernels.
 
 %x = ks.dequantize %q {scale = 0.03125 : f64, zero_point = 0 : i64}
      : tensor<...xi8> -> tensor<...xf32>
+
+%acc = ks.dot_i8 %input, %weight
+       {input_zero_point = 0 : i64, weight_zero_point = 0 : i64}
+       : tensor<...xi8>, tensor<...xi8> -> tensor<i32>
 ```
 
 ## Mathematical Definition
@@ -31,6 +35,13 @@ For dequantization:
 
 ```
 x[i] = (q[i] - zero_point) * scale
+```
+
+For INT8 dot:
+
+```
+acc = sum_k ((input[k] - input_zero_point) *
+             (weight[k] - weight_zero_point))
 ```
 
 Rounding mode and saturation details are defined by future lowering passes. At
@@ -60,6 +71,21 @@ shape compatibility.
 | `scale` | `f64` | required | Positive finite quantization scale |
 | `zero_point` | `i64` | `0` | Integer offset in the quantized domain |
 
+### `ks.dot_i8`
+
+| Name | Type | Description |
+|------|------|-------------|
+| `input` | rank-1 `i8` tensor | Quantized activation vector |
+| `weight` | rank-1 `i8` tensor | Quantized weight vector |
+| `result` | rank-0 `i32` tensor | Exact signed accumulator |
+
+### Attributes
+
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `input_zero_point` | `i64` | `0` | Activation zero-point, must fit signed i8 |
+| `weight_zero_point` | `i64` | `0` | Weight zero-point, must fit signed i8 |
+
 ## Verification Rules
 
 1. Input and result must be ranked tensors.
@@ -70,6 +96,10 @@ shape compatibility.
 6. `ks.dequantize` result element type must be floating-point.
 7. `scale` must be positive and finite.
 8. `zero_point` must fit in the integer storage element type.
+9. `ks.dot_i8` operands must be ranked 1D tensors with signed i8 semantics.
+10. `ks.dot_i8` operand shapes must match, allowing dynamic dimensions.
+11. `ks.dot_i8` result must be a rank-0 tensor with i32 element type.
+12. `ks.dot_i8` zero-point attributes must fit in signed i8.
 
 ## Lowering Strategy
 
@@ -84,6 +114,10 @@ Initial lowering will target linalg or vector forms:
 
 RVV lowering can later fuse quantize/dequantize with dot, GEMV, and matmul
 patterns to avoid materializing intermediate tensors.
+
+`ks.dot_i8` lowers to a `linalg.generic` reduction with two rank-1 inputs and a
+rank-0 i32 output. The body sign-extends each i8 operand to i32, subtracts the
+zero-points, multiplies, and adds into the accumulator.
 
 ## Public C API Foundation
 
@@ -154,3 +188,6 @@ using caller-provided scratch memory.
 8. Reject shape mismatches.
 9. Reject non-positive scale values.
 10. Reject zero-points outside the storage range.
+11. Parse and print `ks.dot_i8` for i8 vectors to an i32 scalar tensor.
+12. Reject invalid `ks.dot_i8` ranks, element types, shapes, result types, and
+    zero-points.

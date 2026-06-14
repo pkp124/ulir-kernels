@@ -31,11 +31,12 @@ def KSLowerToLinalgPass
     : Pass<"ks-lower-to-linalg", "mlir::func::FuncOp"> {
   let summary = "Lower KS structured ops to the linalg dialect";
   let description = [{
-    Lowers KS dialect structured operations to their linalg named-op equivalents.
-    This is the first step in the lowering pipeline for compute-intensive ops.
+    Lowers KS dialect structured operations to linalg structured ops. This is
+    the first step in the lowering pipeline for compute-intensive ops.
 
     Lowering rules:
       ks.matmul %A, %B -> linalg.fill(0) + linalg.matmul ins(%A, %B)
+      ks.dot_i8 %input, %weight -> linalg.generic i32 reduction
 
     The output tensor is zero-initialized via linalg.fill so that the
     linalg.matmul accumulation semantics (C += A*B) produce C = A*B.
