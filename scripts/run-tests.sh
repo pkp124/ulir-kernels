@@ -240,6 +240,29 @@ run_riscv_functional_tests() {
         --vlens "${vlen_args[@]}" \
         --output-dir "${output_dir}" \
         --report "${output_dir}/matvec_i8_riscv_report.json"
+
+    "${python_bin}" "${PROJECT_ROOT}/tests/verify.py" \
+        --case "${PROJECT_ROOT}/tests/golden/cases/dot_w4a8_smoke.json" \
+        --target riscv_rvv_256 \
+        --riscv-runner "${runner_dir}/riscv-golden-runner" \
+        --host-runner "${runner_dir}/host-reference-runner" \
+        --qemu qemu-riscv64 \
+        --vlens "${vlen_args[@]}" \
+        --output-dir "${output_dir}" \
+        --report "${output_dir}/dot_w4a8_riscv_report.json"
+
+    "${python_bin}" "${PROJECT_ROOT}/tests/verify.py" \
+        --case "${PROJECT_ROOT}/tests/golden/cases/matvec_w4a8_smoke.json" \
+        --target riscv_rvv_256 \
+        --riscv-runner "${runner_dir}/riscv-golden-runner" \
+        --host-runner "${runner_dir}/host-reference-runner" \
+        --qemu qemu-riscv64 \
+        --vlens "${vlen_args[@]}" \
+        --output-dir "${output_dir}" \
+        --report "${output_dir}/matvec_w4a8_riscv_report.json" \
+        --benchmark \
+        --benchmark-runs 3 \
+        --benchmark-warmup 1
 }
 
 # Run tests based on flags

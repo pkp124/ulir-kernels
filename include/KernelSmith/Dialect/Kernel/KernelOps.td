@@ -272,6 +272,42 @@ def KS_DotW4A8Op : KS_Op<"dot_w4a8", [Pure]> {
   let hasVerifier = 1;
 }
 
+def KS_MatvecW4A8Op : KS_Op<"matvec_w4a8", [Pure]> {
+  let summary = "W4A8 matrix-vector product with fused dequantization";
+  let description = [{
+    Computes a mixed-precision matrix-vector product over row-major signed INT4
+    packed weights and signed INT8 activations with f32 accumulation:
+
+      output[row] += ((input[col] - input_zero_point) * input_scale) *
+                     ((unpack_i4(packed_weights[row, col]) -
+                       weight_zero_point) *
+                      weight_scales[row, col / group_size])
+
+    Packed weight rows store two signed INT4 values per byte, with even columns
+    in the low nibble and odd columns in the high nibble. The result is a rank-1
+    f32 tensor carrying one fused accumulator per row.
+  }];
+
+  let arguments = (ins
+    AnyTensor:$input,
+    AnyTensor:$packed_weights,
+    AnyTensor:$weight_scales,
+    I64Attr:$group_size,
+    F64Attr:$input_scale,
+    DefaultValuedAttr<I64Attr, "0">:$input_zero_point,
+    DefaultValuedAttr<I64Attr, "0">:$weight_zero_point
+  );
+  let results = (outs AnyTensor:$result);
+
+  let assemblyFormat = [{
+    $input `,` $packed_weights `,` $weight_scales attr-dict `:`
+    type($input) `,` type($packed_weights) `,` type($weight_scales)
+    `->` type($result)
+  }];
+
+  let hasVerifier = 1;
+}
+
 def KS_MatvecI8Op : KS_Op<"matvec_i8", [Pure]> {
   let summary = "INT8 matrix-vector product with i32 accumulation";
   let description = [{

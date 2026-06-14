@@ -118,7 +118,8 @@ static Value buildW4A8ProductAdd(OpBuilder &b, Location loc, Value input,
                                  Value packedWeights, Value weightScales,
                                  Value accumulator, int64_t groupSize,
                                  double inputScale, int64_t inputZeroPoint,
-                                 int64_t weightZeroPoint) {
+                                 int64_t weightZeroPoint, int64_t colIndexDim,
+                                 Value rowIndex = Value()) {
   Type i32Type = b.getI32Type();
   Type f32Type = b.getF32Type();
 
@@ -132,10 +133,14 @@ static Value buildW4A8ProductAdd(OpBuilder &b, Location loc, Value input,
   Value lowMask =
       b.create<arith::ConstantOp>(loc, b.getI32IntegerAttr(0x0f));
 
-  Value k = b.create<linalg::IndexOp>(loc, 0);
+  Value k = b.create<linalg::IndexOp>(loc, colIndexDim);
   Value packedIndex = b.create<arith::DivUIOp>(loc, k, two);
-  Value packed =
-      b.create<tensor::ExtractOp>(loc, packedWeights, packedIndex);
+  SmallVector<Value> packedIndices;
+  if (rowIndex)
+    packedIndices.push_back(rowIndex);
+  packedIndices.push_back(packedIndex);
+  Value packed = b.create<tensor::ExtractOp>(loc, packedWeights,
+                                             packedIndices);
   Value packedI32 = b.create<arith::ExtUIOp>(loc, i32Type, packed);
 
   Value lowNibble = b.create<arith::AndIOp>(loc, packedI32, lowMask);
@@ -165,8 +170,12 @@ static Value buildW4A8ProductAdd(OpBuilder &b, Location loc, Value input,
       b.create<arith::MulFOp>(loc, inputF32, inputScaleValue);
 
   Value scaleIndex = b.create<arith::DivUIOp>(loc, k, groupSizeValue);
-  Value weightScale =
-      b.create<tensor::ExtractOp>(loc, weightScales, scaleIndex);
+  SmallVector<Value> scaleIndices;
+  if (rowIndex)
+    scaleIndices.push_back(rowIndex);
+  scaleIndices.push_back(scaleIndex);
+  Value weightScale = b.create<tensor::ExtractOp>(loc, weightScales,
+                                                  scaleIndices);
   Value weightF32 = b.create<arith::SIToFPOp>(loc, f32Type, centeredWeight);
   Value scaledWeight =
       b.create<arith::MulFOp>(loc, weightF32, weightScale);
@@ -268,7 +277,50 @@ struct DotW4A8ToLinalgPattern : public OpRewritePattern<ks::DotW4A8Op> {
               b, loc, args[0], op.getPackedWeight(), op.getWeightScales(),
               args[1], op.getGroupSize(),
               op.getInputScaleAttr().getValueAsDouble(),
-              op.getInputZeroPoint(), op.getWeightZeroPoint());
+              op.getInputZeroPoint(), op.getWeightZeroPoint(),
+              /*colIndexDim=*/0);
+          b.create<linalg::YieldOp>(loc, sum);
+        });
+
+    rewriter.replaceOp(op, generic.getResults());
+    return success();
+  }
+};
+
+/// Lower ks.matvec_w4a8 to a fused row-parallel linalg.generic reduction.
+struct MatvecW4A8ToLinalgPattern
+    : public OpRewritePattern<ks::MatvecW4A8Op> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(ks::MatvecW4A8Op op,
+                                PatternRewriter &rewriter) const override {
+    Location loc = op.getLoc();
+    MLIRContext *context = rewriter.getContext();
+    auto resultType = cast<RankedTensorType>(op.getType());
+
+    AffineExpr row = rewriter.getAffineDimExpr(0);
+    AffineExpr col = rewriter.getAffineDimExpr(1);
+    AffineMap inputMap = AffineMap::get(/*dimCount=*/2, /*symbolCount=*/0,
+                                        col, context);
+    AffineMap resultMap = AffineMap::get(/*dimCount=*/2, /*symbolCount=*/0,
+                                         row, context);
+    SmallVector<AffineMap> maps{inputMap, resultMap};
+    SmallVector<utils::IteratorType> iters{utils::IteratorType::parallel,
+                                           utils::IteratorType::reduction};
+
+    Value filled = createZeroFilledTensorLike(rewriter, loc, resultType,
+                                              op.getPackedWeights());
+
+    auto generic = rewriter.create<linalg::GenericOp>(
+        loc, resultType, ValueRange{op.getInput()}, ValueRange{filled}, maps,
+        iters, [&](OpBuilder &b, Location loc, ValueRange args) {
+          Value rowIndex = b.create<linalg::IndexOp>(loc, 0);
+          Value sum = buildW4A8ProductAdd(
+              b, loc, args[0], op.getPackedWeights(), op.getWeightScales(),
+              args[1], op.getGroupSize(),
+              op.getInputScaleAttr().getValueAsDouble(),
+              op.getInputZeroPoint(), op.getWeightZeroPoint(),
+              /*colIndexDim=*/1, rowIndex);
           b.create<linalg::YieldOp>(loc, sum);
         });
 
@@ -328,7 +380,7 @@ struct KSLowerToLinalgPass
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
     patterns.add<DotI8ToLinalgPattern, DotW4A8ToLinalgPattern,
-                 MatmulToLinalgPattern,
+                 MatmulToLinalgPattern, MatvecW4A8ToLinalgPattern,
                  MatvecI8ToLinalgPattern>(&getContext());
 
     if (failed(applyPatternsGreedily(getOperation(), std::move(patterns))))

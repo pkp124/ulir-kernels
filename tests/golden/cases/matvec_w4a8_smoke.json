@@ -81,6 +81,11 @@
     }
   ],
   "targets": [
-    "host_reference"
+    "host_reference",
+    "riscv_rvv_256"
+  ],
+  "vlens": [
+    256,
+    512
   ]
 }

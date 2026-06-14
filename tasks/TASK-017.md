@@ -1,7 +1,7 @@
 # TASK-017: Implement W4A8 Fused Dot/GEMV Lowering
 
 ## Status
-[~] In Progress
+[x] Complete
 
 ## Priority
 P1 (High)
@@ -21,13 +21,13 @@ without materializing dequantized weights.
 ## Acceptance Criteria
 - [x] Implement W4A8 packed-weight loading and nibble unpacking according to the
       ABI from `TASK-013`.
-- [ ] Fuse unpack/dequantize with dot/GEMV compute in the generated path.
-- [ ] Support the selected accumulation policy, either i32 or f32, with explicit
+- [x] Fuse unpack/dequantize with dot/GEMV compute in the generated path.
+- [x] Support the selected accumulation policy, either i32 or f32, with explicit
       rounding and saturation behavior.
 - [x] Add lit tests for fused lowering patterns and unsupported-layout
       diagnostics.
-- [ ] Validate against W4A8 golden cases from `TASK-014`.
-- [ ] Add QEMU RVV validation and benchmark reporting for at least one W4A8
+- [x] Validate against W4A8 golden cases from `TASK-014`.
+- [x] Add QEMU RVV validation and benchmark reporting for at least one W4A8
       smoke case when toolchains are available.
 
 ## Dependencies
@@ -63,6 +63,24 @@ cmake --build build --parallel
 Docker parity and local `clang-format` were unavailable on this VM
 (`docker: command not found`, `clang-format: command not found`).
 
+Verified on 2026-06-14 for the `ks.matvec_w4a8` GEMV/linalg and RVV golden
+validation slice:
+
+```bash
+./scripts/setup.sh
+cmake --build build --parallel
+ctest --test-dir build --output-on-failure -R kernelsmith-lit
+ctest --test-dir build --output-on-failure
+.venv/bin/ruff check .
+.venv/bin/ruff format --check .
+PYTHON=.venv/bin/python ./scripts/run-tests.sh --riscv-functional
+git diff --check
+```
+
+`./scripts/setup-rvv-sim.sh` installed QEMU and the RISC-V cross-compiler before
+the RVV functional run. Docker parity and local `clang-format` were unavailable
+on this VM (`docker: command not found`, `clang-format: command not found`).
+
 Verified on 2026-06-14 for the fused `ks.dot_w4a8` linalg lowering slice:
 
 ```bash
@@ -83,6 +101,11 @@ Docker parity and local `clang-format` were unavailable on this VM
 ## Log
 
 ### 2026-06-14
+- Added `ks.matvec_w4a8` dialect, verifier, and fused linalg lowering coverage,
+  including row-parallel packed nibble extraction and f32 accumulation.
+- Extended W4A8 golden descriptors to `riscv_rvv_256` with VLEN 256/512
+  validation, and added W4A8 dot/GEMV execution to `--riscv-functional`.
+- Recorded W4A8 GEMV benchmark reporting in the generated RVV functional report.
 - Added fused `ks.dot_w4a8` lowering to `linalg.generic`, including packed-byte
   extraction, signed nibble unpacking, per-group scale extraction, and f32
   accumulation.
