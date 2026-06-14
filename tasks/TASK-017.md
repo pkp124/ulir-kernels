@@ -46,8 +46,8 @@ ruff check .
 ruff format --check .
 ```
 
-Run `PYTHON=.venv/bin/python ./scripts/run-tests.sh --riscv-functional` once
-W4A8 RISC-V runner support exists.
+W4A8 RISC-V runner support now runs through
+`PYTHON=.venv/bin/python ./scripts/run-tests.sh --riscv-functional`.
 
 Verified on 2026-06-14 for the `ks.dot_w4a8` dialect slice:
 
@@ -111,12 +111,8 @@ Docker parity and local `clang-format` were unavailable on this VM
   accumulation.
 - Tightened quantized compute verifier diagnostics to reject non-signless MLIR
   integer tensor types before lowering; the C ABI remains `int8_t`/`uint8_t`.
-- Remaining task work includes W4A8 GEMV/generated RVV integration and QEMU
-  reporting.
 - Started the first W4A8 compiler-visible slice with `ks.dot_w4a8` dialect
   coverage, verifier diagnostics, and quantization spec updates.
-- Remaining task work includes fused linalg lowering, GEMV coverage, golden
-  W4A8 validation through generated paths, and QEMU RVV reporting.
 
 ### 2026-06-09
 - Created as the W4A8 fused lowering child task for M5.
