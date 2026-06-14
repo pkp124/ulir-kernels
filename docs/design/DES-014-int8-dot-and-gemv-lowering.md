@@ -37,10 +37,10 @@ From specification: `specs/kernels/quantization.md`.
 ## Design
 
 ### Overview
-Add `ks.dot_i8` as a pure KernelSmith op and lower it in
-`--ks-lower-to-linalg` to a `linalg.generic` reduction. The lowering widens both
-i8 operands to i32 with signed extension, subtracts the i8 zero-points in i32,
-multiplies, and accumulates into an i32 scalar tensor.
+Add `ks.dot_i8` and `ks.matvec_i8` as pure KernelSmith ops and lower them in
+`--ks-lower-to-linalg` to `linalg.generic` reductions. The lowering widens i8
+operands to i32 with signed extension, subtracts the i8 zero-points in i32,
+multiplies, and accumulates into i32 output tensors.
 
 ### Component Design
 
@@ -49,8 +49,13 @@ multiplies, and accumulates into an i32 scalar tensor.
 rank-0 i32 tensor. Attributes `input_zero_point` and `weight_zero_point`
 default to zero and must fit in signed i8.
 
+#### `ks.matvec_i8`
+`ks.matvec_i8` consumes a rank-1 i8 input tensor and a rank-2 row-major i8
+weights tensor shaped `[rows, cols]`. The input length must match `cols`, and
+the rank-1 i32 result length must match `rows`.
+
 #### Linalg lowering
-The op lowers to:
+`ks.dot_i8` lowers to:
 
 ```mlir
 %empty = tensor.empty() : tensor<i32>
@@ -74,6 +79,19 @@ acc += (int32(input[k]) - input_zero_point) *
        (int32(weight[k]) - weight_zero_point)
 ```
 
+`ks.matvec_i8` lowers to one `linalg.generic` with indexing maps:
+
+```mlir
+[
+  affine_map<(row, col) -> (col)>,
+  affine_map<(row, col) -> (row, col)>,
+  affine_map<(row, col) -> (row)>
+]
+```
+
+The iterator types are `["parallel", "reduction"]`, producing one i32
+accumulator per weight row.
+
 ### Interface
 
 ```mlir
@@ -84,6 +102,14 @@ func.func @dot(%input: tensor<128xi8>, %weight: tensor<128xi8>)
       : tensor<128xi8>, tensor<128xi8> -> tensor<i32>
   return %acc : tensor<i32>
 }
+
+func.func @matvec(%input: tensor<128xi8>, %weights: tensor<4x128xi8>)
+    -> tensor<4xi32> {
+  %out = ks.matvec_i8 %input, %weights
+      {input_zero_point = -3 : i64, weight_zero_point = 5 : i64}
+      : tensor<128xi8>, tensor<4x128xi8> -> tensor<4xi32>
+  return %out : tensor<4xi32>
+}
 ```
 
 ### Data Flow
@@ -92,6 +118,9 @@ func.func @dot(%input: tensor<128xi8>, %weight: tensor<128xi8>)
 ks.dot_i8
   -> --ks-lower-to-linalg
 linalg.generic i32 reduction
+ks.matvec_i8
+  -> --ks-lower-to-linalg
+linalg.generic parallel row / reduction column i32 accumulation
   -> future tiling/vectorization/RVV lowering
 ```
 
@@ -112,10 +141,14 @@ linalg.generic i32 reduction
 - [x] Parse/print `ks.dot_i8`.
 - [x] Reject invalid ranks, element types, shapes, result type, and zero-points.
 - [x] Check `--ks-lower-to-linalg` emits signed i32 accumulation.
+- [x] Parse/print `ks.matvec_i8`.
+- [x] Reject invalid GEMV ranks, element types, shapes, result type, and
+      zero-points.
+- [x] Check `--ks-lower-to-linalg` emits row-parallel signed i32 accumulation.
 
 ### Edge Cases
-- [ ] Dynamic K dimensions are accepted when both operands are dynamic.
-- [ ] Static K mismatches are rejected.
+- [x] Dynamic K dimensions are accepted when operands are dynamic.
+- [x] Static K mismatches are rejected.
 
 ### Integration Tests
 - [ ] Full CTest keeps host quantized golden validation green.
@@ -130,7 +163,7 @@ linalg.generic i32 reduction
 
 ## Open Questions
 
-- [ ] Should `ks.matvec_i8` lower by decomposition into dot slices or as one
+- [x] Should `ks.matvec_i8` lower by decomposition into dot slices or as one
       rank-2 linalg reduction for better vectorization?
 - [ ] Where should generated quantized RVV objects plug into `libkernelsmith.a`?
 
@@ -147,7 +180,7 @@ linalg.generic i32 reduction
 - [x] Lower `ks.dot_i8` to `linalg.generic` with i32 accumulation.
 
 ### Phase 2: GEMV and RVV follow-ons
-- [ ] Add `ks.matvec_i8` and row-wise lowering.
+- [x] Add `ks.matvec_i8` and row-wise lowering.
 - [ ] Add quantized tiling/vectorization/RVV validation using profile macros.
 
 ---

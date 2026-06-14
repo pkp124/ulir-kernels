@@ -509,6 +509,63 @@ LogicalResult DotI8Op::verify() {
 }
 
 //===----------------------------------------------------------------------===//
+// MatvecI8Op
+//===----------------------------------------------------------------------===//
+
+LogicalResult MatvecI8Op::verify() {
+  auto inputType = dyn_cast<RankedTensorType>(getInput().getType());
+  auto weightsType = dyn_cast<RankedTensorType>(getWeights().getType());
+  auto resultType = dyn_cast<RankedTensorType>(getResult().getType());
+
+  if (!inputType || !weightsType || !resultType)
+    return emitOpError("operands and result must be ranked tensors");
+
+  if (inputType.getRank() != 1)
+    return emitOpError("input must be a 1D tensor");
+
+  if (weightsType.getRank() != 2)
+    return emitOpError("weights must be a 2D tensor");
+
+  auto inputElementType = dyn_cast<IntegerType>(inputType.getElementType());
+  if (!inputElementType || inputElementType.getWidth() != 8)
+    return emitOpError("input element type must be i8");
+
+  auto weightsElementType = dyn_cast<IntegerType>(weightsType.getElementType());
+  if (!weightsElementType || weightsElementType.getWidth() != 8)
+    return emitOpError("weights element type must be i8");
+
+  if (resultType.getRank() != 1)
+    return emitOpError("result must be a 1D tensor");
+
+  auto resultElementType = dyn_cast<IntegerType>(resultType.getElementType());
+  if (!resultElementType || resultElementType.getWidth() != 32)
+    return emitOpError("result element type must be i32");
+
+  int64_t inputCols = inputType.getDimSize(0);
+  int64_t weightsRows = weightsType.getDimSize(0);
+  int64_t weightsCols = weightsType.getDimSize(1);
+  int64_t resultRows = resultType.getDimSize(0);
+
+  if (inputCols != ShapedType::kDynamic &&
+      weightsCols != ShapedType::kDynamic && inputCols != weightsCols) {
+    return emitOpError(
+        "input dimension must match weights column dimension");
+  }
+
+  if (resultRows != ShapedType::kDynamic &&
+      weightsRows != ShapedType::kDynamic && resultRows != weightsRows) {
+    return emitOpError("result dimension must match weights row dimension");
+  }
+
+  if (failed(verifySignedI8ZeroPointFits(getOperation(), "input_zero_point",
+                                         getInputZeroPoint())))
+    return failure();
+
+  return verifySignedI8ZeroPointFits(getOperation(), "weight_zero_point",
+                                     getWeightZeroPoint());
+}
+
+//===----------------------------------------------------------------------===//
 // RMSNormOp
 //===----------------------------------------------------------------------===//
 

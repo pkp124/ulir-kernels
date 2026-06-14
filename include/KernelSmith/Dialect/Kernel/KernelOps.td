@@ -238,6 +238,35 @@ def KS_DotI8Op : KS_Op<"dot_i8", [Pure]> {
   let hasVerifier = 1;
 }
 
+def KS_MatvecI8Op : KS_Op<"matvec_i8", [Pure]> {
+  let summary = "INT8 matrix-vector product with i32 accumulation";
+  let description = [{
+    Computes a quantized INT8 matrix-vector product with signed i32
+    accumulation:
+
+      output[row] += (input[col] - input_zero_point) *
+                     (weights[row, col] - weight_zero_point)
+
+    Weights are row-major with shape rows x cols. The result is a rank-1 i32
+    tensor carrying one exact accumulator per row.
+  }];
+
+  let arguments = (ins
+    AnyTensor:$input,
+    AnyTensor:$weights,
+    DefaultValuedAttr<I64Attr, "0">:$input_zero_point,
+    DefaultValuedAttr<I64Attr, "0">:$weight_zero_point
+  );
+  let results = (outs AnyTensor:$result);
+
+  let assemblyFormat = [{
+    $input `,` $weights attr-dict `:` type($input) `,` type($weights)
+    `->` type($result)
+  }];
+
+  let hasVerifier = 1;
+}
+
 //===----------------------------------------------------------------------===//
 // Normalization Operations
 //===----------------------------------------------------------------------===//

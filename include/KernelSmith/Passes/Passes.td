@@ -37,9 +37,10 @@ def KSLowerToLinalgPass
     Lowering rules:
       ks.matmul %A, %B -> linalg.fill(0) + linalg.matmul ins(%A, %B)
       ks.dot_i8 %input, %weight -> linalg.generic i32 reduction
+      ks.matvec_i8 %input, %weights -> linalg.generic i32 row reductions
 
     The output tensor is zero-initialized via linalg.fill so that the
-    linalg.matmul accumulation semantics (C += A*B) produce C = A*B.
+    accumulation semantics produce replacement-style results.
 
     Dynamic shapes are handled by inserting tensor.dim queries for any
     dimension of the result tensor that is not statically known.

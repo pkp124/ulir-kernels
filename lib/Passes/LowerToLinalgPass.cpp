@@ -78,6 +78,42 @@ static Value createZeroFilledScalarTensor(OpBuilder &b, Location loc,
   return b.create<linalg::FillOp>(loc, zero, empty).getResult(0);
 }
 
+/// Build a zero-filled tensor with dynamic dimensions sourced from `shapeLike`.
+static Value createZeroFilledTensorLike(OpBuilder &b, Location loc,
+                                        RankedTensorType resultType,
+                                        Value shapeLike) {
+  SmallVector<Value> dynamicSizes;
+  for (int64_t dim = 0; dim < resultType.getRank(); ++dim) {
+    if (resultType.isDynamicDim(dim))
+      dynamicSizes.push_back(b.create<tensor::DimOp>(loc, shapeLike, dim));
+  }
+
+  Value empty = b.create<tensor::EmptyOp>(
+      loc, resultType.getShape(), resultType.getElementType(), dynamicSizes);
+  Value zero = b.create<arith::ConstantOp>(
+      loc, b.getZeroAttr(resultType.getElementType()));
+  return b.create<linalg::FillOp>(loc, zero, empty).getResult(0);
+}
+
+static Value buildI8ProductAdd(OpBuilder &b, Location loc, Value input,
+                               Value weight, Value accumulator,
+                               int64_t inputZeroPoint,
+                               int64_t weightZeroPoint) {
+  Type i32Type = b.getI32Type();
+  Value inputI32 = b.create<arith::ExtSIOp>(loc, i32Type, input);
+  Value inputZp = b.create<arith::ConstantOp>(
+      loc, b.getI32IntegerAttr(inputZeroPoint));
+  Value centeredInput = b.create<arith::SubIOp>(loc, inputI32, inputZp);
+
+  Value weightI32 = b.create<arith::ExtSIOp>(loc, i32Type, weight);
+  Value weightZp = b.create<arith::ConstantOp>(
+      loc, b.getI32IntegerAttr(weightZeroPoint));
+  Value centeredWeight = b.create<arith::SubIOp>(loc, weightI32, weightZp);
+
+  Value product = b.create<arith::MulIOp>(loc, centeredInput, centeredWeight);
+  return b.create<arith::AddIOp>(loc, accumulator, product);
+}
+
 //===----------------------------------------------------------------------===//
 // Lowering pattern
 //===----------------------------------------------------------------------===//
@@ -118,7 +154,6 @@ struct DotI8ToLinalgPattern : public OpRewritePattern<ks::DotI8Op> {
     Location loc = op.getLoc();
     MLIRContext *context = rewriter.getContext();
     auto resultType = cast<RankedTensorType>(op.getType());
-    Type i32Type = rewriter.getI32Type();
 
     AffineExpr k = rewriter.getAffineDimExpr(0);
     AffineMap vectorMap = AffineMap::get(/*dimCount=*/1, /*symbolCount=*/0,
@@ -134,21 +169,49 @@ struct DotI8ToLinalgPattern : public OpRewritePattern<ks::DotI8Op> {
         loc, resultType, ValueRange{op.getInput(), op.getWeight()},
         ValueRange{filled}, maps, iters,
         [&](OpBuilder &b, Location loc, ValueRange args) {
-          Value inputI32 = b.create<arith::ExtSIOp>(loc, i32Type, args[0]);
-          Value inputZeroPoint = b.create<arith::ConstantOp>(
-              loc, b.getI32IntegerAttr(op.getInputZeroPoint()));
-          Value centeredInput =
-              b.create<arith::SubIOp>(loc, inputI32, inputZeroPoint);
+          Value sum = buildI8ProductAdd(b, loc, args[0], args[1], args[2],
+                                        op.getInputZeroPoint(),
+                                        op.getWeightZeroPoint());
+          b.create<linalg::YieldOp>(loc, sum);
+        });
 
-          Value weightI32 = b.create<arith::ExtSIOp>(loc, i32Type, args[1]);
-          Value weightZeroPoint = b.create<arith::ConstantOp>(
-              loc, b.getI32IntegerAttr(op.getWeightZeroPoint()));
-          Value centeredWeight =
-              b.create<arith::SubIOp>(loc, weightI32, weightZeroPoint);
+    rewriter.replaceOp(op, generic.getResults());
+    return success();
+  }
+};
 
-          Value product =
-              b.create<arith::MulIOp>(loc, centeredInput, centeredWeight);
-          Value sum = b.create<arith::AddIOp>(loc, args[2], product);
+/// Lower ks.matvec_i8 to a linalg.generic row-parallel reduction.
+struct MatvecI8ToLinalgPattern : public OpRewritePattern<ks::MatvecI8Op> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(ks::MatvecI8Op op,
+                                PatternRewriter &rewriter) const override {
+    Location loc = op.getLoc();
+    MLIRContext *context = rewriter.getContext();
+    auto resultType = cast<RankedTensorType>(op.getType());
+
+    AffineExpr row = rewriter.getAffineDimExpr(0);
+    AffineExpr col = rewriter.getAffineDimExpr(1);
+    AffineMap inputMap = AffineMap::get(/*dimCount=*/2, /*symbolCount=*/0,
+                                        col, context);
+    AffineMap weightsMap = AffineMap::get(
+        /*dimCount=*/2, /*symbolCount=*/0, {row, col}, context);
+    AffineMap resultMap = AffineMap::get(/*dimCount=*/2, /*symbolCount=*/0,
+                                         row, context);
+    SmallVector<AffineMap> maps{inputMap, weightsMap, resultMap};
+    SmallVector<utils::IteratorType> iters{utils::IteratorType::parallel,
+                                           utils::IteratorType::reduction};
+
+    Value filled =
+        createZeroFilledTensorLike(rewriter, loc, resultType, op.getWeights());
+
+    auto generic = rewriter.create<linalg::GenericOp>(
+        loc, resultType, ValueRange{op.getInput(), op.getWeights()},
+        ValueRange{filled}, maps, iters,
+        [&](OpBuilder &b, Location loc, ValueRange args) {
+          Value sum = buildI8ProductAdd(b, loc, args[0], args[1], args[2],
+                                        op.getInputZeroPoint(),
+                                        op.getWeightZeroPoint());
           b.create<linalg::YieldOp>(loc, sum);
         });
 
@@ -167,7 +230,8 @@ struct KSLowerToLinalgPass
 
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
-    patterns.add<DotI8ToLinalgPattern, MatmulToLinalgPattern>(&getContext());
+    patterns.add<DotI8ToLinalgPattern, MatmulToLinalgPattern,
+                 MatvecI8ToLinalgPattern>(&getContext());
 
     if (failed(applyPatternsGreedily(getOperation(), std::move(patterns))))
       signalPassFailure();

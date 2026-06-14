@@ -21,6 +21,10 @@ lowering to target-specific integer kernels.
 %acc = ks.dot_i8 %input, %weight
        {input_zero_point = 0 : i64, weight_zero_point = 0 : i64}
        : tensor<...xi8>, tensor<...xi8> -> tensor<i32>
+
+%out = ks.matvec_i8 %input, %weights
+       {input_zero_point = 0 : i64, weight_zero_point = 0 : i64}
+       : tensor<...xi8>, tensor<...x...xi8> -> tensor<...xi32>
 ```
 
 ## Mathematical Definition
@@ -42,6 +46,13 @@ For INT8 dot:
 ```
 acc = sum_k ((input[k] - input_zero_point) *
              (weight[k] - weight_zero_point))
+```
+
+For INT8 GEMV:
+
+```
+output[row] = sum_col ((input[col] - input_zero_point) *
+                       (weights[row, col] - weight_zero_point))
 ```
 
 Rounding mode and saturation details are defined by future lowering passes. At
@@ -86,6 +97,21 @@ shape compatibility.
 | `input_zero_point` | `i64` | `0` | Activation zero-point, must fit signed i8 |
 | `weight_zero_point` | `i64` | `0` | Weight zero-point, must fit signed i8 |
 
+### `ks.matvec_i8`
+
+| Name | Type | Description |
+|------|------|-------------|
+| `input` | rank-1 `i8` tensor | Quantized activation vector of length `cols` |
+| `weights` | rank-2 `i8` tensor | Row-major quantized weights `[rows, cols]` |
+| `result` | rank-1 `i32` tensor | Exact signed accumulators, one per row |
+
+### Attributes
+
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `input_zero_point` | `i64` | `0` | Activation zero-point, must fit signed i8 |
+| `weight_zero_point` | `i64` | `0` | Weight zero-point, must fit signed i8 |
+
 ## Verification Rules
 
 1. Input and result must be ranked tensors.
@@ -100,6 +126,13 @@ shape compatibility.
 10. `ks.dot_i8` operand shapes must match, allowing dynamic dimensions.
 11. `ks.dot_i8` result must be a rank-0 tensor with i32 element type.
 12. `ks.dot_i8` zero-point attributes must fit in signed i8.
+13. `ks.matvec_i8` input must be a ranked 1D tensor with signed i8 semantics.
+14. `ks.matvec_i8` weights must be a ranked 2D tensor with signed i8 semantics.
+15. `ks.matvec_i8` input length must match the weights column dimension,
+    allowing dynamic dimensions.
+16. `ks.matvec_i8` result must be a rank-1 tensor with i32 element type and a
+    length matching the weights row dimension, allowing dynamic dimensions.
+17. `ks.matvec_i8` zero-point attributes must fit in signed i8.
 
 ## Lowering Strategy
 
@@ -118,6 +151,10 @@ patterns to avoid materializing intermediate tensors.
 `ks.dot_i8` lowers to a `linalg.generic` reduction with two rank-1 inputs and a
 rank-0 i32 output. The body sign-extends each i8 operand to i32, subtracts the
 zero-points, multiplies, and adds into the accumulator.
+
+`ks.matvec_i8` lowers to a `linalg.generic` with one parallel row iterator and
+one reduction column iterator. The input vector is indexed by column, the weight
+matrix by `[row, column]`, and the output by row.
 
 ## Public C API Foundation
 
@@ -191,3 +228,7 @@ using caller-provided scratch memory.
 11. Parse and print `ks.dot_i8` for i8 vectors to an i32 scalar tensor.
 12. Reject invalid `ks.dot_i8` ranks, element types, shapes, result types, and
     zero-points.
+13. Parse and print `ks.matvec_i8` for an i8 vector and row-major i8 matrix to
+    an i32 output vector.
+14. Reject invalid `ks.matvec_i8` ranks, element types, shapes, result types,
+    and zero-points.
