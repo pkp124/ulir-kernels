@@ -157,8 +157,35 @@ Native CI lint is **ruff only** (`ruff check .`, `ruff format --check .`).
 `clang-format` enforcement requires Docker (`./scripts/docker-verify.sh`) or a
 local `clang-format` install.
 
+### RVV functional simulation (preinstalled in the Cloud snapshot)
+
+`qemu-riscv64` and the `riscv64-linux-gnu-gcc` cross-compiler are baked into the
+Cloud Agent snapshot, so RVV functional tests run without first invoking
+`./scripts/setup-rvv-sim.sh` (that script remains the bootstrap path on a bare
+VM). These are system apt packages held by the snapshot, not the update script.
+
+Non-obvious gotchas when running the cross-compiled RVV flow:
+
+- LLVM binaries on `PATH` are version-suffixed (`llc-21`, `mlir-translate-21`);
+  the unversioned names live in `/usr/lib/llvm-21/bin`. `scripts/compile-rvv.sh`
+  honors `LLC` / `MLIR_TRANSLATE` env vars if you need to point at them.
+- The comment header in `tests/riscv/relu_rvv.mlir` shows `llc -float-abi=double`,
+  which `llc-21` rejects. Use `-float-abi=hard` (as `scripts/compile-rvv.sh`
+  already does).
+
+End-to-end RVV functional test (exit code 0 = PASS):
+
+```bash
+build/bin/ks-opt tests/riscv/relu_rvv.mlir --ks-lower-to-rvv -o /tmp/relu_llvm.mlir
+mlir-translate-21 --mlir-to-llvmir /tmp/relu_llvm.mlir -o /tmp/relu.ll
+llc-21 -mtriple=riscv64-unknown-linux-gnu -march=riscv64 -mcpu=generic-rv64 \
+  -mattr=+v,+zve64d,+zvl256b -float-abi=hard -filetype=obj /tmp/relu.ll -o /tmp/relu.o
+riscv64-linux-gnu-gcc -static /tmp/relu.o -o /tmp/relu_test
+qemu-riscv64 -cpu rv64,v=true,vlen=256 /tmp/relu_test; echo "exit=$?"
+```
+
 ### Optional tooling (not required for standard `ctest`)
 
 - **Docker**: `./scripts/docker-verify.sh` for container parity before push.
-- **RVV/QEMU**: `./scripts/setup-rvv-sim.sh` then `scripts/compile-rvv.sh` for
-  cross-compiled RISC-V simulation (separate from main CTest).
+- **Spike**: `INSTALL_SPIKE=1 ./scripts/setup-rvv-sim.sh` builds the ISA
+  simulator from source (not in the snapshot; better RVV 1.0 edge-case fidelity).
