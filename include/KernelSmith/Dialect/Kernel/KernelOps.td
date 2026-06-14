@@ -211,6 +211,33 @@ def KS_DequantizeOp : KS_Op<"dequantize", [Pure]> {
   let hasVerifier = 1;
 }
 
+def KS_DotI8Op : KS_Op<"dot_i8", [Pure]> {
+  let summary = "INT8 dot product with i32 accumulation";
+  let description = [{
+    Computes a quantized INT8 dot product with signed i32 accumulation:
+
+      acc += (input[k] - input_zero_point) *
+             (weight[k] - weight_zero_point)
+
+    The result is a rank-0 tensor carrying the exact accumulator value.
+  }];
+
+  let arguments = (ins
+    AnyTensor:$input,
+    AnyTensor:$weight,
+    DefaultValuedAttr<I64Attr, "0">:$input_zero_point,
+    DefaultValuedAttr<I64Attr, "0">:$weight_zero_point
+  );
+  let results = (outs AnyTensor:$result);
+
+  let assemblyFormat = [{
+    $input `,` $weight attr-dict `:` type($input) `,` type($weight)
+    `->` type($result)
+  }];
+
+  let hasVerifier = 1;
+}
+
 //===----------------------------------------------------------------------===//
 // Normalization Operations
 //===----------------------------------------------------------------------===//
