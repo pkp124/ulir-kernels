@@ -15,7 +15,7 @@
     "weight_zero_point": -2
   },
   "descriptor": "tests/golden/cases/dot_i8_smoke.json",
-  "descriptor_sha256": "ccdb3b98fe0279e43efa8588e641c5c2ec6ae6ae26821ac1ec96d58cb27ff258",
+  "descriptor_sha256": "7d7aa3077cde918830cbd62da14900bea7ad28fb3a72c5acbf68a157e6d388ce",
   "generator": {
     "backend": "numpy",
     "backend_version": "2.4.6",
@@ -40,7 +40,8 @@
   },
   "schema_version": 1,
   "targets": [
-    "host_reference"
+    "host_reference",
+    "riscv_rvv_256"
   ],
   "tensors": [
     {
@@ -80,5 +81,8 @@
       "size_bytes": 4
     }
   ],
-  "vlens": []
+  "vlens": [
+    256,
+    512
+  ]
 }
