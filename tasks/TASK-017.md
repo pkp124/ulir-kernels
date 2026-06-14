@@ -49,6 +49,20 @@ ruff format --check .
 Run `PYTHON=.venv/bin/python ./scripts/run-tests.sh --riscv-functional` once
 W4A8 RISC-V runner support exists.
 
+Verified on 2026-06-14 for the `ks.dot_w4a8` dialect slice:
+
+```bash
+./scripts/setup.sh
+ctest --test-dir build --output-on-failure -R kernelsmith-lit
+ctest --test-dir build --output-on-failure
+cmake --build build --parallel
+.venv/bin/ruff check .
+.venv/bin/ruff format --check .
+```
+
+Docker parity and local `clang-format` were unavailable on this VM
+(`docker: command not found`, `clang-format: command not found`).
+
 ## Notes
 - This is the primary batch-1 transformer decode kernel track. Keep it ahead of
   broad W4A8 GEMM unless prefill work becomes the immediate product need.
