@@ -151,7 +151,9 @@ linalg.generic parallel row / reduction column i32 accumulation
 - [x] Static K mismatches are rejected.
 
 ### Integration Tests
-- [ ] Full CTest keeps host quantized golden validation green.
+- [x] Full CTest keeps host quantized golden validation green.
+- [x] RISC-V QEMU validation runs `dot_i8_smoke` and `matvec_i8_smoke` through
+      the descriptor-backed C API runner.
 
 ## Risks
 
@@ -165,7 +167,8 @@ linalg.generic parallel row / reduction column i32 accumulation
 
 - [x] `ks.matvec_i8` lowers as one rank-2 linalg reduction instead of
       decomposing into dot slices.
-- [ ] Where should generated quantized RVV objects plug into `libkernelsmith.a`?
+- [x] Where should generated quantized RVV objects plug into `libkernelsmith.a`?
+      Track the generated INT8 RVV object replacement separately in `TASK-018`.
 
 ## Dependencies
 
@@ -181,8 +184,9 @@ linalg.generic parallel row / reduction column i32 accumulation
 
 ### Phase 2: GEMV and RVV follow-ons
 - [x] Add `ks.matvec_i8` and row-wise lowering.
-- [ ] Add quantized tiling/vectorization/RVV validation using profile macros.
-- [ ] Wire generated quantized RVV objects into the public C API build path.
+- [x] Add quantized RISC-V functional validation for the INT8 C API runner.
+- [ ] Wire generated quantized RVV objects into the public C API build path
+      (`TASK-018`).
 
 ---
 

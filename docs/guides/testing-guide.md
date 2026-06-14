@@ -222,8 +222,8 @@ python3 tests/verify.py \
 `tests/verify.py` validates manifest hashes, stages descriptor inputs for the
 host runner, captures `actual_<name>.npy` outputs under `build/golden-actual/`,
 compares them with the manifest comparison policy, and emits JSON result lines.
-CTest runs the smoke cases through `kernelsmith-host-golden-relu` and
-`kernelsmith-host-golden-matmul`.
+CTest runs the smoke cases through `kernelsmith-host-golden-*`, including the
+f32 relu/matmul cases and the quantized i8/W4A8 dot/GEMV cases.
 
 Run RISC-V RVV outputs under QEMU against the same golden bundle:
 
@@ -240,6 +240,11 @@ The RISC-V path rejects VLENs below the profile baseline, restores executable
 bits on downloaded runner artifacts, writes per-VLEN `actual_<name>.npy`
 outputs, and emits JSON lines with case name, VLEN, pass/fail status, max error,
 and mismatch count.
+
+Use `PYTHON=.venv/bin/python ./scripts/run-tests.sh --riscv-functional` to run
+the local descriptor-backed RVV smoke set. It validates relu, matmul, INT8 dot,
+and INT8 GEMV against golden outputs through QEMU when the RISC-V simulator and
+cross compiler are installed.
 
 Add `--benchmark --benchmark-runs 3 --benchmark-warmup 1` to record
 `benchmarks` in the JSON report. For RISC-V targets, benchmark reports include

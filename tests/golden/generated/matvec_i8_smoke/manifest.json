@@ -15,7 +15,7 @@
     "weight_zero_point": 2
   },
   "descriptor": "tests/golden/cases/matvec_i8_smoke.json",
-  "descriptor_sha256": "618b03e67ffe63aadc63cbf6a4580633f41f23533b7c28ab7bbabc2366cf461e",
+  "descriptor_sha256": "24ec9643c4a7fa8de31ff2aea155d00fad765a882b2e5c9295be710d0fef68e7",
   "generator": {
     "backend": "numpy",
     "backend_version": "2.4.6",
@@ -40,7 +40,8 @@
   },
   "schema_version": 1,
   "targets": [
-    "host_reference"
+    "host_reference",
+    "riscv_rvv_256"
   ],
   "tensors": [
     {
@@ -84,5 +85,8 @@
       "size_bytes": 12
     }
   ],
-  "vlens": []
+  "vlens": [
+    256,
+    512
+  ]
 }

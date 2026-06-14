@@ -238,6 +238,26 @@ jobs:
             --benchmark-runs 3 \
             --benchmark-warmup 1
 
+          python tests/verify.py \
+            --case tests/golden/cases/dot_i8_smoke.json \
+            --target riscv_rvv_256 \
+            --riscv-runner rvv-bin/riscv-golden-runner \
+            --host-runner rvv-bin/host-reference-runner \
+            --qemu qemu-riscv64 \
+            --vlens ${{ matrix.vlen }} \
+            --output-dir build/golden-rvv \
+            --report build/golden-rvv/dot_i8_vlen_${{ matrix.vlen }}.json
+
+          python tests/verify.py \
+            --case tests/golden/cases/matvec_i8_smoke.json \
+            --target riscv_rvv_256 \
+            --riscv-runner rvv-bin/riscv-golden-runner \
+            --host-runner rvv-bin/host-reference-runner \
+            --qemu qemu-riscv64 \
+            --vlens ${{ matrix.vlen }} \
+            --output-dir build/golden-rvv \
+            --report build/golden-rvv/matvec_i8_vlen_${{ matrix.vlen }}.json
+
       - name: Upload RVV verification reports
         if: always()
         uses: actions/upload-artifact@v4

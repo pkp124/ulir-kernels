@@ -1,7 +1,7 @@
 # TASK-016: Implement INT8 Dot/GEMV Lowering
 
 ## Status
-[~] In Progress
+[x] Complete
 
 ## Priority
 P1 (High)
@@ -28,7 +28,7 @@ integer output.
 - [x] Add host/reference or generated C API tests using the ABI from
       `TASK-013`.
 - [x] Verify outputs against quantized golden cases from `TASK-014`.
-- [ ] Add QEMU RVV validation when the generated RISC-V binary is runnable in
+- [x] Add QEMU RVV validation when the generated RISC-V binary is runnable in
       CI or locally.
 
 ## Dependencies
@@ -76,6 +76,18 @@ Docker parity and local `clang-format` were unavailable on this VM
 Run `PYTHON=.venv/bin/python ./scripts/run-tests.sh --riscv-functional` once
 RISC-V quantized runner support exists.
 
+Final verification for the 2026-06-14 INT8 RVV functional validation slice:
+
+```bash
+./scripts/setup.sh
+PYTHON=.venv/bin/python ./scripts/run-tests.sh --riscv-functional --qemu-vlen 256
+PYTHON=.venv/bin/python ./scripts/run-tests.sh --riscv-functional
+cmake --build build --parallel
+ctest --test-dir build --output-on-failure
+.venv/bin/ruff check .
+.venv/bin/ruff format --check .
+```
+
 ## Notes
 - Keep this task focused on INT8. W4A8 fused unpack/dequantize is tracked by
   `TASK-017`.
@@ -95,6 +107,13 @@ RISC-V quantized runner support exists.
 - Verified the dot+GEMV linalg path with focused lit, full CTest including
   `matvec_i8_smoke` host golden validation, and Python lint/format checks.
   Remaining task work is generated/RVV validation and C API object integration.
+- Added local and CI QEMU validation for `dot_i8_smoke` and
+  `matvec_i8_smoke` through the RISC-V C API runner, including the quantized C
+  implementation in the cross-linked binary.
+- Marked the INT8 lowering task complete after VLEN 256 and default VLEN
+  256/512 RISC-V functional checks, full native CTest, and Python lint/format
+  checks passed. Generated INT8 RVV object replacement is tracked separately in
+  `TASK-018`.
 
 ### 2026-06-09
 - Created as the INT8 lowering child task for M5.
