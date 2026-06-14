@@ -127,6 +127,18 @@ static LogicalResult verifySignedI8ZeroPointFits(Operation *op,
   return success();
 }
 
+static LogicalResult verifySignedI4ZeroPointFits(Operation *op,
+                                                 StringRef attrName,
+                                                 int64_t zeroPoint) {
+  constexpr int64_t minI4 = -8;
+  constexpr int64_t maxI4 = 7;
+  if (zeroPoint < minI4 || zeroPoint > maxI4)
+    return op->emitOpError(attrName)
+           << " " << zeroPoint << " does not fit in i4";
+
+  return success();
+}
+
 //===----------------------------------------------------------------------===//
 // MatmulOp
 //===----------------------------------------------------------------------===//
@@ -505,6 +517,85 @@ LogicalResult DotI8Op::verify() {
     return failure();
 
   return verifySignedI8ZeroPointFits(getOperation(), "weight_zero_point",
+                                     getWeightZeroPoint());
+}
+
+//===----------------------------------------------------------------------===//
+// DotW4A8Op
+//===----------------------------------------------------------------------===//
+
+LogicalResult DotW4A8Op::verify() {
+  auto inputType = dyn_cast<RankedTensorType>(getInput().getType());
+  auto packedWeightType =
+      dyn_cast<RankedTensorType>(getPackedWeight().getType());
+  auto weightScalesType =
+      dyn_cast<RankedTensorType>(getWeightScales().getType());
+  auto resultType = dyn_cast<RankedTensorType>(getResult().getType());
+
+  if (!inputType || !packedWeightType || !weightScalesType || !resultType)
+    return emitOpError("operands and result must be ranked tensors");
+
+  if (inputType.getRank() != 1)
+    return emitOpError("input must be a 1D tensor");
+
+  if (packedWeightType.getRank() != 1)
+    return emitOpError("packed_weight must be a 1D tensor");
+
+  if (weightScalesType.getRank() != 1)
+    return emitOpError("weight_scales must be a 1D tensor");
+
+  auto inputElementType = dyn_cast<IntegerType>(inputType.getElementType());
+  if (!inputElementType || inputElementType.getWidth() != 8)
+    return emitOpError("input element type must be i8");
+
+  auto packedWeightElementType =
+      dyn_cast<IntegerType>(packedWeightType.getElementType());
+  if (!packedWeightElementType || packedWeightElementType.getWidth() != 8) {
+    return emitOpError(
+        "packed_weight element type must be 8-bit integer");
+  }
+
+  if (!weightScalesType.getElementType().isF32())
+    return emitOpError("weight_scales element type must be f32");
+
+  if (resultType.getRank() != 0)
+    return emitOpError("result must be a rank-0 tensor");
+
+  if (!resultType.getElementType().isF32())
+    return emitOpError("result element type must be f32");
+
+  int64_t groupSize = getGroupSize();
+  if (groupSize <= 0)
+    return emitOpError("group_size must be positive");
+
+  int64_t inputDim = inputType.getDimSize(0);
+  int64_t packedWeightDim = packedWeightType.getDimSize(0);
+  int64_t weightScalesDim = weightScalesType.getDimSize(0);
+  if (inputDim != ShapedType::kDynamic) {
+    int64_t expectedPackedWeightDim = (inputDim + 1) / 2;
+    if (packedWeightDim != ShapedType::kDynamic &&
+        packedWeightDim != expectedPackedWeightDim) {
+      return emitOpError(
+          "packed_weight dimension must equal ceil(input dimension / 2)");
+    }
+
+    int64_t expectedWeightScalesDim = (inputDim + groupSize - 1) / groupSize;
+    if (weightScalesDim != ShapedType::kDynamic &&
+        weightScalesDim != expectedWeightScalesDim) {
+      return emitOpError("weight_scales dimension must equal ceil(input "
+                         "dimension / group_size)");
+    }
+  }
+
+  if (failed(verifyPositiveFiniteFloatAttr(getOperation(), getInputScaleAttr(),
+                                           "input_scale")))
+    return failure();
+
+  if (failed(verifySignedI8ZeroPointFits(getOperation(), "input_zero_point",
+                                         getInputZeroPoint())))
+    return failure();
+
+  return verifySignedI4ZeroPointFits(getOperation(), "weight_zero_point",
                                      getWeightZeroPoint());
 }
 
