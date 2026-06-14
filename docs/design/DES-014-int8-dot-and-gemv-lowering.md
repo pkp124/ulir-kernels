@@ -109,9 +109,9 @@ linalg.generic i32 reduction
 - [ ] Keep existing C API and golden dot/GEMV tests passing.
 
 ### Lit Tests
-- [ ] Parse/print `ks.dot_i8`.
-- [ ] Reject invalid ranks, element types, shapes, result type, and zero-points.
-- [ ] Check `--ks-lower-to-linalg` emits signed i32 accumulation.
+- [x] Parse/print `ks.dot_i8`.
+- [x] Reject invalid ranks, element types, shapes, result type, and zero-points.
+- [x] Check `--ks-lower-to-linalg` emits signed i32 accumulation.
 
 ### Edge Cases
 - [ ] Dynamic K dimensions are accepted when both operands are dynamic.
@@ -143,8 +143,8 @@ linalg.generic i32 reduction
 ## Implementation Plan
 
 ### Phase 1: INT8 dot linalg slice
-- [ ] Add `ks.dot_i8` with verifier and lit coverage.
-- [ ] Lower `ks.dot_i8` to `linalg.generic` with i32 accumulation.
+- [x] Add `ks.dot_i8` with verifier and lit coverage.
+- [x] Lower `ks.dot_i8` to `linalg.generic` with i32 accumulation.
 
 ### Phase 2: GEMV and RVV follow-ons
 - [ ] Add `ks.matvec_i8` and row-wise lowering.

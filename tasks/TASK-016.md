@@ -46,6 +46,20 @@ ruff check .
 ruff format --check .
 ```
 
+Partial verification for the 2026-06-14 `ks.dot_i8` linalg lowering slice:
+
+```bash
+./scripts/setup.sh
+cmake --build build --parallel
+ctest --test-dir build --output-on-failure -R kernelsmith-lit
+ctest --test-dir build --output-on-failure
+.venv/bin/ruff check .
+.venv/bin/ruff format --check .
+```
+
+Docker parity and local `clang-format` were unavailable on this VM
+(`docker: command not found`, `clang-format: command not found`).
+
 Run `PYTHON=.venv/bin/python ./scripts/run-tests.sh --riscv-functional` once
 RISC-V quantized runner support exists.
 
@@ -58,6 +72,11 @@ RISC-V quantized runner support exists.
 ### 2026-06-14
 - Started first compiler slice: `ks.dot_i8` dialect coverage and linalg lowering
   with i32 accumulation.
+- Added `ks.dot_i8`, verifier diagnostics, `--ks-lower-to-linalg` lowering to
+  a `linalg.generic` i32 reduction, quantization spec updates, and DES-014.
+- Verified the slice with focused lit, full CTest, and Python lint/format
+  checks. Remaining task work includes INT8 GEMV lowering, RVV validation, and
+  generated-kernel C API integration.
 
 ### 2026-06-09
 - Created as the INT8 lowering child task for M5.
