@@ -139,6 +139,17 @@ static LogicalResult verifySignedI4ZeroPointFits(Operation *op,
   return success();
 }
 
+static LogicalResult verifySignlessI8ElementType(Operation *op,
+                                                 RankedTensorType type,
+                                                 StringRef tensorName) {
+  auto elementType = dyn_cast<IntegerType>(type.getElementType());
+  if (!elementType || !elementType.isSignless() || elementType.getWidth() != 8)
+    return op->emitOpError(tensorName)
+           << " element type must be signless i8";
+
+  return success();
+}
+
 //===----------------------------------------------------------------------===//
 // MatmulOp
 //===----------------------------------------------------------------------===//
@@ -490,13 +501,13 @@ LogicalResult DotI8Op::verify() {
   if (weightType.getRank() != 1)
     return emitOpError("weight must be a 1D tensor");
 
-  auto inputElementType = dyn_cast<IntegerType>(inputType.getElementType());
-  if (!inputElementType || inputElementType.getWidth() != 8)
-    return emitOpError("input element type must be i8");
+  if (failed(
+          verifySignlessI8ElementType(getOperation(), inputType, "input")))
+    return failure();
 
-  auto weightElementType = dyn_cast<IntegerType>(weightType.getElementType());
-  if (!weightElementType || weightElementType.getWidth() != 8)
-    return emitOpError("weight element type must be i8");
+  if (failed(
+          verifySignlessI8ElementType(getOperation(), weightType, "weight")))
+    return failure();
 
   if (resultType.getRank() != 0)
     return emitOpError("result must be a rank-0 tensor");
@@ -544,15 +555,15 @@ LogicalResult DotW4A8Op::verify() {
   if (weightScalesType.getRank() != 1)
     return emitOpError("weight_scales must be a 1D tensor");
 
-  auto inputElementType = dyn_cast<IntegerType>(inputType.getElementType());
-  if (!inputElementType || inputElementType.getWidth() != 8)
-    return emitOpError("input element type must be i8");
+  if (failed(
+          verifySignlessI8ElementType(getOperation(), inputType, "input")))
+    return failure();
 
   auto packedWeightElementType =
       dyn_cast<IntegerType>(packedWeightType.getElementType());
-  if (!packedWeightElementType || packedWeightElementType.getWidth() != 8) {
-    return emitOpError(
-        "packed_weight element type must be 8-bit integer");
+  if (!packedWeightElementType || !packedWeightElementType.isSignless() ||
+      packedWeightElementType.getWidth() != 8) {
+    return emitOpError("packed_weight element type must be signless i8");
   }
 
   if (!weightScalesType.getElementType().isF32())
@@ -617,13 +628,13 @@ LogicalResult MatvecI8Op::verify() {
   if (weightsType.getRank() != 2)
     return emitOpError("weights must be a 2D tensor");
 
-  auto inputElementType = dyn_cast<IntegerType>(inputType.getElementType());
-  if (!inputElementType || inputElementType.getWidth() != 8)
-    return emitOpError("input element type must be i8");
+  if (failed(
+          verifySignlessI8ElementType(getOperation(), inputType, "input")))
+    return failure();
 
-  auto weightsElementType = dyn_cast<IntegerType>(weightsType.getElementType());
-  if (!weightsElementType || weightsElementType.getWidth() != 8)
-    return emitOpError("weights element type must be i8");
+  if (failed(
+          verifySignlessI8ElementType(getOperation(), weightsType, "weights")))
+    return failure();
 
   if (resultType.getRank() != 1)
     return emitOpError("result must be a 1D tensor");

@@ -31,8 +31,17 @@ func.func @dot_i8_ranked_2d_weight(%arg0: tensor<7xi8>,
 
 func.func @dot_i8_non_i8_input(%arg0: tensor<7xi32>,
                                %arg1: tensor<7xi8>) -> tensor<i32> {
-  // expected-error @+1 {{'ks.dot_i8' op input element type must be i8}}
+  // expected-error @+1 {{'ks.dot_i8' op input element type must be signless i8}}
   %0 = ks.dot_i8 %arg0, %arg1 : tensor<7xi32>, tensor<7xi8> -> tensor<i32>
+  return %0 : tensor<i32>
+}
+
+// -----
+
+func.func @dot_i8_unsigned_input(%arg0: tensor<7xui8>,
+                                 %arg1: tensor<7xi8>) -> tensor<i32> {
+  // expected-error @+1 {{'ks.dot_i8' op input element type must be signless i8}}
+  %0 = ks.dot_i8 %arg0, %arg1 : tensor<7xui8>, tensor<7xi8> -> tensor<i32>
   return %0 : tensor<i32>
 }
 
@@ -40,8 +49,17 @@ func.func @dot_i8_non_i8_input(%arg0: tensor<7xi32>,
 
 func.func @dot_i8_non_i8_weight(%arg0: tensor<7xi8>,
                                 %arg1: tensor<7xi32>) -> tensor<i32> {
-  // expected-error @+1 {{'ks.dot_i8' op weight element type must be i8}}
+  // expected-error @+1 {{'ks.dot_i8' op weight element type must be signless i8}}
   %0 = ks.dot_i8 %arg0, %arg1 : tensor<7xi8>, tensor<7xi32> -> tensor<i32>
+  return %0 : tensor<i32>
+}
+
+// -----
+
+func.func @dot_i8_unsigned_weight(%arg0: tensor<7xi8>,
+                                  %arg1: tensor<7xui8>) -> tensor<i32> {
+  // expected-error @+1 {{'ks.dot_i8' op weight element type must be signless i8}}
+  %0 = ks.dot_i8 %arg0, %arg1 : tensor<7xi8>, tensor<7xui8> -> tensor<i32>
   return %0 : tensor<i32>
 }
 

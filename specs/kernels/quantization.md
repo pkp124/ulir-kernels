@@ -29,7 +29,7 @@ lowering to target-specific integer kernels.
 %acc = ks.dot_w4a8 %input, %packed_weight, %weight_scales
        {group_size = 64 : i64, input_scale = 0.03125 : f64,
         input_zero_point = 0 : i64, weight_zero_point = 0 : i64}
-       : tensor<...xi8>, tensor<...xui8>, tensor<...xf32>
+       : tensor<...xi8>, tensor<...xi8>, tensor<...xf32>
          -> tensor<f32>
 ```
 
@@ -131,7 +131,7 @@ shape compatibility.
 | Name | Type | Description |
 |------|------|-------------|
 | `input` | rank-1 `i8` tensor | Quantized activation vector of length `K` |
-| `packed_weight` | rank-1 `ui8` tensor | Signed int4 weights packed two per byte, length `ceil(K / 2)` |
+| `packed_weight` | rank-1 signless `i8` tensor | Signed int4 weights packed two per byte, length `ceil(K / 2)` |
 | `weight_scales` | rank-1 `f32` tensor | Per-group weight scales, length `ceil(K / group_size)` |
 | `result` | rank-0 `f32` tensor | Fused dequantized accumulator |
 
@@ -154,12 +154,15 @@ shape compatibility.
 6. `ks.dequantize` result element type must be floating-point.
 7. `scale` must be positive and finite.
 8. `zero_point` must fit in the integer storage element type.
-9. `ks.dot_i8` operands must be ranked 1D tensors with signed i8 semantics.
+9. `ks.dot_i8` operands must be ranked 1D signless `i8` tensors with signed
+   semantics.
 10. `ks.dot_i8` operand shapes must match, allowing dynamic dimensions.
 11. `ks.dot_i8` result must be a rank-0 tensor with i32 element type.
 12. `ks.dot_i8` zero-point attributes must fit in signed i8.
-13. `ks.matvec_i8` input must be a ranked 1D tensor with signed i8 semantics.
-14. `ks.matvec_i8` weights must be a ranked 2D tensor with signed i8 semantics.
+13. `ks.matvec_i8` input must be a ranked 1D signless `i8` tensor with signed
+    semantics.
+14. `ks.matvec_i8` weights must be a ranked 2D signless `i8` tensor with
+    signed semantics.
 15. `ks.matvec_i8` input length must match the weights column dimension,
     allowing dynamic dimensions.
 16. `ks.matvec_i8` result must be a rank-1 tensor with i32 element type and a
@@ -169,8 +172,8 @@ shape compatibility.
     tensors.
 19. `ks.dot_w4a8` input, packed weight, and weight scale operands must be
     rank-1 tensors.
-20. `ks.dot_w4a8` input must have i8 element type, packed weights must have an
-    8-bit integer element type, and weight scales must have f32 element type.
+20. `ks.dot_w4a8` input and packed weights must have signless i8 element type,
+    and weight scales must have f32 element type.
 21. `ks.dot_w4a8` result must be a rank-0 tensor with f32 element type.
 22. `ks.dot_w4a8` packed weight length must equal `ceil(K / 2)` for static `K`.
 23. `ks.dot_w4a8` weight scale length must equal `ceil(K / group_size)` for
@@ -227,8 +230,10 @@ before adding output quantization policy.
 
 ### W4A8 Packed Weight Layout
 
-W4A8 weights are signed int4 values stored in two's-complement form. Two weights
-are packed per byte:
+W4A8 weights are signed int4 values stored in two's-complement form. In MLIR IR,
+packed byte tensors use signless `i8` storage so arithmetic lowering can use
+standard `arith` integer ops. The public C ABI stores the same bytes as
+`uint8_t`. Two weights are packed per byte:
 
 ```
 byte[k / 2] bits 0..3 = weight[k]     for even k
