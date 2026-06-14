@@ -611,6 +611,98 @@ LogicalResult DotW4A8Op::verify() {
 }
 
 //===----------------------------------------------------------------------===//
+// MatvecW4A8Op
+//===----------------------------------------------------------------------===//
+
+LogicalResult MatvecW4A8Op::verify() {
+  auto inputType = dyn_cast<RankedTensorType>(getInput().getType());
+  auto packedWeightsType =
+      dyn_cast<RankedTensorType>(getPackedWeights().getType());
+  auto weightScalesType =
+      dyn_cast<RankedTensorType>(getWeightScales().getType());
+  auto resultType = dyn_cast<RankedTensorType>(getResult().getType());
+
+  if (!inputType || !packedWeightsType || !weightScalesType || !resultType)
+    return emitOpError("operands and result must be ranked tensors");
+
+  if (inputType.getRank() != 1)
+    return emitOpError("input must be a 1D tensor");
+
+  if (packedWeightsType.getRank() != 2)
+    return emitOpError("packed_weights must be a 2D tensor");
+
+  if (weightScalesType.getRank() != 2)
+    return emitOpError("weight_scales must be a 2D tensor");
+
+  if (failed(
+          verifySignlessI8ElementType(getOperation(), inputType, "input")))
+    return failure();
+
+  if (failed(verifySignlessI8ElementType(getOperation(), packedWeightsType,
+                                         "packed_weights")))
+    return failure();
+
+  if (!weightScalesType.getElementType().isF32())
+    return emitOpError("weight_scales element type must be f32");
+
+  if (resultType.getRank() != 1)
+    return emitOpError("result must be a 1D tensor");
+
+  if (!resultType.getElementType().isF32())
+    return emitOpError("result element type must be f32");
+
+  int64_t groupSize = getGroupSize();
+  if (groupSize <= 0)
+    return emitOpError("group_size must be positive");
+
+  int64_t inputCols = inputType.getDimSize(0);
+  int64_t packedRows = packedWeightsType.getDimSize(0);
+  int64_t packedCols = packedWeightsType.getDimSize(1);
+  int64_t scaleRows = weightScalesType.getDimSize(0);
+  int64_t scaleCols = weightScalesType.getDimSize(1);
+  int64_t resultRows = resultType.getDimSize(0);
+
+  if (inputCols != ShapedType::kDynamic) {
+    int64_t expectedPackedCols = (inputCols + 1) / 2;
+    if (packedCols != ShapedType::kDynamic &&
+        packedCols != expectedPackedCols) {
+      return emitOpError("packed_weights column dimension must equal "
+                         "ceil(input dimension / 2)");
+    }
+
+    int64_t expectedScaleCols = (inputCols + groupSize - 1) / groupSize;
+    if (scaleCols != ShapedType::kDynamic &&
+        scaleCols != expectedScaleCols) {
+      return emitOpError("weight_scales column dimension must equal "
+                         "ceil(input dimension / group_size)");
+    }
+  }
+
+  if (scaleRows != ShapedType::kDynamic &&
+      packedRows != ShapedType::kDynamic && scaleRows != packedRows) {
+    return emitOpError(
+        "weight_scales row dimension must match packed_weights row dimension");
+  }
+
+  if (resultRows != ShapedType::kDynamic &&
+      packedRows != ShapedType::kDynamic && resultRows != packedRows) {
+    return emitOpError(
+        "result dimension must match packed_weights row dimension");
+  }
+
+  if (failed(verifyPositiveFiniteFloatAttr(getOperation(), getInputScaleAttr(),
+                                           "input_scale")))
+    return failure();
+
+  if (failed(verifySignedI8ZeroPointFits(getOperation(), "input_zero_point",
+                                         getInputZeroPoint())))
+    return failure();
+
+  return verifySignedI4ZeroPointFits(getOperation(), "weight_zero_point",
+                                     getWeightZeroPoint());
+}
+
+//===----------------------------------------------------------------------===//
 // MatvecI8Op
 //===----------------------------------------------------------------------===//
 

@@ -31,6 +31,12 @@ lowering to target-specific integer kernels.
         input_zero_point = 0 : i64, weight_zero_point = 0 : i64}
        : tensor<...xi8>, tensor<...xi8>, tensor<...xf32>
          -> tensor<f32>
+
+%out = ks.matvec_w4a8 %input, %packed_weights, %weight_scales
+       {group_size = 64 : i64, input_scale = 0.03125 : f64,
+        input_zero_point = 0 : i64, weight_zero_point = 0 : i64}
+       : tensor<...xi8>, tensor<...x...xi8>, tensor<...x...xf32>
+         -> tensor<...xf32>
 ```
 
 ## Mathematical Definition
@@ -67,6 +73,15 @@ For W4A8 dot:
 acc = sum_k (((input[k] - input_zero_point) * input_scale) *
              ((unpack_i4(packed_weight[k]) - weight_zero_point) *
               weight_scales[k / group_size]))
+```
+
+For W4A8 GEMV:
+
+```
+output[row] = sum_col (((input[col] - input_zero_point) * input_scale) *
+                       ((unpack_i4(weights[row, col]) -
+                         weight_zero_point) *
+                        weight_scales[row, col / group_size]))
 ```
 
 Rounding mode and saturation details are defined by future lowering passes. At
@@ -144,6 +159,24 @@ shape compatibility.
 | `input_zero_point` | `i64` | `0` | Activation zero-point, must fit signed i8 |
 | `weight_zero_point` | `i64` | `0` | Packed weight zero-point, must fit signed i4 |
 
+### `ks.matvec_w4a8`
+
+| Name | Type | Description |
+|------|------|-------------|
+| `input` | rank-1 `i8` tensor | Quantized activation vector of length `cols` |
+| `packed_weights` | rank-2 signless `i8` tensor | Row-major signed int4 weights packed two per byte, shape `[rows, ceil(cols / 2)]` |
+| `weight_scales` | rank-2 `f32` tensor | Row-major per-group weight scales, shape `[rows, ceil(cols / group_size)]` |
+| `result` | rank-1 `f32` tensor | Fused dequantized accumulators, one per row |
+
+### Attributes
+
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `group_size` | `i64` | required | Number of input elements sharing one weight scale, must be positive |
+| `input_scale` | `f64` | required | Positive finite activation scale |
+| `input_zero_point` | `i64` | `0` | Activation zero-point, must fit signed i8 |
+| `weight_zero_point` | `i64` | `0` | Packed weight zero-point, must fit signed i4 |
+
 ## Verification Rules
 
 1. Input and result must be ranked tensors.
@@ -182,6 +215,22 @@ shape compatibility.
     positive and finite.
 25. `ks.dot_w4a8` input zero-point must fit signed i8, and weight zero-point
     must fit signed i4.
+26. `ks.matvec_w4a8` input, packed weights, weight scales, and result must be
+    ranked tensors.
+27. `ks.matvec_w4a8` input must be rank-1, packed weights and weight scales
+    rank-2, and result rank-1.
+28. `ks.matvec_w4a8` input and packed weights must have signless i8 element
+    type, and weight scales and result must have f32 element type.
+29. `ks.matvec_w4a8` packed weight column dimension must equal
+    `ceil(cols / 2)` for static `cols`.
+30. `ks.matvec_w4a8` weight scale column dimension must equal
+    `ceil(cols / group_size)` for static `cols`.
+31. `ks.matvec_w4a8` weight scale and result row dimensions must match packed
+    weight rows, allowing dynamic dimensions.
+32. `ks.matvec_w4a8` `group_size` must be positive and `input_scale` must be
+    positive and finite.
+33. `ks.matvec_w4a8` input zero-point must fit signed i8, and weight zero-point
+    must fit signed i4.
 
 ## Lowering Strategy
 
@@ -204,6 +253,11 @@ zero-points, multiplies, and adds into the accumulator.
 `ks.matvec_i8` lowers to a `linalg.generic` with one parallel row iterator and
 one reduction column iterator. The input vector is indexed by column, the weight
 matrix by `[row, column]`, and the output by row.
+
+`ks.dot_w4a8` and `ks.matvec_w4a8` lower to fused `linalg.generic` reductions.
+The linalg body extracts packed bytes, selects and sign-extends signed int4
+nibbles, applies activation and weight scales, and accumulates in f32 without
+materializing dequantized weights.
 
 ## Public C API Foundation
 
@@ -287,3 +341,7 @@ using caller-provided scratch memory.
     weights, f32 scales, and an f32 scalar tensor.
 16. Reject invalid `ks.dot_w4a8` ranks, element types, packed-weight length,
     scale-group length, scale metadata, result type, and zero-points.
+17. Parse and print `ks.matvec_w4a8` for an i8 activation vector, row-major
+    packed i4 weights, f32 scales, and an f32 output vector.
+18. Reject invalid `ks.matvec_w4a8` ranks, element types, packed-weight column
+    length, scale-group shape, result shape, scale metadata, and zero-points.

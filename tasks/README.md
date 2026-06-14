@@ -90,7 +90,7 @@ Progress updates with dates.
 | TASK-014 | M5 | Add quantized golden validation cases | Complete | P0 |
 | TASK-015 | M5 | Add quantized RVV target profile parameters | Complete | P1 |
 | TASK-016 | M5 | Implement INT8 dot/GEMV lowering | Complete | P1 |
-| TASK-017 | M5 | Implement W4A8 fused dot/GEMV lowering | Not Started | P1 |
+| TASK-017 | M5 | Implement W4A8 fused dot/GEMV lowering | Complete | P1 |
 | TASK-018 | M5 | Integrate generated INT8 RVV objects with the C API | Not Started | P1 |
 | TASK-008 | M6 | Transformer minimum kernel set | Not Started | P1 |
 
