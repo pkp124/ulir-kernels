@@ -29,8 +29,8 @@ lowering to target-specific integer kernels.
 %acc = ks.dot_w4a8 %input, %packed_weight, %weight_scales
        {group_size = 64 : i64, input_scale = 0.03125 : f64,
         input_zero_point = 0 : i64, weight_zero_point = 0 : i64}
-       : tensor<...xi8>, tensor<ceil(... / 2)xui8>,
-         tensor<ceil(... / group_size)xf32> -> tensor<f32>
+       : tensor<...xi8>, tensor<...xui8>, tensor<...xf32>
+         -> tensor<f32>
 ```
 
 ## Mathematical Definition
