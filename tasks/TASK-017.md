@@ -1,7 +1,7 @@
 # TASK-017: Implement W4A8 Fused Dot/GEMV Lowering
 
 ## Status
-[ ] Not Started
+[~] In Progress
 
 ## Priority
 P1 (High)
@@ -54,6 +54,12 @@ W4A8 RISC-V runner support exists.
   broad W4A8 GEMM unless prefill work becomes the immediate product need.
 
 ## Log
+
+### 2026-06-14
+- Started the first W4A8 compiler-visible slice with `ks.dot_w4a8` dialect
+  coverage, verifier diagnostics, and quantization spec updates.
+- Remaining task work includes fused linalg lowering, GEMV coverage, golden
+  W4A8 validation through generated paths, and QEMU RVV reporting.
 
 ### 2026-06-09
 - Created as the W4A8 fused lowering child task for M5.
