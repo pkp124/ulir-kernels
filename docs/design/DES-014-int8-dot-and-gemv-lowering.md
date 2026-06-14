@@ -163,8 +163,8 @@ linalg.generic parallel row / reduction column i32 accumulation
 
 ## Open Questions
 
-- [x] Should `ks.matvec_i8` lower by decomposition into dot slices or as one
-      rank-2 linalg reduction for better vectorization?
+- [x] `ks.matvec_i8` lowers as one rank-2 linalg reduction instead of
+      decomposing into dot slices.
 - [ ] Where should generated quantized RVV objects plug into `libkernelsmith.a`?
 
 ## Dependencies
@@ -182,6 +182,7 @@ linalg.generic parallel row / reduction column i32 accumulation
 ### Phase 2: GEMV and RVV follow-ons
 - [x] Add `ks.matvec_i8` and row-wise lowering.
 - [ ] Add quantized tiling/vectorization/RVV validation using profile macros.
+- [ ] Wire generated quantized RVV objects into the public C API build path.
 
 ---
 

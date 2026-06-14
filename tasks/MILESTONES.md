@@ -21,14 +21,14 @@ milestone should show status, task links, blockers, and the next concrete work.
 | M2 — Activation Lowering | Partial | Covered by roadmap history | Track generated-object integration when resumed. |
 | M3 — Generic MatMul Lowering | Partial | `TASK-004` | Track generated matmul replacement separately if prioritized. |
 | M4 — RISC-V RVV Target | Done | `TASK-005`, `TASK-006`, `TASK-009`, `TASK-010`, `TASK-011`, `TASK-012` | Keep RVV validation reports green as new kernels land. |
-| M5 — RISC-V Quantization Foundation | Active | `TASK-007`, `TASK-013`, `TASK-014`, `TASK-015`, `TASK-016`, `TASK-017` | Continue `TASK-016` with INT8 GEMV/RVV follow-ons after the `ks.dot_i8` linalg slice. |
+| M5 — RISC-V Quantization Foundation | Active | `TASK-007`, `TASK-013`, `TASK-014`, `TASK-015`, `TASK-016`, `TASK-017` | Continue `TASK-016` with generated INT8 RVV validation and C API object integration. |
 | M6 — Transformer Minimum Kernel Set | Planned | `TASK-008` | Start after M5 dot/GEMV ABI and validation policy are stable. |
 | M7 — Minimal RISC-V Transformer Demo | Planned | Not created | Create tasks after M5/M6 interfaces stabilize. |
 
 ## Active focus
 
-1. `TASK-016`: continue INT8 dot/GEMV lowering with GEMV and RVV validation
-   after the initial `ks.dot_i8` linalg lowering slice.
+1. `TASK-016`: continue INT8 dot/GEMV work with generated RVV validation and
+   C API object integration after the linalg lowering slices.
 2. `TASK-017`: implement W4A8 lowering once INT8 lowering establishes the
    quantized lowering pattern.
 3. `TASK-008`: start M6 transformer helpers after quantized layout decisions are

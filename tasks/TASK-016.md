@@ -19,15 +19,15 @@ i32 accumulation, and explicit requantization where the public API requires an
 integer output.
 
 ## Acceptance Criteria
-- [ ] Add or update dialect/lowering metadata for i8 accumulator and
+- [x] Add or update dialect/lowering metadata for i8 accumulator and
       quantization policy.
-- [ ] Lower i8 dot/GEMV to vectorizable or RVV-friendly IR with i32
+- [x] Lower i8 dot/GEMV to vectorizable or RVV-friendly IR with i32
       accumulation.
-- [ ] Add lit tests for supported lowering patterns and diagnostics for
+- [x] Add lit tests for supported lowering patterns and diagnostics for
       unsupported metadata/layout cases.
-- [ ] Add host/reference or generated C API tests using the ABI from
+- [x] Add host/reference or generated C API tests using the ABI from
       `TASK-013`.
-- [ ] Verify outputs against quantized golden cases from `TASK-014`.
+- [x] Verify outputs against quantized golden cases from `TASK-014`.
 - [ ] Add QEMU RVV validation when the generated RISC-V binary is runnable in
       CI or locally.
 
@@ -60,6 +60,19 @@ ctest --test-dir build --output-on-failure
 Docker parity and local `clang-format` were unavailable on this VM
 (`docker: command not found`, `clang-format: command not found`).
 
+Partial verification for the 2026-06-14 `ks.matvec_i8` linalg lowering slice:
+
+```bash
+cmake --build build --parallel
+ctest --test-dir build --output-on-failure -R kernelsmith-lit
+ctest --test-dir build --output-on-failure
+.venv/bin/ruff check .
+.venv/bin/ruff format --check .
+```
+
+Docker parity and local `clang-format` were unavailable on this VM
+(`docker: command not found`, `clang-format: command not found`).
+
 Run `PYTHON=.venv/bin/python ./scripts/run-tests.sh --riscv-functional` once
 RISC-V quantized runner support exists.
 
@@ -77,6 +90,11 @@ RISC-V quantized runner support exists.
 - Verified the slice with focused lit, full CTest, and Python lint/format
   checks. Remaining task work includes INT8 GEMV lowering, RVV validation, and
   generated-kernel C API integration.
+- Added `ks.matvec_i8`, verifier diagnostics, and `--ks-lower-to-linalg`
+  lowering to a row-parallel, column-reduction `linalg.generic`.
+- Verified the dot+GEMV linalg path with focused lit, full CTest including
+  `matvec_i8_smoke` host golden validation, and Python lint/format checks.
+  Remaining task work is generated/RVV validation and C API object integration.
 
 ### 2026-06-09
 - Created as the INT8 lowering child task for M5.
