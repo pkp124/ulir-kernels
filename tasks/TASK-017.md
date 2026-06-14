@@ -19,12 +19,12 @@ INT4 weights, apply scale metadata, and accumulate against INT8 activations
 without materializing dequantized weights.
 
 ## Acceptance Criteria
-- [ ] Implement W4A8 packed-weight loading and nibble unpacking according to the
+- [x] Implement W4A8 packed-weight loading and nibble unpacking according to the
       ABI from `TASK-013`.
 - [ ] Fuse unpack/dequantize with dot/GEMV compute in the generated path.
 - [ ] Support the selected accumulation policy, either i32 or f32, with explicit
       rounding and saturation behavior.
-- [ ] Add lit tests for fused lowering patterns and unsupported-layout
+- [x] Add lit tests for fused lowering patterns and unsupported-layout
       diagnostics.
 - [ ] Validate against W4A8 golden cases from `TASK-014`.
 - [ ] Add QEMU RVV validation and benchmark reporting for at least one W4A8
@@ -63,6 +63,19 @@ cmake --build build --parallel
 Docker parity and local `clang-format` were unavailable on this VM
 (`docker: command not found`, `clang-format: command not found`).
 
+Verified on 2026-06-14 for the fused `ks.dot_w4a8` linalg lowering slice:
+
+```bash
+cmake --build build --parallel
+ctest --test-dir build --output-on-failure -R kernelsmith-lit
+ctest --test-dir build --output-on-failure
+.venv/bin/ruff check .
+.venv/bin/ruff format --check .
+```
+
+Docker parity and local `clang-format` were unavailable on this VM
+(`docker: command not found`, `clang-format: command not found`).
+
 ## Notes
 - This is the primary batch-1 transformer decode kernel track. Keep it ahead of
   broad W4A8 GEMM unless prefill work becomes the immediate product need.
@@ -70,6 +83,13 @@ Docker parity and local `clang-format` were unavailable on this VM
 ## Log
 
 ### 2026-06-14
+- Added fused `ks.dot_w4a8` lowering to `linalg.generic`, including packed-byte
+  extraction, signed nibble unpacking, per-group scale extraction, and f32
+  accumulation.
+- Tightened quantized compute verifier diagnostics to reject non-signless MLIR
+  integer tensor types before lowering; the C ABI remains `int8_t`/`uint8_t`.
+- Remaining task work includes W4A8 GEMV/generated RVV integration and QEMU
+  reporting.
 - Started the first W4A8 compiler-visible slice with `ks.dot_w4a8` dialect
   coverage, verifier diagnostics, and quantization spec updates.
 - Remaining task work includes fused linalg lowering, GEMV coverage, golden

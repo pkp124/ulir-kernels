@@ -35,7 +35,7 @@ func.func @matvec_i8_weight_rank(%arg0: tensor<7xi8>,
 
 func.func @matvec_i8_non_i8_input(%arg0: tensor<7xi32>,
                                   %arg1: tensor<3x7xi8>) -> tensor<3xi32> {
-  // expected-error @+1 {{'ks.matvec_i8' op input element type must be i8}}
+  // expected-error @+1 {{'ks.matvec_i8' op input element type must be signless i8}}
   %0 = ks.matvec_i8 %arg0, %arg1
       : tensor<7xi32>, tensor<3x7xi8> -> tensor<3xi32>
   return %0 : tensor<3xi32>
@@ -43,11 +43,32 @@ func.func @matvec_i8_non_i8_input(%arg0: tensor<7xi32>,
 
 // -----
 
+func.func @matvec_i8_unsigned_input(%arg0: tensor<7xui8>,
+                                    %arg1: tensor<3x7xi8>) -> tensor<3xi32> {
+  // expected-error @+1 {{'ks.matvec_i8' op input element type must be signless i8}}
+  %0 = ks.matvec_i8 %arg0, %arg1
+      : tensor<7xui8>, tensor<3x7xi8> -> tensor<3xi32>
+  return %0 : tensor<3xi32>
+}
+
+// -----
+
 func.func @matvec_i8_non_i8_weights(%arg0: tensor<7xi8>,
                                     %arg1: tensor<3x7xi32>) -> tensor<3xi32> {
-  // expected-error @+1 {{'ks.matvec_i8' op weights element type must be i8}}
+  // expected-error @+1 {{'ks.matvec_i8' op weights element type must be signless i8}}
   %0 = ks.matvec_i8 %arg0, %arg1
       : tensor<7xi8>, tensor<3x7xi32> -> tensor<3xi32>
+  return %0 : tensor<3xi32>
+}
+
+// -----
+
+func.func @matvec_i8_unsigned_weights(%arg0: tensor<7xi8>,
+                                      %arg1: tensor<3x7xui8>)
+    -> tensor<3xi32> {
+  // expected-error @+1 {{'ks.matvec_i8' op weights element type must be signless i8}}
+  %0 = ks.matvec_i8 %arg0, %arg1
+      : tensor<7xi8>, tensor<3x7xui8> -> tensor<3xi32>
   return %0 : tensor<3xi32>
 }
 
