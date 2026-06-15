@@ -20,11 +20,11 @@ llama-style transformer block on RISC-V RVV.
 
 ## Acceptance Criteria
 
-- [ ] Add `ks.add` and `ks.mul` ops with broadcasting rules, verifiers, and lit
+- [x] Add `ks.add` and `ks.mul` ops with broadcasting rules, verifiers, and lit
       tests.
 - [ ] Add C APIs for `ks_add_f32`, `ks_mul_f32`, `ks_rms_norm_f32`, and
       `ks_softmax_f32`.
-- [ ] Lower add, mul, and SiLU to vectorizable linalg or loop forms.
+- [x] Lower add, mul, and SiLU to vectorizable linalg or loop forms.
 - [ ] Lower RMSNorm with f32 accumulation and explicit epsilon behavior.
 - [ ] Lower softmax using max-subtract-exp-sum-divide for numerical stability.
 - [ ] Add functional validator coverage for transformer helper kernels.
@@ -53,6 +53,9 @@ Add C API and NumPy validation commands as each helper kernel lands.
 ### 2026-06-15
 - Started M6 by splitting the first compiler helper slice into `TASK-019` for
   `ks.add`/`ks.mul` dialect definitions, verifiers, and linalg lowering.
+- Completed `TASK-019`; `ks.add` and `ks.mul` now parse, verify static
+  broadcasting, and lower to vectorizable `linalg.generic`. Existing SiLU
+  lowering remains covered by `--ks-lower-activations`.
 
 ### 2026-06-06
 - Created from M6 roadmap tasks.
