@@ -168,13 +168,23 @@ run_riscv_functional_tests() {
         python_bin="${PROJECT_ROOT}/${python_bin}"
     fi
     local runner_dir="${BUILD_DIR}/rvv-functional/bin"
+    local int8_object_dir="${BUILD_DIR}/rvv-functional/int8-objects"
     local output_dir="${BUILD_DIR}/rvv-functional/actual"
     local vlen_args=()
+    local int8_rvv_objects=(
+        "${int8_object_dir}/ks_dot_i8_riscv_rvv_256.o"
+        "${int8_object_dir}/ks_matvec_i8_riscv_rvv_256.o"
+    )
     mkdir -p "${runner_dir}" "${output_dir}"
 
     cmake --build . --target host-reference-runner
     cp "${BUILD_DIR}/tests/host_reference/host-reference-runner" \
        "${runner_dir}/host-reference-runner"
+
+    "${python_bin}" "${PROJECT_ROOT}/scripts/generate-int8-rvv-objects.py" \
+        --cc riscv64-linux-gnu-gcc \
+        --source-root "${PROJECT_ROOT}" \
+        --output-dir "${int8_object_dir}"
 
     riscv64-linux-gnu-gcc \
         -std=c99 \
@@ -182,6 +192,7 @@ run_riscv_functional_tests() {
         -static \
         -march=rv64gcv \
         -mabi=lp64d \
+        -DKS_QUANTIZED_INT8_EXTERNAL=1 \
         -I "${PROJECT_ROOT}/include" \
         -include "${PROJECT_ROOT}/target/riscv_rvv_256.h" \
         "${PROJECT_ROOT}/tests/host_reference/host_reference_runner.c" \
@@ -189,6 +200,7 @@ run_riscv_functional_tests() {
         "${PROJECT_ROOT}/lib/kernelsmith/ks_matmul.c" \
         "${PROJECT_ROOT}/lib/kernelsmith/ks_activations.c" \
         "${PROJECT_ROOT}/lib/kernelsmith/ks_quantized.c" \
+        "${int8_rvv_objects[@]}" \
         -o "${runner_dir}/riscv-golden-runner" \
         -lm
 

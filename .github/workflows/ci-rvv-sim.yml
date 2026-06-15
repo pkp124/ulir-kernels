@@ -140,12 +140,18 @@ jobs:
             build-rvv/bin/host-reference-runner
 
           echo "=== RISC-V descriptor runner ==="
+          python scripts/generate-int8-rvv-objects.py \
+            --cc riscv64-linux-gnu-gcc \
+            --source-root . \
+            --output-dir build-rvv/int8-objects
+
           riscv64-linux-gnu-gcc \
             -std=c99 \
             -O2 \
             -static \
             -march=rv64gcv \
             -mabi=lp64d \
+            -DKS_QUANTIZED_INT8_EXTERNAL=1 \
             -I include \
             -include target/riscv_rvv_256.h \
             tests/host_reference/host_reference_runner.c \
@@ -153,6 +159,8 @@ jobs:
             lib/kernelsmith/ks_matmul.c \
             lib/kernelsmith/ks_activations.c \
             lib/kernelsmith/ks_quantized.c \
+            build-rvv/int8-objects/ks_dot_i8_riscv_rvv_256.o \
+            build-rvv/int8-objects/ks_matvec_i8_riscv_rvv_256.o \
             -o build-rvv/bin/riscv-golden-runner \
             -lm
           file build-rvv/bin/riscv-golden-runner
