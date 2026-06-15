@@ -46,6 +46,23 @@ ruff check .
 ruff format --check .
 ```
 
+Verified on 2026-06-15 for the generated-object build integration slice:
+
+```bash
+./scripts/setup.sh
+cmake --build build --parallel
+ctest --test-dir build --output-on-failure -R "capi-(quantized|int8-generated-profile-build)"
+ctest --test-dir build --output-on-failure
+.venv/bin/ruff check .
+.venv/bin/ruff format --check .
+PYTHON=.venv/bin/python ./scripts/run-tests.sh --riscv-functional
+```
+
+The generated-profile C API test uses a mock external object to prove link-time
+symbol replacement. The RISC-V functional command validates the current runner
+at VLEN 256 and 512; real generated INT8 RVV objects still need to replace the
+mock and scalar runner path before this task can be marked complete.
+
 ## Notes
 - Keep generated-object integration separate from the reference C API and
   descriptor-backed QEMU validation that `TASK-016` completed.
