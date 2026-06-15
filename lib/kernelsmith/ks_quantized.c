@@ -40,6 +40,7 @@ static int ks_validate_w4a8_scales(const float *scales, size_t groups) {
   return 1;
 }
 
+#ifndef KS_QUANTIZED_INT8_EXTERNAL
 int ks_dot_i8(const int8_t *input, const int8_t *weight, size_t k,
               int32_t input_zero_point, int32_t weight_zero_point,
               int32_t *output, void *workspace, size_t ws_size) {
@@ -88,6 +89,7 @@ int ks_matvec_i8(const int8_t *input, const int8_t *weights,
 
   return KS_OK;
 }
+#endif
 
 int ks_dot_w4a8(const int8_t *input, const uint8_t *packed_weight,
                 const float *weight_scales, size_t k, size_t group_size,
@@ -157,27 +159,19 @@ int ks_matvec_w4a8(const int8_t *input, const uint8_t *packed_weights,
 }
 
 size_t ks_dot_i8_workspace(size_t k) {
-  (void)k;
-  return 0;
+  return KS_QUANT_DOT_I8_WORKSPACE_BYTES(k);
 }
 
 size_t ks_matvec_i8_workspace(size_t rows, size_t cols) {
-  (void)rows;
-  (void)cols;
-  return 0;
+  return KS_QUANT_MATVEC_I8_WORKSPACE_BYTES(rows, cols);
 }
 
 size_t ks_dot_w4a8_workspace(size_t k, size_t group_size) {
-  (void)k;
-  (void)group_size;
-  return 0;
+  return KS_QUANT_DOT_W4A8_WORKSPACE_BYTES(k, group_size);
 }
 
 size_t ks_matvec_w4a8_workspace(size_t rows, size_t cols, size_t group_size) {
-  (void)rows;
-  (void)cols;
-  (void)group_size;
-  return 0;
+  return KS_QUANT_MATVEC_W4A8_WORKSPACE_BYTES(rows, cols, group_size);
 }
 
 size_t ks_quantized_alignment(void) { return KS_PREFERRED_ALIGN; }

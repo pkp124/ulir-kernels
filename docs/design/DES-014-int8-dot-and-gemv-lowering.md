@@ -112,6 +112,27 @@ func.func @matvec(%input: tensor<128xi8>, %weights: tensor<4x128xi8>)
 }
 ```
 
+#### Generated object integration policy
+
+`TASK-018` uses static target-profile selection instead of runtime dispatch. The
+generic profile compiles the scalar reference `ks_dot_i8` and `ks_matvec_i8`
+symbols from `ks_quantized.c`. A `riscv_rvv_256` build may pass generated object
+files through `KS_INT8_RVV_OBJECTS`; those objects must export the same public
+symbols, and the reference definitions are suppressed to avoid duplicate linker
+symbols.
+
+Generated object names should include the target profile and public symbol, for
+example:
+
+```text
+ks_dot_i8_riscv_rvv_256.o
+ks_matvec_i8_riscv_rvv_256.o
+```
+
+The public headers do not change. Workspace and alignment queries remain in the
+C reference source and read target-profile macros, so future generated kernels
+can request scratch space without changing the ABI.
+
 ### Data Flow
 
 ```
@@ -185,7 +206,9 @@ linalg.generic parallel row / reduction column i32 accumulation
 ### Phase 2: GEMV and RVV follow-ons
 - [x] Add `ks.matvec_i8` and row-wise lowering.
 - [x] Add quantized RISC-V functional validation for the INT8 C API runner.
-- [ ] Wire generated quantized RVV objects into the public C API build path
+- [x] Add profile-selected external INT8 object hooks for `riscv_rvv_256`
+      builds.
+- [ ] Wire real generated quantized RVV objects into the public C API build path
       (`TASK-018`).
 
 ---
