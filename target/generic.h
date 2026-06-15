@@ -86,4 +86,15 @@
 
 #define KS_ELEMENTWISE_TILE   64    /* Elements per loop iteration */
 
+/* ── Quantized Workspace ─────────────────────────────────────────────── */
+
+#define KS_QUANT_DOT_I8_WORKSPACE_BYTES(K) \
+  0u
+#define KS_QUANT_MATVEC_I8_WORKSPACE_BYTES(ROWS, COLS) \
+  0u
+#define KS_QUANT_DOT_W4A8_WORKSPACE_BYTES(K, GROUP_SIZE) \
+  0u
+#define KS_QUANT_MATVEC_W4A8_WORKSPACE_BYTES(ROWS, COLS, GROUP_SIZE) \
+  0u
+
 #endif /* KS_TARGET_PROFILE_H */

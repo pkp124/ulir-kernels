@@ -1,7 +1,7 @@
 # TASK-018: Integrate Generated INT8 RVV Objects with the C API
 
 ## Status
-[ ] Not Started
+[~] In Progress
 
 ## Priority
 P1 (High)
@@ -20,10 +20,11 @@ implementation for generic targets.
 
 ## Acceptance Criteria
 - [ ] Define the generated-object naming, symbol, and dispatch policy for
+- [x] Define the generated-object naming, symbol, and dispatch policy for
       `ks_dot_i8` and `ks_matvec_i8`.
-- [ ] Extend the build path so generated INT8 RVV objects can be linked into
+- [x] Extend the build path so generated INT8 RVV objects can be linked into
       `libkernelsmith.a` without changing the public headers.
-- [ ] Keep generic/profile reference implementations available as fallback
+- [x] Keep generic/profile reference implementations available as fallback
       objects.
 - [ ] Add C API or golden tests proving the public symbols use the generated
       target objects when the RVV profile is selected.
@@ -52,6 +53,17 @@ ruff format --check .
   `target/riscv_rvv_256.h` or generated pass options.
 
 ## Log
+
+### 2026-06-15
+- Added static profile-selected INT8 object replacement plumbing for
+  `riscv_rvv_256`: generated objects passed through `KS_INT8_RVV_OBJECTS`
+  export `ks_dot_i8`/`ks_matvec_i8`, while the scalar reference implementation
+  remains the fallback when no generated objects are provided.
+- Documented generated object names, public symbol policy, and no-runtime-
+  dispatch behavior in DES-014.
+- Added a generated-profile C API build test using a mock external INT8 object
+  to prove the public symbols are replaced without changing headers. Real
+  generated RVV object production and VLEN 256/512 QEMU validation remain open.
 
 ### 2026-06-14
 - Created as the generated INT8 RVV object replacement follow-up after
