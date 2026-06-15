@@ -19,7 +19,6 @@ objects for the `riscv_rvv_256` target while preserving the scalar reference
 implementation for generic targets.
 
 ## Acceptance Criteria
-- [ ] Define the generated-object naming, symbol, and dispatch policy for
 - [x] Define the generated-object naming, symbol, and dispatch policy for
       `ks_dot_i8` and `ks_matvec_i8`.
 - [x] Extend the build path so generated INT8 RVV objects can be linked into
