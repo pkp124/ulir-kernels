@@ -1,7 +1,7 @@
 # TASK-008: Transformer Minimum Kernel Set
 
 ## Status
-[ ] Not Started
+[~] In Progress
 
 ## Priority
 P1 (High)
@@ -49,6 +49,10 @@ Add C API and NumPy validation commands as each helper kernel lands.
   implementation spans multiple PRs.
 
 ## Log
+
+### 2026-06-15
+- Started M6 by splitting the first compiler helper slice into `TASK-019` for
+  `ks.add`/`ks.mul` dialect definitions, verifiers, and linalg lowering.
 
 ### 2026-06-06
 - Created from M6 roadmap tasks.

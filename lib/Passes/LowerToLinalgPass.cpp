@@ -95,6 +95,63 @@ static Value createZeroFilledTensorLike(OpBuilder &b, Location loc,
   return b.create<linalg::FillOp>(loc, zero, empty).getResult(0);
 }
 
+static Value createEmptyElementwiseTensor(OpBuilder &b, Location loc,
+                                          RankedTensorType resultType,
+                                          Value lhs, Value rhs) {
+  auto lhsType = cast<RankedTensorType>(lhs.getType());
+  auto rhsType = cast<RankedTensorType>(rhs.getType());
+  int64_t resultRank = resultType.getRank();
+  SmallVector<Value> dynamicSizes;
+
+  auto getAlignedDimIndex = [resultRank](RankedTensorType type,
+                                         int64_t resultDim) -> int64_t {
+    int64_t offset = resultRank - type.getRank();
+    return resultDim < offset ? -1 : resultDim - offset;
+  };
+
+  for (int64_t dim = 0; dim < resultRank; ++dim) {
+    if (!resultType.isDynamicDim(dim))
+      continue;
+
+    int64_t lhsDim = getAlignedDimIndex(lhsType, dim);
+    if (lhsDim >= 0 && lhsType.getDimSize(lhsDim) != 1) {
+      dynamicSizes.push_back(b.create<tensor::DimOp>(loc, lhs, lhsDim));
+      continue;
+    }
+
+    int64_t rhsDim = getAlignedDimIndex(rhsType, dim);
+    if (rhsDim >= 0 && rhsType.getDimSize(rhsDim) != 1) {
+      dynamicSizes.push_back(b.create<tensor::DimOp>(loc, rhs, rhsDim));
+      continue;
+    }
+
+    dynamicSizes.push_back(b.create<arith::ConstantIndexOp>(loc, 1));
+  }
+
+  return b.create<tensor::EmptyOp>(
+      loc, resultType.getShape(), resultType.getElementType(), dynamicSizes);
+}
+
+static AffineMap getBroadcastIndexingMap(OpBuilder &b,
+                                         RankedTensorType operandType,
+                                         RankedTensorType resultType) {
+  int64_t resultRank = resultType.getRank();
+  int64_t offset = resultRank - operandType.getRank();
+  SmallVector<AffineExpr> exprs;
+  exprs.reserve(operandType.getRank());
+
+  for (int64_t dim = 0; dim < operandType.getRank(); ++dim) {
+    if (operandType.getDimSize(dim) == 1) {
+      exprs.push_back(b.getAffineConstantExpr(0));
+      continue;
+    }
+    exprs.push_back(b.getAffineDimExpr(offset + dim));
+  }
+
+  return AffineMap::get(resultRank, /*symbolCount=*/0, exprs,
+                        b.getContext());
+}
+
 static Value buildI8ProductAdd(OpBuilder &b, Location loc, Value input,
                                Value weight, Value accumulator,
                                int64_t inputZeroPoint,
@@ -211,6 +268,70 @@ struct MatmulToLinalgPattern : public OpRewritePattern<ks::MatmulOp> {
     rewriter.replaceOpWithNewOp<linalg::MatmulOp>(
         op, TypeRange{resultType}, ValueRange{op.getLhs(), op.getRhs()},
         ValueRange{filled});
+    return success();
+  }
+};
+
+struct AddToLinalgPattern : public OpRewritePattern<ks::AddOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(ks::AddOp op,
+                                PatternRewriter &rewriter) const override {
+    Location loc = op.getLoc();
+    auto resultType = cast<RankedTensorType>(op.getType());
+    auto lhsType = cast<RankedTensorType>(op.getLhs().getType());
+    auto rhsType = cast<RankedTensorType>(op.getRhs().getType());
+
+    SmallVector<AffineMap> maps{
+        getBroadcastIndexingMap(rewriter, lhsType, resultType),
+        getBroadcastIndexingMap(rewriter, rhsType, resultType),
+        rewriter.getMultiDimIdentityMap(resultType.getRank())};
+    SmallVector<utils::IteratorType> iters(resultType.getRank(),
+                                           utils::IteratorType::parallel);
+    Value empty = createEmptyElementwiseTensor(
+        rewriter, loc, resultType, op.getLhs(), op.getRhs());
+
+    auto generic = rewriter.create<linalg::GenericOp>(
+        loc, resultType, ValueRange{op.getLhs(), op.getRhs()},
+        ValueRange{empty}, maps, iters,
+        [&](OpBuilder &b, Location loc, ValueRange args) {
+          Value sum = b.create<arith::AddFOp>(loc, args[0], args[1]);
+          b.create<linalg::YieldOp>(loc, sum);
+        });
+
+    rewriter.replaceOp(op, generic.getResults());
+    return success();
+  }
+};
+
+struct MulToLinalgPattern : public OpRewritePattern<ks::MulOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(ks::MulOp op,
+                                PatternRewriter &rewriter) const override {
+    Location loc = op.getLoc();
+    auto resultType = cast<RankedTensorType>(op.getType());
+    auto lhsType = cast<RankedTensorType>(op.getLhs().getType());
+    auto rhsType = cast<RankedTensorType>(op.getRhs().getType());
+
+    SmallVector<AffineMap> maps{
+        getBroadcastIndexingMap(rewriter, lhsType, resultType),
+        getBroadcastIndexingMap(rewriter, rhsType, resultType),
+        rewriter.getMultiDimIdentityMap(resultType.getRank())};
+    SmallVector<utils::IteratorType> iters(resultType.getRank(),
+                                           utils::IteratorType::parallel);
+    Value empty = createEmptyElementwiseTensor(
+        rewriter, loc, resultType, op.getLhs(), op.getRhs());
+
+    auto generic = rewriter.create<linalg::GenericOp>(
+        loc, resultType, ValueRange{op.getLhs(), op.getRhs()},
+        ValueRange{empty}, maps, iters,
+        [&](OpBuilder &b, Location loc, ValueRange args) {
+          Value product = b.create<arith::MulFOp>(loc, args[0], args[1]);
+          b.create<linalg::YieldOp>(loc, product);
+        });
+
+    rewriter.replaceOp(op, generic.getResults());
     return success();
   }
 };
@@ -379,8 +500,9 @@ struct KSLowerToLinalgPass
 
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
-    patterns.add<DotI8ToLinalgPattern, DotW4A8ToLinalgPattern,
-                 MatmulToLinalgPattern, MatvecW4A8ToLinalgPattern,
+    patterns.add<AddToLinalgPattern, DotI8ToLinalgPattern,
+                 DotW4A8ToLinalgPattern, MatmulToLinalgPattern,
+                 MatvecW4A8ToLinalgPattern, MulToLinalgPattern,
                  MatvecI8ToLinalgPattern>(&getContext());
 
     if (failed(applyPatternsGreedily(getOperation(), std::move(patterns))))

@@ -118,6 +118,61 @@ def KS_ScaledDotProductAttentionOp : KS_Op<"attention", [Pure]> {
 }
 
 //===----------------------------------------------------------------------===//
+// Elementwise Operations
+//===----------------------------------------------------------------------===//
+
+def KS_AddOp : KS_Op<"add", [Pure]> {
+  let summary = "Elementwise floating-point addition with broadcasting";
+  let description = [{
+    Computes elementwise floating-point addition with NumPy-style broadcasting.
+
+    Example:
+    ```mlir
+    %z = ks.add %x, %y : tensor<4x8xf32>, tensor<8xf32>
+                         -> tensor<4x8xf32>
+    ```
+  }];
+
+  let arguments = (ins
+    KS_FloatTensor:$lhs,
+    KS_FloatTensor:$rhs
+  );
+  let results = (outs KS_FloatTensor:$result);
+
+  let assemblyFormat = [{
+    $lhs `,` $rhs attr-dict `:` type($lhs) `,` type($rhs) `->` type($result)
+  }];
+
+  let hasVerifier = 1;
+}
+
+def KS_MulOp : KS_Op<"mul", [Pure]> {
+  let summary = "Elementwise floating-point multiplication with broadcasting";
+  let description = [{
+    Computes elementwise floating-point multiplication with NumPy-style
+    broadcasting.
+
+    Example:
+    ```mlir
+    %z = ks.mul %x, %y : tensor<4x8xf32>, tensor<8xf32>
+                         -> tensor<4x8xf32>
+    ```
+  }];
+
+  let arguments = (ins
+    KS_FloatTensor:$lhs,
+    KS_FloatTensor:$rhs
+  );
+  let results = (outs KS_FloatTensor:$result);
+
+  let assemblyFormat = [{
+    $lhs `,` $rhs attr-dict `:` type($lhs) `,` type($rhs) `->` type($result)
+  }];
+
+  let hasVerifier = 1;
+}
+
+//===----------------------------------------------------------------------===//
 // Activation Functions
 //===----------------------------------------------------------------------===//
 

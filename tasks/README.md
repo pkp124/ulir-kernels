@@ -92,7 +92,8 @@ Progress updates with dates.
 | TASK-016 | M5 | Implement INT8 dot/GEMV lowering | Complete | P1 |
 | TASK-017 | M5 | Implement W4A8 fused dot/GEMV lowering | Complete | P1 |
 | TASK-018 | M5 | Integrate generated INT8 RVV objects with the C API | Complete | P1 |
-| TASK-008 | M6 | Transformer minimum kernel set | Not Started | P1 |
+| TASK-008 | M6 | Transformer minimum kernel set | In Progress | P1 |
+| TASK-019 | M6 | Add elementwise add/mul ops and linalg lowering | In Progress | P1 |
 
 ## Agent workflow
 
