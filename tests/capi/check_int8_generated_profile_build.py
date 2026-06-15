@@ -26,6 +26,7 @@ def main() -> int:
     parser.add_argument("--generator", required=True)
     parser.add_argument("--mlir-dir", required=True, type=Path)
     parser.add_argument("--llvm-dir", required=True, type=Path)
+    parser.add_argument("--lit-command", required=True, type=Path)
     args = parser.parse_args()
 
     source_dir = args.source_dir.resolve()
@@ -69,6 +70,7 @@ def main() -> int:
             f"-DKS_INT8_RVV_OBJECTS={mock_object}",
             f"-DMLIR_DIR={args.mlir_dir}",
             f"-DLLVM_DIR={args.llvm_dir}",
+            f"-DLIT_COMMAND={args.lit_command}",
         ]
     )
 
