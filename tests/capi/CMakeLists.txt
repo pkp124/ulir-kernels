@@ -42,5 +42,6 @@ if(Python3_FOUND)
       --generator ${CMAKE_GENERATOR}
       --mlir-dir ${MLIR_DIR}
       --llvm-dir ${LLVM_DIR}
+      --lit-command ${LIT_COMMAND}
   )
 endif()
