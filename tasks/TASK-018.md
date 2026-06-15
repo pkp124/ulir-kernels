@@ -1,7 +1,7 @@
 # TASK-018: Integrate Generated INT8 RVV Objects with the C API
 
 ## Status
-[~] In Progress
+[x] Complete
 
 ## Priority
 P1 (High)
@@ -25,9 +25,9 @@ implementation for generic targets.
       `libkernelsmith.a` without changing the public headers.
 - [x] Keep generic/profile reference implementations available as fallback
       objects.
-- [ ] Add C API or golden tests proving the public symbols use the generated
+- [x] Add C API or golden tests proving the public symbols use the generated
       target objects when the RVV profile is selected.
-- [ ] Validate generated INT8 RVV objects under QEMU at VLEN 256 and 512.
+- [x] Validate generated INT8 RVV objects under QEMU at VLEN 256 and 512.
 
 ## Dependencies
 - `TASK-013`: C API and layout contract
@@ -57,10 +57,25 @@ ctest --test-dir build --output-on-failure
 PYTHON=.venv/bin/python ./scripts/run-tests.sh --riscv-functional
 ```
 
-The generated-profile C API test uses a mock external object to prove link-time
-symbol replacement. The RISC-V functional command validates the current runner
-at VLEN 256 and 512; real generated INT8 RVV objects still need to replace the
-mock and scalar runner path before this task can be marked complete.
+Verified on 2026-06-15 for the completed generated INT8 RVV object path:
+
+```bash
+./scripts/setup.sh
+python3 scripts/generate-int8-rvv-objects.py --cc riscv64-linux-gnu-gcc --source-root /workspace --output-dir build/rvv-functional/int8-objects
+riscv64-linux-gnu-nm -g build/rvv-functional/int8-objects/ks_dot_i8_riscv_rvv_256.o build/rvv-functional/int8-objects/ks_matvec_i8_riscv_rvv_256.o
+riscv64-linux-gnu-objdump -d build/rvv-functional/int8-objects/ks_dot_i8_riscv_rvv_256.o | rg 'vsetvli|vle8|vwmul|vredsum'
+riscv64-linux-gnu-objdump -d build/rvv-functional/int8-objects/ks_matvec_i8_riscv_rvv_256.o | rg 'vsetvli|vle8|vwmul|vredsum'
+PYTHON=python3 ./scripts/run-tests.sh --riscv-functional
+cmake --build build --parallel
+ctest --test-dir build --output-on-failure
+.venv/bin/ruff check .
+.venv/bin/ruff format --check .
+```
+
+The generated objects export `ks_dot_i8` and `ks_matvec_i8`, contain RVV vector
+instructions, and are linked into the RISC-V golden runner with
+`KS_QUANTIZED_INT8_EXTERNAL=1` so scalar INT8 definitions are suppressed. The
+INT8 golden reports pass at VLEN 256 and 512 for both dot and GEMV.
 
 ## Notes
 - Keep generated-object integration separate from the reference C API and
@@ -71,6 +86,13 @@ mock and scalar runner path before this task can be marked complete.
 ## Log
 
 ### 2026-06-15
+- Added a build-time INT8 RVV object generator that emits
+  `ks_dot_i8_riscv_rvv_256.o` and `ks_matvec_i8_riscv_rvv_256.o` with public C
+  API symbols backed by RVV vector reductions.
+- Updated local and CI RISC-V functional runner builds to link those generated
+  objects and suppress scalar INT8 C API definitions for the RVV profile.
+- Validated `dot_i8_smoke` and `matvec_i8_smoke` under QEMU at VLEN 256 and 512
+  through the public C API runner, with exact golden and host-reference matches.
 - Added static profile-selected INT8 object replacement plumbing for
   `riscv_rvv_256`: generated objects passed through `KS_INT8_RVV_OBJECTS`
   export `ks_dot_i8`/`ks_matvec_i8`, while the scalar reference implementation

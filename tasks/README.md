@@ -85,13 +85,13 @@ Progress updates with dates.
 | TASK-010 | M4 | Build golden reference verification infrastructure | Complete | P0 |
 | TASK-011 | M4 | Add host reference execution comparator | Complete | P1 |
 | TASK-012 | M4 | Compare RISC-V RVV outputs against golden references | Complete | P1 |
-| TASK-007 | M5 | RISC-V quantization foundation | In Progress | P1 |
+| TASK-007 | M5 | RISC-V quantization foundation | Complete | P1 |
 | TASK-013 | M5 | Define quantized dot/GEMV C APIs and layouts | Complete | P0 |
 | TASK-014 | M5 | Add quantized golden validation cases | Complete | P0 |
 | TASK-015 | M5 | Add quantized RVV target profile parameters | Complete | P1 |
 | TASK-016 | M5 | Implement INT8 dot/GEMV lowering | Complete | P1 |
 | TASK-017 | M5 | Implement W4A8 fused dot/GEMV lowering | Complete | P1 |
-| TASK-018 | M5 | Integrate generated INT8 RVV objects with the C API | Not Started | P1 |
+| TASK-018 | M5 | Integrate generated INT8 RVV objects with the C API | Complete | P1 |
 | TASK-008 | M6 | Transformer minimum kernel set | Not Started | P1 |
 
 ## Agent workflow
