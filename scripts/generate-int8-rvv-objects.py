@@ -8,7 +8,6 @@ import shlex
 import subprocess
 from pathlib import Path
 
-
 COMMON_SOURCE = r"""
 #include "kernelsmith/ks_common.h"
 #include "kernelsmith/ks_quantized.h"

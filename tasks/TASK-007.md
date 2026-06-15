@@ -1,7 +1,7 @@
 # TASK-007: RISC-V Quantization Foundation
 
 ## Status
-[~] In Progress
+[x] Complete
 
 ## Priority
 P1 (High)
@@ -29,9 +29,9 @@ INT8 and W4A8 RISC-V inference kernels.
       profiles.
 - [x] `TASK-016`: Implement INT8 dot/GEMV lowering with i8 inputs, i32
       accumulation, and requantization where needed.
-- [ ] `TASK-017`: Implement W4A8 fused unpack/dequantize plus i32 or f32
+- [x] `TASK-017`: Implement W4A8 fused unpack/dequantize plus i32 or f32
       accumulation for RVV.
-- [ ] `TASK-018`: Integrate generated INT8 RVV objects with the public C API
+- [x] `TASK-018`: Integrate generated INT8 RVV objects with the public C API
       build path.
 
 ## Dependencies
@@ -51,6 +51,16 @@ ruff format --check .
 
 Add focused QEMU validation when generated RVV quantized kernels are runnable in
 the local or CI environment.
+
+Verified on 2026-06-15 after completing `TASK-018`:
+
+```bash
+PYTHON=python3 ./scripts/run-tests.sh --riscv-functional
+cmake --build build --parallel
+ctest --test-dir build --output-on-failure
+.venv/bin/ruff check .
+.venv/bin/ruff format --check .
+```
 
 ## Notes
 
@@ -90,3 +100,9 @@ the local or CI environment.
   `matvec_i8_smoke`.
 - Split generated INT8 RVV object replacement into `TASK-018` so `TASK-017`
   can focus on W4A8 fused lowering.
+
+### 2026-06-15
+- Completed `TASK-017` and `TASK-018`, including W4A8 fused dot/GEMV lowering
+  and generated INT8 RVV object linkage through the public C API runner.
+- Closed the M5 parent tracker after QEMU VLEN 256/512 validation, full CTest,
+  and Python lint/format checks passed.
