@@ -21,14 +21,14 @@ milestone should show status, task links, blockers, and the next concrete work.
 | M2 — Activation Lowering | Partial | Covered by roadmap history | Track generated-object integration when resumed. |
 | M3 — Generic MatMul Lowering | Partial | `TASK-004` | Track generated matmul replacement separately if prioritized. |
 | M4 — RISC-V RVV Target | Done | `TASK-005`, `TASK-006`, `TASK-009`, `TASK-010`, `TASK-011`, `TASK-012` | Keep RVV validation reports green as new kernels land. |
-| M5 — RISC-V Quantization Foundation | Active | `TASK-007`, `TASK-013`, `TASK-014`, `TASK-015`, `TASK-016`, `TASK-017`, `TASK-018` | Continue `TASK-018` with generated INT8 RVV object replacement. |
+| M5 — RISC-V Quantization Foundation | Active | `TASK-007`, `TASK-013`, `TASK-014`, `TASK-015`, `TASK-016`, `TASK-017`, `TASK-018` | Continue `TASK-018` by producing real INT8 RVV objects for the new build hook. |
 | M6 — Transformer Minimum Kernel Set | Planned | `TASK-008` | Start after M5 dot/GEMV ABI and validation policy are stable. |
 | M7 — Minimal RISC-V Transformer Demo | Planned | Not created | Create tasks after M5/M6 interfaces stabilize. |
 
 ## Active focus
 
-1. `TASK-018`: wire generated INT8 RVV objects into the public C API build path
-   once the generated-object ABI is selected.
+1. `TASK-018`: produce and QEMU-validate real generated INT8 RVV objects for
+   the public C API build hook.
 2. `TASK-008`: start M6 transformer helpers after quantized layout decisions are
    stable enough for public C APIs.
 
