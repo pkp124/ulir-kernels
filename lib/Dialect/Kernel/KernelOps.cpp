@@ -12,6 +12,7 @@
 #include "llvm/ADT/STLExtras.h"
 
 #include <cmath>
+#include <optional>
 
 using namespace mlir;
 using namespace kernelsmith::ks;
@@ -62,6 +63,64 @@ static LogicalResult verifyMatchingElementTypes(Operation *op,
   for (RankedTensorType type : types.drop_front()) {
     if (type.getElementType() != elementType)
       return op->emitOpError(tensorNames) << " element types must match";
+  }
+
+  return success();
+}
+
+static LogicalResult verifyElementwiseBroadcast(Operation *op,
+                                                RankedTensorType lhsType,
+                                                RankedTensorType rhsType,
+                                                RankedTensorType resultType) {
+  int64_t resultRank = resultType.getRank();
+  int64_t expectedRank = std::max(lhsType.getRank(), rhsType.getRank());
+  if (resultRank != expectedRank)
+    return op->emitOpError(
+        "result shape must be the broadcasted operand shape");
+
+  auto getAlignedDim = [resultRank](RankedTensorType type,
+                                    int64_t resultDim) -> int64_t {
+    int64_t offset = resultRank - type.getRank();
+    if (resultDim < offset)
+      return 1;
+    return type.getDimSize(resultDim - offset);
+  };
+
+  for (int64_t dim = 0; dim < resultRank; ++dim) {
+    int64_t lhsDim = getAlignedDim(lhsType, dim);
+    int64_t rhsDim = getAlignedDim(rhsType, dim);
+    bool lhsKnownNonOne =
+        lhsDim != ShapedType::kDynamic && lhsDim != 1;
+    bool rhsKnownNonOne =
+        rhsDim != ShapedType::kDynamic && rhsDim != 1;
+    if (lhsKnownNonOne && rhsKnownNonOne && lhsDim != rhsDim) {
+      return op->emitOpError(
+          "operand shapes must be broadcast-compatible with result shape");
+    }
+  }
+
+  for (int64_t dim = 0; dim < resultRank; ++dim) {
+    int64_t lhsDim = getAlignedDim(lhsType, dim);
+    int64_t rhsDim = getAlignedDim(rhsType, dim);
+    int64_t resultDim = resultType.getDimSize(dim);
+    if (resultDim == ShapedType::kDynamic)
+      continue;
+
+    std::optional<int64_t> expectedDim;
+    for (int64_t operandDim : {lhsDim, rhsDim}) {
+      if (operandDim == ShapedType::kDynamic)
+        continue;
+      if (operandDim != 1) {
+        expectedDim = operandDim;
+        break;
+      }
+      if (!expectedDim)
+        expectedDim = 1;
+    }
+
+    if (expectedDim && resultDim != *expectedDim)
+      return op->emitOpError(
+          "result shape must be the broadcasted operand shape");
   }
 
   return success();
@@ -333,6 +392,35 @@ LogicalResult ScaledDotProductAttentionOp::verify() {
 
   return success();
 }
+
+//===----------------------------------------------------------------------===//
+// AddOp / MulOp
+//===----------------------------------------------------------------------===//
+
+template <typename OpTy>
+static LogicalResult verifyElementwiseBinaryOp(OpTy op) {
+  auto lhsType = dyn_cast<RankedTensorType>(op.getLhs().getType());
+  auto rhsType = dyn_cast<RankedTensorType>(op.getRhs().getType());
+  auto resultType = dyn_cast<RankedTensorType>(op.getResult().getType());
+
+  if (!lhsType || !rhsType || !resultType)
+    return op.emitOpError("operands and result must be ranked tensors");
+
+  if (failed(verifyFloatingPointElementType(op.getOperation(), lhsType, "lhs")))
+    return failure();
+
+  if (failed(verifyMatchingElementTypes(
+          op.getOperation(), {lhsType, rhsType, resultType},
+          "lhs, rhs, and result")))
+    return failure();
+
+  return verifyElementwiseBroadcast(op.getOperation(), lhsType, rhsType,
+                                    resultType);
+}
+
+LogicalResult AddOp::verify() { return verifyElementwiseBinaryOp(*this); }
+
+LogicalResult MulOp::verify() { return verifyElementwiseBinaryOp(*this); }
 
 //===----------------------------------------------------------------------===//
 // LayerNormOp
