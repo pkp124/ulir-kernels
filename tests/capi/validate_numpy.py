@@ -138,9 +138,7 @@ def validate_matmul_references():
     for label, A, B, C_ref in generate_matmul_cases():
         total += 1
         C_np = (A.astype(np.float64) @ B.astype(np.float64)).astype(np.float32)
-        max_rel_err = np.max(
-            np.abs(C_ref - C_np) / np.maximum(np.abs(C_np), 1e-8)
-        )
+        max_rel_err = np.max(np.abs(C_ref - C_np) / np.maximum(np.abs(C_np), 1e-8))
         if max_rel_err < 1e-5:
             print(f"  PASS {label} (max_rel_err={max_rel_err:.2e})")
             passed += 1
@@ -172,10 +170,7 @@ def validate_activation_references():
     total += 1
     gelu_out = ref_gelu_f32(x)
     # Sanity: GELU(-5) ~ 0, GELU(5) ~ 5
-    if (
-        abs(float(gelu_out[0])) < 0.01
-        and abs(float(gelu_out[-1]) - 5.0) < 0.01
-    ):
+    if abs(float(gelu_out[0])) < 0.01 and abs(float(gelu_out[-1]) - 5.0) < 0.01:
         print("  PASS gelu (range check)")
         passed += 1
     else:
@@ -201,9 +196,7 @@ def validate_activation_references():
 def validate_transformer_helper_references():
     """Validate transformer helper function references."""
     print("=== transformer helper reference validation (numpy) ===\n")
-    lhs, rhs, rms_input, rms_weight, softmax_input = (
-        generate_transformer_helper_cases()
-    )
+    lhs, rhs, rms_input, rms_weight, softmax_input = generate_transformer_helper_cases()
     passed = 0
     total = 0
 
@@ -223,9 +216,7 @@ def validate_transformer_helper_references():
 
     total += 1
     rms_out = ref_rms_norm_f32(rms_input, rms_weight, 1e-5).astype(np.float32)
-    rms_scale = 1.0 / np.sqrt(
-        np.mean(rms_input * rms_input, axis=-1, keepdims=True) + 1e-5
-    )
+    rms_scale = 1.0 / np.sqrt(np.mean(rms_input * rms_input, axis=-1, keepdims=True) + 1e-5)
     rms_expected = (rms_input * rms_scale * rms_weight).astype(np.float32)
     if np.allclose(rms_out, rms_expected, atol=1e-6):
         print("  PASS rms_norm")
