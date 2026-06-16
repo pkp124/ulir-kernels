@@ -94,6 +94,7 @@ Progress updates with dates.
 | TASK-018 | M5 | Integrate generated INT8 RVV objects with the C API | Complete | P1 |
 | TASK-008 | M6 | Transformer minimum kernel set | In Progress | P1 |
 | TASK-019 | M6 | Add elementwise add/mul ops and linalg lowering | Complete | P1 |
+| TASK-020 | M6 | Add transformer helper C APIs | In Progress | P1 |
 
 ## Agent workflow
 
