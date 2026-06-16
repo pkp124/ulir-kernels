@@ -8,6 +8,7 @@ compares outputs to numpy reference. Uses ctypes to call the shared lib.
 This script validates correctness, not performance.
 """
 
+import math
 import sys
 from pathlib import Path
 
@@ -47,13 +48,34 @@ def ref_relu_f32(x):
 
 
 def ref_gelu_f32(x):
-    from scipy.special import erf
-
+    erf = np.vectorize(math.erf)
     return 0.5 * x * (1.0 + erf(x / np.sqrt(2.0)))
 
 
 def ref_silu_f32(x):
     return x / (1.0 + np.exp(-x.astype(np.float64)))
+
+
+def ref_add_f32(lhs, rhs):
+    return lhs + rhs
+
+
+def ref_mul_f32(lhs, rhs):
+    return lhs * rhs
+
+
+def ref_rms_norm_f32(x, weight, eps):
+    x_f32 = x.astype(np.float32)
+    sum_squares = np.sum(x_f32 * x_f32, axis=-1, keepdims=True)
+    scale = 1.0 / np.sqrt(sum_squares / x.shape[-1] + eps)
+    return x * scale * weight
+
+
+def ref_softmax_f32(x):
+    x_f64 = x.astype(np.float64)
+    shifted = x_f64 - np.max(x_f64, axis=-1, keepdims=True)
+    exp = np.exp(shifted)
+    return exp / np.sum(exp, axis=-1, keepdims=True)
 
 
 # --------------------------------------------------------------------------- #
@@ -81,12 +103,29 @@ def generate_matmul_cases():
 
 def generate_activation_cases():
     """Generate activation test values."""
-    x = np.array([-5.0, -2.0, -1.0, -0.5, 0.0, 0.5, 1.0, 2.0, 5.0], dtype=np.float32)
+    x = np.array(
+        [-5.0, -2.0, -1.0, -0.5, 0.0, 0.5, 1.0, 2.0, 5.0],
+        dtype=np.float32,
+    )
     return x
 
 
+def generate_transformer_helper_cases():
+    """Generate transformer helper test values."""
+    rng = np.random.default_rng(123)
+    lhs = rng.standard_normal(17).astype(np.float32)
+    rhs = rng.standard_normal(17).astype(np.float32)
+    rms_input = rng.standard_normal((3, 8)).astype(np.float32)
+    rms_weight = rng.standard_normal(8).astype(np.float32)
+    softmax_input = np.array(
+        [[1.0, 2.0, 3.0, 4.0], [1000.0, 1001.0, 999.0, 998.0]],
+        dtype=np.float32,
+    )
+    return lhs, rhs, rms_input, rms_weight, softmax_input
+
+
 # --------------------------------------------------------------------------- #
-# Validation (numpy-only, no ctypes — validates test data and references)
+# Validation (numpy-only, no ctypes - validates test data and references)
 # --------------------------------------------------------------------------- #
 
 
@@ -99,7 +138,9 @@ def validate_matmul_references():
     for label, A, B, C_ref in generate_matmul_cases():
         total += 1
         C_np = (A.astype(np.float64) @ B.astype(np.float64)).astype(np.float32)
-        max_rel_err = np.max(np.abs(C_ref - C_np) / np.maximum(np.abs(C_np), 1e-8))
+        max_rel_err = np.max(
+            np.abs(C_ref - C_np) / np.maximum(np.abs(C_np), 1e-8)
+        )
         if max_rel_err < 1e-5:
             print(f"  PASS {label} (max_rel_err={max_rel_err:.2e})")
             passed += 1
@@ -127,24 +168,23 @@ def validate_activation_references():
     else:
         print("  FAIL relu")
 
-    # GELU (compare against scipy)
+    # GELU
     total += 1
-    try:
-        gelu_out = ref_gelu_f32(x)
-        # Sanity: GELU(-5) ~ 0, GELU(5) ~ 5
-        if abs(float(gelu_out[0])) < 0.01 and abs(float(gelu_out[-1]) - 5.0) < 0.01:
-            print("  PASS gelu (range check)")
-            passed += 1
-        else:
-            print("  FAIL gelu (range check)")
-    except ImportError:
-        print("  SKIP gelu (scipy not available)")
-        passed += 1  # Don't fail without scipy
+    gelu_out = ref_gelu_f32(x)
+    # Sanity: GELU(-5) ~ 0, GELU(5) ~ 5
+    if (
+        abs(float(gelu_out[0])) < 0.01
+        and abs(float(gelu_out[-1]) - 5.0) < 0.01
+    ):
+        print("  PASS gelu (range check)")
+        passed += 1
+    else:
+        print("  FAIL gelu (range check)")
 
     # SiLU
     total += 1
     silu_out = ref_silu_f32(x).astype(np.float32)
-    # Sanity: SiLU(0) = 0, SiLU(x) ~ x for large x, SiLU(x) ~ 0 for large negative x
+    # Sanity: SiLU(0) = 0, approaches x for large x, and 0 for large -x.
     if (
         abs(float(silu_out[4])) < 1e-6  # x=0
         and abs(float(silu_out[-1]) - 5.0) < 0.1
@@ -155,6 +195,54 @@ def validate_activation_references():
         print("  FAIL silu (range check)")
 
     print(f"\n{passed}/{total} activation reference checks passed.\n")
+    return passed == total
+
+
+def validate_transformer_helper_references():
+    """Validate transformer helper function references."""
+    print("=== transformer helper reference validation (numpy) ===\n")
+    lhs, rhs, rms_input, rms_weight, softmax_input = (
+        generate_transformer_helper_cases()
+    )
+    passed = 0
+    total = 0
+
+    total += 1
+    if np.allclose(ref_add_f32(lhs, rhs), lhs + rhs, atol=1e-6):
+        print("  PASS add")
+        passed += 1
+    else:
+        print("  FAIL add")
+
+    total += 1
+    if np.allclose(ref_mul_f32(lhs, rhs), lhs * rhs, atol=1e-6):
+        print("  PASS mul")
+        passed += 1
+    else:
+        print("  FAIL mul")
+
+    total += 1
+    rms_out = ref_rms_norm_f32(rms_input, rms_weight, 1e-5).astype(np.float32)
+    rms_scale = 1.0 / np.sqrt(
+        np.mean(rms_input * rms_input, axis=-1, keepdims=True) + 1e-5
+    )
+    rms_expected = (rms_input * rms_scale * rms_weight).astype(np.float32)
+    if np.allclose(rms_out, rms_expected, atol=1e-6):
+        print("  PASS rms_norm")
+        passed += 1
+    else:
+        print("  FAIL rms_norm")
+
+    total += 1
+    softmax_out = ref_softmax_f32(softmax_input).astype(np.float32)
+    row_sums = np.sum(softmax_out, axis=-1)
+    if np.allclose(row_sums, np.ones_like(row_sums), atol=1e-6):
+        print("  PASS softmax")
+        passed += 1
+    else:
+        print("  FAIL softmax")
+
+    print(f"\n{passed}/{total} transformer helper reference checks passed.\n")
     return passed == total
 
 
@@ -192,6 +280,7 @@ def main():
     ok = True
     ok = validate_matmul_references() and ok
     ok = validate_activation_references() and ok
+    ok = validate_transformer_helper_references() and ok
 
     if "--write-data" in sys.argv:
         write_test_data()

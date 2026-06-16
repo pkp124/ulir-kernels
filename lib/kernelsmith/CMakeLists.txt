@@ -50,6 +50,8 @@ add_library(kernelsmith STATIC
   ks_common.c
   ks_matmul.c
   ks_activations.c
+  ks_elementwise.c
+  ks_normalization.c
   ks_quantized.c
   ${KS_INT8_EXTERNAL_OBJECTS}
 )
