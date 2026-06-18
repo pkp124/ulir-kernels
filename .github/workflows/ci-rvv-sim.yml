@@ -18,7 +18,7 @@ name: CI - RVV Simulation
 
 on:
   push:
-    branches: [main, develop, 'claude/**', 'cursor/**']
+    branches: [main, develop, 'claude/**']
     paths:
       - 'lib/Passes/**'
       - 'lib/kernelsmith/**'
@@ -190,6 +190,7 @@ jobs:
     name: "QEMU ${{ matrix.name }}"
     runs-on: ubuntu-24.04
     needs: build-rvv-kernels
+    timeout-minutes: 10
 
     strategy:
       fail-fast: false
