@@ -18,7 +18,7 @@ name: CI - RVV Simulation
 
 on:
   push:
-    branches: [main, develop, 'claude/**']
+    branches: [main, develop, 'claude/**', 'cursor/**']
     paths:
       - 'lib/Passes/**'
       - 'lib/kernelsmith/**'
@@ -50,6 +50,8 @@ on:
       - 'scripts/compile-rvv.sh'
       - 'scripts/generate-int8-rvv-objects.py'
       - 'scripts/run-tests.sh'
+      - 'scripts/setup-rvv-sim.sh'
+      - '.github/workflows/ci-rvv-sim.yml'
   workflow_dispatch:
     inputs:
       run_spike:
