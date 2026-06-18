@@ -11,7 +11,7 @@
 # Key differences from pkp124/riscv:
 #   - Uses qemu-user (user-mode) instead of qemu-system (bare-metal).
 #   - Uses descriptor-defined golden inputs and NumPy comparison policy.
-#   - Tests both f32 ReLU and f32 matmul smoke cases under RVV QEMU.
+#   - Tests f32, INT8, and W4A8 smoke cases under RVV QEMU.
 # =============================================================================
 
 name: CI - RVV Simulation
@@ -21,7 +21,9 @@ on:
     branches: [main, develop, 'claude/**']
     paths:
       - 'lib/Passes/**'
+      - 'lib/kernelsmith/**'
       - 'include/KernelSmith/Passes/**'
+      - 'include/kernelsmith/**'
       - 'target/riscv_rvv_256.h'
       - 'tests/riscv/**'
       - 'tests/golden/**'
@@ -29,12 +31,16 @@ on:
       - 'tests/riscv_runner.py'
       - 'tests/verify.py'
       - 'scripts/compile-rvv.sh'
+      - 'scripts/generate-int8-rvv-objects.py'
+      - 'scripts/run-tests.sh'
       - 'scripts/setup-rvv-sim.sh'
       - '.github/workflows/ci-rvv-sim.yml'
   pull_request:
     paths:
       - 'lib/Passes/**'
+      - 'lib/kernelsmith/**'
       - 'include/KernelSmith/Passes/**'
+      - 'include/kernelsmith/**'
       - 'target/riscv_rvv_256.h'
       - 'tests/riscv/**'
       - 'tests/golden/**'
@@ -42,6 +48,8 @@ on:
       - 'tests/riscv_runner.py'
       - 'tests/verify.py'
       - 'scripts/compile-rvv.sh'
+      - 'scripts/generate-int8-rvv-objects.py'
+      - 'scripts/run-tests.sh'
   workflow_dispatch:
     inputs:
       run_spike:
@@ -219,7 +227,7 @@ jobs:
         run: chmod +x rvv-bin/*
 
       - name: "Verify golden cases (VLEN=${{ matrix.vlen }})"
-        timeout-minutes: 2
+        timeout-minutes: 5
         run: |
           mkdir -p build/golden-rvv
 
@@ -265,6 +273,29 @@ jobs:
             --vlens ${{ matrix.vlen }} \
             --output-dir build/golden-rvv \
             --report build/golden-rvv/matvec_i8_vlen_${{ matrix.vlen }}.json
+
+          python tests/verify.py \
+            --case tests/golden/cases/dot_w4a8_smoke.json \
+            --target riscv_rvv_256 \
+            --riscv-runner rvv-bin/riscv-golden-runner \
+            --host-runner rvv-bin/host-reference-runner \
+            --qemu qemu-riscv64 \
+            --vlens ${{ matrix.vlen }} \
+            --output-dir build/golden-rvv \
+            --report build/golden-rvv/dot_w4a8_vlen_${{ matrix.vlen }}.json
+
+          python tests/verify.py \
+            --case tests/golden/cases/matvec_w4a8_smoke.json \
+            --target riscv_rvv_256 \
+            --riscv-runner rvv-bin/riscv-golden-runner \
+            --host-runner rvv-bin/host-reference-runner \
+            --qemu qemu-riscv64 \
+            --vlens ${{ matrix.vlen }} \
+            --output-dir build/golden-rvv \
+            --report build/golden-rvv/matvec_w4a8_vlen_${{ matrix.vlen }}.json \
+            --benchmark \
+            --benchmark-runs 3 \
+            --benchmark-warmup 1
 
       - name: Upload RVV verification reports
         if: always()
