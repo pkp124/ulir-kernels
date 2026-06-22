@@ -75,6 +75,18 @@ if(Python3_FOUND)
     COMMAND ${KS_GOLDEN_VERIFY_COMMAND}
       --case ${CMAKE_CURRENT_SOURCE_DIR}/golden/cases/matmul_f32_smoke.json
   )
+  set(KS_TRANSFORMER_HELPER_GOLDEN_CASES
+    add_f32_smoke
+    mul_f32_smoke
+    rms_norm_f32_smoke
+    softmax_f32_smoke
+  )
+  foreach(KS_TRANSFORMER_HELPER_GOLDEN_CASE ${KS_TRANSFORMER_HELPER_GOLDEN_CASES})
+    add_test(NAME kernelsmith-host-golden-${KS_TRANSFORMER_HELPER_GOLDEN_CASE}
+      COMMAND ${KS_GOLDEN_VERIFY_COMMAND}
+        --case ${CMAKE_CURRENT_SOURCE_DIR}/golden/cases/${KS_TRANSFORMER_HELPER_GOLDEN_CASE}.json
+    )
+  endforeach()
   set(KS_QUANTIZED_GOLDEN_CASES
     dot_i8_smoke
     matvec_i8_smoke
@@ -93,6 +105,14 @@ if(Python3_FOUND)
       --case ${CMAKE_CURRENT_SOURCE_DIR}/golden/cases/relu_f32_smoke.json
     COMMAND ${KS_GOLDEN_VERIFY_COMMAND}
       --case ${CMAKE_CURRENT_SOURCE_DIR}/golden/cases/matmul_f32_smoke.json
+    COMMAND ${KS_GOLDEN_VERIFY_COMMAND}
+      --case ${CMAKE_CURRENT_SOURCE_DIR}/golden/cases/add_f32_smoke.json
+    COMMAND ${KS_GOLDEN_VERIFY_COMMAND}
+      --case ${CMAKE_CURRENT_SOURCE_DIR}/golden/cases/mul_f32_smoke.json
+    COMMAND ${KS_GOLDEN_VERIFY_COMMAND}
+      --case ${CMAKE_CURRENT_SOURCE_DIR}/golden/cases/rms_norm_f32_smoke.json
+    COMMAND ${KS_GOLDEN_VERIFY_COMMAND}
+      --case ${CMAKE_CURRENT_SOURCE_DIR}/golden/cases/softmax_f32_smoke.json
     COMMAND ${KS_GOLDEN_VERIFY_COMMAND}
       --case ${CMAKE_CURRENT_SOURCE_DIR}/golden/cases/dot_i8_smoke.json
     COMMAND ${KS_GOLDEN_VERIFY_COMMAND}

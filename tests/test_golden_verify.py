@@ -17,6 +17,12 @@ from tests.test_data_generator import TestDataGenerator
 from tests.verify import VerifyError, _json_safe, benchmark_case, verify_case
 
 CASES_DIR = Path(__file__).parent / "golden" / "cases"
+TRANSFORMER_HELPER_CASE_NAMES = [
+    "add_f32_smoke",
+    "mul_f32_smoke",
+    "rms_norm_f32_smoke",
+    "softmax_f32_smoke",
+]
 QUANTIZED_CASE_NAMES = [
     "dot_i8_smoke",
     "matvec_i8_smoke",
@@ -49,6 +55,22 @@ def test_committed_quantized_descriptors_validate() -> None:
     ]
     assert descriptors[0].compare.quantization["rounding"] == "none"
     assert descriptors[3].inputs[1].layout["nibble_order"] == "low_even_high_odd"
+
+
+def test_committed_transformer_helper_descriptors_validate() -> None:
+    descriptors = [
+        load_case_descriptor(CASES_DIR / f"{case_name}.json")
+        for case_name in TRANSFORMER_HELPER_CASE_NAMES
+    ]
+
+    assert [descriptor.kernel for descriptor in descriptors] == [
+        "add",
+        "mul",
+        "rms_norm",
+        "softmax",
+    ]
+    assert descriptors[2].compare.quantization["epsilon"] == 1e-5
+    assert all("riscv_rvv_256" in descriptor.targets for descriptor in descriptors)
 
 
 def test_descriptor_validation_rejects_bad_matmul_shape() -> None:
@@ -102,6 +124,44 @@ def test_generator_builds_i8_quantized_references() -> None:
     a = matmul_arrays["input_A"].astype(np.int32) - matmul.compare.quantization["input_zero_point"]
     b = matmul_arrays["input_B"].astype(np.int32) - matmul.compare.quantization["weight_zero_point"]
     np.testing.assert_array_equal(matmul_arrays["expected_C"], np.matmul(a, b))
+
+
+def test_generator_builds_transformer_helper_references() -> None:
+    add = load_case_descriptor(CASES_DIR / "add_f32_smoke.json")
+    mul = load_case_descriptor(CASES_DIR / "mul_f32_smoke.json")
+    rms_norm = load_case_descriptor(CASES_DIR / "rms_norm_f32_smoke.json")
+    softmax = load_case_descriptor(CASES_DIR / "softmax_f32_smoke.json")
+
+    add_arrays = generate_case_arrays(add)
+    np.testing.assert_allclose(
+        add_arrays["expected_Y"],
+        add_arrays["input_X"] + add_arrays["input_Z"],
+        rtol=1e-6,
+        atol=1e-6,
+    )
+
+    mul_arrays = generate_case_arrays(mul)
+    np.testing.assert_allclose(
+        mul_arrays["expected_Y"],
+        mul_arrays["input_X"] * mul_arrays["input_Z"],
+        rtol=1e-6,
+        atol=1e-6,
+    )
+
+    rms_arrays = generate_case_arrays(rms_norm)
+    squared = rms_arrays["input_X"] * rms_arrays["input_X"]
+    scale = 1.0 / np.sqrt(np.mean(squared, axis=-1, keepdims=True) + 1e-5)
+    expected_rms = rms_arrays["input_X"] * scale * rms_arrays["input_W"].reshape((1, -1))
+    np.testing.assert_allclose(rms_arrays["expected_Y"], expected_rms, rtol=1e-6, atol=1e-6)
+
+    softmax_arrays = generate_case_arrays(softmax)
+    assert np.all(softmax_arrays["expected_Y"] >= 0.0)
+    np.testing.assert_allclose(
+        np.sum(softmax_arrays["expected_Y"], axis=-1),
+        np.ones((2,), dtype=np.float32),
+        rtol=1e-6,
+        atol=1e-6,
+    )
 
 
 def _unpack_i4(packed: np.ndarray, logical_shape: tuple[int, ...]) -> np.ndarray:
@@ -281,7 +341,13 @@ def _write_fake_descriptor_runner(tmp_path: Path, name: str, *, executable: bool
         "import sys\n"
         "import numpy as np\n"
         "kernel = sys.argv[1]\n"
-        "if kernel == 'relu':\n"
+        "if kernel in {'add', 'mul'}:\n"
+        "    lhs_path, rhs_path, output_path, n = sys.argv[2], sys.argv[3], sys.argv[4], int(sys.argv[5])\n"
+        "    lhs = np.fromfile(lhs_path, dtype=np.float32, count=n)\n"
+        "    rhs = np.fromfile(rhs_path, dtype=np.float32, count=n)\n"
+        "    out = lhs + rhs if kernel == 'add' else lhs * rhs\n"
+        "    out.astype(np.float32).tofile(output_path)\n"
+        "elif kernel == 'relu':\n"
         "    input_path, output_path, n = sys.argv[2], sys.argv[3], int(sys.argv[4])\n"
         "    data = np.fromfile(input_path, dtype=np.float32, count=n)\n"
         "    np.maximum(data, 0).astype(np.float32).tofile(output_path)\n"
@@ -291,6 +357,20 @@ def _write_fake_descriptor_runner(tmp_path: Path, name: str, *, executable: bool
         "    lhs = np.fromfile(lhs_path, dtype=np.float32, count=m * k).reshape(m, k)\n"
         "    rhs = np.fromfile(rhs_path, dtype=np.float32, count=k * n).reshape(k, n)\n"
         "    np.matmul(lhs, rhs).astype(np.float32).tofile(output_path)\n"
+        "elif kernel == 'rms_norm':\n"
+        "    input_path, weight_path, output_path = sys.argv[2], sys.argv[3], sys.argv[4]\n"
+        "    outer, inner, eps = int(sys.argv[5]), int(sys.argv[6]), float(sys.argv[7])\n"
+        "    data = np.fromfile(input_path, dtype=np.float32, count=outer * inner).reshape(outer, inner)\n"
+        "    weight = np.fromfile(weight_path, dtype=np.float32, count=inner)\n"
+        "    scale = 1.0 / np.sqrt(np.mean(data * data, axis=-1, keepdims=True) + eps)\n"
+        "    (data * scale * weight.reshape(1, -1)).astype(np.float32).tofile(output_path)\n"
+        "elif kernel == 'softmax':\n"
+        "    input_path, output_path = sys.argv[2], sys.argv[3]\n"
+        "    outer, inner = int(sys.argv[4]), int(sys.argv[5])\n"
+        "    data = np.fromfile(input_path, dtype=np.float32, count=outer * inner).reshape(outer, inner)\n"
+        "    shifted = data - np.max(data, axis=-1, keepdims=True)\n"
+        "    exp = np.exp(shifted)\n"
+        "    (exp / np.sum(exp, axis=-1, keepdims=True)).astype(np.float32).tofile(output_path)\n"
         "else:\n"
         "    print(f'unsupported kernel: {kernel}', file=sys.stderr)\n"
         "    raise SystemExit(2)\n"

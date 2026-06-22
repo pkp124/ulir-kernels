@@ -1,0 +1,78 @@
+{
+  "case": "rms_norm_f32_smoke",
+  "compare": {
+    "atol": 1e-05,
+    "epsilon": 1e-05,
+    "mode": "allclose",
+    "rtol": 1e-05,
+    "strict_dtype": true,
+    "strict_shape": true
+  },
+  "descriptor": "tests/golden/cases/rms_norm_f32_smoke.json",
+  "descriptor_sha256": "a681aa0b4e0dfa5a9857508bc3bdbd85b4966b798a3dc686f05e2a82016c2901",
+  "generator": {
+    "backend": "numpy",
+    "backend_version": "2.4.4",
+    "distribution": {
+      "high": 2.0,
+      "kind": "uniform",
+      "low": -2.0
+    },
+    "function": "rms_norm",
+    "seed": 419
+  },
+  "kernel": "rms_norm",
+  "packed_layouts": [],
+  "quantization_policy": {
+    "epsilon": 1e-05
+  },
+  "schema_version": 1,
+  "targets": [
+    "host_reference",
+    "riscv_rvv_256"
+  ],
+  "tensors": [
+    {
+      "dtype": "float32",
+      "filename": "input_X.npy",
+      "layout": {},
+      "name": "X",
+      "role": "input",
+      "sha256": "9d9bdb65443fe2c58dca289c89df316b4e4f1c244eecfa35dfa79d24ea9c4293",
+      "shape": [
+        2,
+        5
+      ],
+      "size_bytes": 40
+    },
+    {
+      "dtype": "float32",
+      "filename": "input_W.npy",
+      "layout": {},
+      "name": "W",
+      "role": "input",
+      "sha256": "234dfa0cb41ae7b5a1a18001ded7a19c33aecbf50ec28000bae922595ea01618",
+      "shape": [
+        5
+      ],
+      "size_bytes": 20
+    },
+    {
+      "dtype": "float32",
+      "filename": "expected_Y.npy",
+      "layout": {},
+      "name": "Y",
+      "role": "expected_output",
+      "sha256": "8d499829fc503c7e6dffde3fc6be026a18e4670c84aaab91464f8e46347c8633",
+      "shape": [
+        2,
+        5
+      ],
+      "size_bytes": 40
+    }
+  ],
+  "vlens": [
+    256,
+    512
+  ]
+}

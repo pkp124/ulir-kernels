@@ -158,6 +158,28 @@ def _case_runner_args(
     raw_dir: Path,
     raw_output: Path,
 ) -> list[str]:
+    if case.kernel in {"add", "mul"}:
+        lhs, rhs = case.inputs
+        raw_lhs = _write_raw_input(
+            bundle_dir=bundle_dir,
+            raw_dir=raw_dir,
+            manifest=manifest,
+            tensor_name=lhs.name,
+        )
+        raw_rhs = _write_raw_input(
+            bundle_dir=bundle_dir,
+            raw_dir=raw_dir,
+            manifest=manifest,
+            tensor_name=rhs.name,
+        )
+        return [
+            case.kernel,
+            str(raw_lhs),
+            str(raw_rhs),
+            str(raw_output),
+            str(_product(lhs.shape)),
+        ]
+
     if case.kernel == "relu":
         raw_input = _write_raw_input(
             bundle_dir=bundle_dir,
@@ -198,6 +220,49 @@ def _case_runner_args(
             str(m),
             str(n),
             str(k),
+        ]
+
+    if case.kernel == "rms_norm":
+        input_tensor, weight = case.inputs
+        raw_input = _write_raw_input(
+            bundle_dir=bundle_dir,
+            raw_dir=raw_dir,
+            manifest=manifest,
+            tensor_name=input_tensor.name,
+        )
+        raw_weight = _write_raw_input(
+            bundle_dir=bundle_dir,
+            raw_dir=raw_dir,
+            manifest=manifest,
+            tensor_name=weight.name,
+        )
+        outer, inner = input_tensor.shape
+        eps = case.compare.quantization["epsilon"]
+        return [
+            "rms_norm",
+            str(raw_input),
+            str(raw_weight),
+            str(raw_output),
+            str(outer),
+            str(inner),
+            str(eps),
+        ]
+
+    if case.kernel == "softmax":
+        input_tensor = case.inputs[0]
+        raw_input = _write_raw_input(
+            bundle_dir=bundle_dir,
+            raw_dir=raw_dir,
+            manifest=manifest,
+            tensor_name=input_tensor.name,
+        )
+        outer, inner = input_tensor.shape
+        return [
+            "softmax",
+            str(raw_input),
+            str(raw_output),
+            str(outer),
+            str(inner),
         ]
 
     if case.kernel == "dot_i8":

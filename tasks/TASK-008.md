@@ -62,5 +62,10 @@ Add C API and NumPy validation commands as each helper kernel lands.
   `ks_softmax_f32` now have public C headers, scalar reference implementations,
   C API smoke tests, and NumPy reference validation.
 
+### 2026-06-22
+- Started `TASK-021` to add descriptor-backed host and RVV/QEMU CI coverage for
+  the transformer helper C APIs. RMSNorm and softmax compiler lowerings remain
+  separate M6 follow-ups.
+
 ### 2026-06-06
 - Created from M6 roadmap tasks.

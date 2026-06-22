@@ -1,0 +1,76 @@
+{
+  "case": "mul_f32_smoke",
+  "compare": {
+    "atol": 1e-06,
+    "mode": "allclose",
+    "rtol": 1e-06,
+    "strict_dtype": true,
+    "strict_shape": true
+  },
+  "descriptor": "tests/golden/cases/mul_f32_smoke.json",
+  "descriptor_sha256": "d9c599085723425f21d5db7f36a62418a43642d6c74b0a223f09073723665b73",
+  "generator": {
+    "backend": "numpy",
+    "backend_version": "2.4.4",
+    "distribution": {
+      "high": 3.0,
+      "kind": "uniform",
+      "low": -3.0
+    },
+    "function": "mul",
+    "seed": 409
+  },
+  "kernel": "mul",
+  "packed_layouts": [],
+  "quantization_policy": {},
+  "schema_version": 1,
+  "targets": [
+    "host_reference",
+    "riscv_rvv_256"
+  ],
+  "tensors": [
+    {
+      "dtype": "float32",
+      "filename": "input_X.npy",
+      "layout": {},
+      "name": "X",
+      "role": "input",
+      "sha256": "646ce5c665b7965b376146aec5c441fd73dc9ed81ae0ea2debaf9d879d790e00",
+      "shape": [
+        2,
+        3
+      ],
+      "size_bytes": 24
+    },
+    {
+      "dtype": "float32",
+      "filename": "input_Z.npy",
+      "layout": {},
+      "name": "Z",
+      "role": "input",
+      "sha256": "1fe840f82653758f6779e60f768e65b08c58f85bbf0b796fdaae014a76d2b08b",
+      "shape": [
+        2,
+        3
+      ],
+      "size_bytes": 24
+    },
+    {
+      "dtype": "float32",
+      "filename": "expected_Y.npy",
+      "layout": {},
+      "name": "Y",
+      "role": "expected_output",
+      "sha256": "84f8af7989ffdcde66a58d1dc456d1879adb2b7e3f955afe0a819e5ac18ddf30",
+      "shape": [
+        2,
+        3
+      ],
+      "size_bytes": 24
+    }
+  ],
+  "vlens": [
+    256,
+    512
+  ]
+}

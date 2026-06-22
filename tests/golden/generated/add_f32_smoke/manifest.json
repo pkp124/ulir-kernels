@@ -1,0 +1,76 @@
+{
+  "case": "add_f32_smoke",
+  "compare": {
+    "atol": 1e-06,
+    "mode": "allclose",
+    "rtol": 1e-06,
+    "strict_dtype": true,
+    "strict_shape": true
+  },
+  "descriptor": "tests/golden/cases/add_f32_smoke.json",
+  "descriptor_sha256": "2134ec2cb803877c897b5a6d530de8a581300a36ad25869045404d3e2e7ff3e7",
+  "generator": {
+    "backend": "numpy",
+    "backend_version": "2.4.4",
+    "distribution": {
+      "high": 3.0,
+      "kind": "uniform",
+      "low": -3.0
+    },
+    "function": "add",
+    "seed": 401
+  },
+  "kernel": "add",
+  "packed_layouts": [],
+  "quantization_policy": {},
+  "schema_version": 1,
+  "targets": [
+    "host_reference",
+    "riscv_rvv_256"
+  ],
+  "tensors": [
+    {
+      "dtype": "float32",
+      "filename": "input_X.npy",
+      "layout": {},
+      "name": "X",
+      "role": "input",
+      "sha256": "9c6f7663e66e210de938f5fcf9ae242f7a6817b04ba5ea6feb4513071dea0b17",
+      "shape": [
+        2,
+        3
+      ],
+      "size_bytes": 24
+    },
+    {
+      "dtype": "float32",
+      "filename": "input_Z.npy",
+      "layout": {},
+      "name": "Z",
+      "role": "input",
+      "sha256": "30fdb4575feb1ef4783b29f7b5d39cc4d5ece808522addba5eb4935ebda62a56",
+      "shape": [
+        2,
+        3
+      ],
+      "size_bytes": 24
+    },
+    {
+      "dtype": "float32",
+      "filename": "expected_Y.npy",
+      "layout": {},
+      "name": "Y",
+      "role": "expected_output",
+      "sha256": "5426b8b5edaf89f2aea77ef3ecab41796075014354e98ab29fdb5133f6be242b",
+      "shape": [
+        2,
+        3
+      ],
+      "size_bytes": 24
+    }
+  ],
+  "vlens": [
+    256,
+    512
+  ]
+}

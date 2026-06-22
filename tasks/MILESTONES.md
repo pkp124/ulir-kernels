@@ -22,13 +22,12 @@ milestone should show status, task links, blockers, and the next concrete work.
 | M3 — Generic MatMul Lowering | Partial | `TASK-004` | Track generated matmul replacement separately if prioritized. |
 | M4 — RISC-V RVV Target | Done | `TASK-005`, `TASK-006`, `TASK-009`, `TASK-010`, `TASK-011`, `TASK-012` | Keep RVV validation reports green as new kernels land. |
 | M5 — RISC-V Quantization Foundation | Done | `TASK-007`, `TASK-013`, `TASK-014`, `TASK-015`, `TASK-016`, `TASK-017`, `TASK-018` | Keep quantized RVV validation reports green as transformer kernels land. |
-| M6 — Transformer Minimum Kernel Set | Active | `TASK-008`, `TASK-019`, `TASK-020` | Split RMSNorm/softmax lowering and QEMU helper validation follow-ups. |
+| M6 — Transformer Minimum Kernel Set | Active | `TASK-008`, `TASK-019`, `TASK-020`, `TASK-021` | Split RMSNorm/softmax compiler lowering follow-ups. |
 | M7 — Minimal RISC-V Transformer Demo | Planned | Not created | Create tasks after M5/M6 interfaces stabilize. |
 
 ## Active focus
 
-1. Split follow-up M6 child tasks for RMSNorm/softmax lowering and QEMU helper
-   validation.
+1. Split follow-up M6 child tasks for RMSNorm and softmax compiler lowering.
 
 ## Maintenance rules
 

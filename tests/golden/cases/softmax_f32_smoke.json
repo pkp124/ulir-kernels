@@ -1,0 +1,49 @@
+{
+  "compare": {
+    "atol": 0.00001,
+    "mode": "allclose",
+    "rtol": 0.00001,
+    "strict_dtype": true,
+    "strict_shape": true
+  },
+  "generator": {
+    "distribution": {
+      "high": 5.0,
+      "kind": "uniform",
+      "low": -5.0
+    },
+    "function": "softmax",
+    "kind": "numpy",
+    "seed": 421
+  },
+  "inputs": [
+    {
+      "dtype": "float32",
+      "name": "X",
+      "shape": [
+        2,
+        4
+      ]
+    }
+  ],
+  "kernel": "softmax",
+  "name": "softmax_f32_smoke",
+  "outputs": [
+    {
+      "dtype": "float32",
+      "name": "Y",
+      "shape": [
+        2,
+        4
+      ]
+    }
+  ],
+  "targets": [
+    "host_reference",
+    "riscv_rvv_256"
+  ],
+  "vlens": [
+    256,
+    512
+  ]
+}

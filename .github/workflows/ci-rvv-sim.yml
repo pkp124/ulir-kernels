@@ -18,7 +18,7 @@ name: CI - RVV Simulation
 
 on:
   push:
-    branches: [main, develop, 'claude/**']
+    branches: [main, develop, 'claude/**', 'cursor/**']
     paths:
       - 'lib/Passes/**'
       - 'lib/kernelsmith/**'
@@ -168,6 +168,8 @@ jobs:
             lib/kernelsmith/ks_common.c \
             lib/kernelsmith/ks_matmul.c \
             lib/kernelsmith/ks_activations.c \
+            lib/kernelsmith/ks_elementwise.c \
+            lib/kernelsmith/ks_normalization.c \
             lib/kernelsmith/ks_quantized.c \
             build-rvv/int8-objects/ks_dot_i8_riscv_rvv_256.o \
             build-rvv/int8-objects/ks_matvec_i8_riscv_rvv_256.o \
@@ -243,6 +245,18 @@ jobs:
             --vlens ${{ matrix.vlen }} \
             --output-dir build/golden-rvv \
             --report build/golden-rvv/relu_vlen_${{ matrix.vlen }}.json
+
+          for case in add_f32_smoke mul_f32_smoke rms_norm_f32_smoke softmax_f32_smoke; do
+            python tests/verify.py \
+              --case tests/golden/cases/${case}.json \
+              --target riscv_rvv_256 \
+              --riscv-runner rvv-bin/riscv-golden-runner \
+              --host-runner rvv-bin/host-reference-runner \
+              --qemu qemu-riscv64 \
+              --vlens ${{ matrix.vlen }} \
+              --output-dir build/golden-rvv \
+              --report build/golden-rvv/${case}_vlen_${{ matrix.vlen }}.json
+          done
 
           python tests/verify.py \
             --case tests/golden/cases/matmul_f32_smoke.json \
