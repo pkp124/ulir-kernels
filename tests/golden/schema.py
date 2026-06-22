@@ -323,9 +323,13 @@ class CaseDescriptor:
         input_tensor, weight = self.inputs
         out = self.outputs[0]
         if len(input_tensor.shape) != 2 or len(weight.shape) != 1:
-            raise GoldenSchemaError("rms_norm cases require input [outer, inner] and weight [inner]")
+            raise GoldenSchemaError(
+                "rms_norm cases require input [outer, inner] and weight [inner]"
+            )
         if out.shape != input_tensor.shape or weight.shape != (input_tensor.shape[1],):
-            raise GoldenSchemaError("rms_norm output/weight shapes must match input inner dimension")
+            raise GoldenSchemaError(
+                "rms_norm output/weight shapes must match input inner dimension"
+            )
         if {input_tensor.dtype, weight.dtype, out.dtype} != {"float32"}:
             raise GoldenSchemaError("rms_norm cases must use float32 tensors")
         if self.compare.mode != "allclose":

@@ -95,7 +95,7 @@ Progress updates with dates.
 | TASK-008 | M6 | Transformer minimum kernel set | In Progress | P1 |
 | TASK-019 | M6 | Add elementwise add/mul ops and linalg lowering | Complete | P1 |
 | TASK-020 | M6 | Add transformer helper C APIs | Complete | P1 |
-| TASK-021 | M6 | Add transformer helper golden CI coverage | In Progress | P1 |
+| TASK-021 | M6 | Add transformer helper golden CI coverage | Complete | P1 |
 
 ## Agent workflow
 
