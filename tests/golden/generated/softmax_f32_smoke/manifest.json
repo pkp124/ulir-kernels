@@ -1,0 +1,63 @@
+{
+  "case": "softmax_f32_smoke",
+  "compare": {
+    "atol": 1e-05,
+    "mode": "allclose",
+    "rtol": 1e-05,
+    "strict_dtype": true,
+    "strict_shape": true
+  },
+  "descriptor": "tests/golden/cases/softmax_f32_smoke.json",
+  "descriptor_sha256": "3ecc09fee1659c7e80d5faf4212388bd44c2a1b4390f3e7bae41e43b7581ad8c",
+  "generator": {
+    "backend": "numpy",
+    "backend_version": "2.4.4",
+    "distribution": {
+      "high": 5.0,
+      "kind": "uniform",
+      "low": -5.0
+    },
+    "function": "softmax",
+    "seed": 421
+  },
+  "kernel": "softmax",
+  "packed_layouts": [],
+  "quantization_policy": {},
+  "schema_version": 1,
+  "targets": [
+    "host_reference",
+    "riscv_rvv_256"
+  ],
+  "tensors": [
+    {
+      "dtype": "float32",
+      "filename": "input_X.npy",
+      "layout": {},
+      "name": "X",
+      "role": "input",
+      "sha256": "0549ec8c7f40f5c8c5b189aa6f89ad4c476f0d76cb193ac8d19af56aeca71f90",
+      "shape": [
+        2,
+        4
+      ],
+      "size_bytes": 32
+    },
+    {
+      "dtype": "float32",
+      "filename": "expected_Y.npy",
+      "layout": {},
+      "name": "Y",
+      "role": "expected_output",
+      "sha256": "765ee0dfe3bdbcd3f0fa4ffeb968337c759f4c7dbe98365b188949e67644fa53",
+      "shape": [
+        2,
+        4
+      ],
+      "size_bytes": 32
+    }
+  ],
+  "vlens": [
+    256,
+    512
+  ]
+}

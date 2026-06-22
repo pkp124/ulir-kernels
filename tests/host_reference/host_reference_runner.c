@@ -1,5 +1,7 @@
 #include "kernelsmith/ks_activations.h"
+#include "kernelsmith/ks_elementwise.h"
 #include "kernelsmith/ks_matmul.h"
+#include "kernelsmith/ks_normalization.h"
 #include "kernelsmith/ks_quantized.h"
 
 #include <errno.h>
@@ -138,6 +140,46 @@ static int run_relu(int argc, char **argv) {
   return status;
 }
 
+static int run_binary_f32(int argc, char **argv, const char *name) {
+  if (argc != 6) {
+    fprintf(stderr, "usage: %s %s <lhs.raw> <rhs.raw> <output.raw> <n>\n",
+            argv[0], name);
+    return 2;
+  }
+
+  size_t n = 0;
+  if (!parse_size(argv[5], &n)) {
+    fprintf(stderr, "invalid %s element count: %s\n", name, argv[5]);
+    return 2;
+  }
+
+  float *lhs = (float *)malloc(n * sizeof(float));
+  float *rhs = (float *)malloc(n * sizeof(float));
+  float *output = (float *)malloc(n * sizeof(float));
+  if (!lhs || !rhs || !output) {
+    fprintf(stderr, "failed to allocate %s buffers\n", name);
+    free(lhs);
+    free(rhs);
+    free(output);
+    return 1;
+  }
+
+  int status = read_f32_file(argv[2], lhs, n);
+  if (status == 0)
+    status = read_f32_file(argv[3], rhs, n);
+  if (status == 0 && strcmp(name, "add") == 0)
+    status = ks_add_f32(lhs, rhs, output, n);
+  else if (status == 0)
+    status = ks_mul_f32(lhs, rhs, output, n);
+  if (status == 0)
+    status = write_f32_file(argv[4], output, n);
+
+  free(lhs);
+  free(rhs);
+  free(output);
+  return status;
+}
+
 static int run_matmul(int argc, char **argv) {
   if (argc != 8) {
     fprintf(stderr,
@@ -182,6 +224,84 @@ static int run_matmul(int argc, char **argv) {
   free(rhs);
   free(output);
   free(workspace);
+  return status;
+}
+
+static int run_rms_norm(int argc, char **argv) {
+  if (argc != 8) {
+    fprintf(stderr,
+            "usage: %s rms_norm <input.raw> <weight.raw> <output.raw> "
+            "<outer> <inner> <eps>\n",
+            argv[0]);
+    return 2;
+  }
+
+  size_t outer = 0;
+  size_t inner = 0;
+  float eps = 0.0f;
+  if (!parse_size(argv[5], &outer) || !parse_size(argv[6], &inner) ||
+      !parse_float(argv[7], &eps)) {
+    fprintf(stderr, "invalid rms_norm arguments\n");
+    return 2;
+  }
+
+  float *input = (float *)malloc(outer * inner * sizeof(float));
+  float *weight = (float *)malloc(inner * sizeof(float));
+  float *output = (float *)malloc(outer * inner * sizeof(float));
+  if (!input || !weight || !output) {
+    fprintf(stderr, "failed to allocate rms_norm buffers\n");
+    free(input);
+    free(weight);
+    free(output);
+    return 1;
+  }
+
+  int status = read_f32_file(argv[2], input, outer * inner);
+  if (status == 0)
+    status = read_f32_file(argv[3], weight, inner);
+  if (status == 0)
+    status = ks_rms_norm_f32(input, weight, output, outer, inner, eps);
+  if (status == 0)
+    status = write_f32_file(argv[4], output, outer * inner);
+
+  free(input);
+  free(weight);
+  free(output);
+  return status;
+}
+
+static int run_softmax(int argc, char **argv) {
+  if (argc != 6) {
+    fprintf(stderr,
+            "usage: %s softmax <input.raw> <output.raw> <outer> <inner>\n",
+            argv[0]);
+    return 2;
+  }
+
+  size_t outer = 0;
+  size_t inner = 0;
+  if (!parse_size(argv[4], &outer) || !parse_size(argv[5], &inner)) {
+    fprintf(stderr, "invalid softmax arguments\n");
+    return 2;
+  }
+
+  float *input = (float *)malloc(outer * inner * sizeof(float));
+  float *output = (float *)malloc(outer * inner * sizeof(float));
+  if (!input || !output) {
+    fprintf(stderr, "failed to allocate softmax buffers\n");
+    free(input);
+    free(output);
+    return 1;
+  }
+
+  int status = read_f32_file(argv[2], input, outer * inner);
+  if (status == 0)
+    status = ks_softmax_f32(input, output, outer, inner);
+  if (status == 0)
+    status = write_f32_file(argv[3], output, outer * inner);
+
+  free(input);
+  free(output);
   return status;
 }
 
@@ -385,16 +505,24 @@ static int run_matvec_w4a8(int argc, char **argv) {
 int main(int argc, char **argv) {
   if (argc < 2) {
     fprintf(stderr,
-            "usage: %s <relu|matmul|dot_i8|matvec_i8|dot_w4a8|"
-            "matvec_w4a8> ...\n",
+            "usage: %s <add|relu|mul|matmul|rms_norm|softmax|dot_i8|"
+            "matvec_i8|dot_w4a8|matvec_w4a8> ...\n",
             argv[0]);
     return 2;
   }
 
+  if (strcmp(argv[1], "add") == 0)
+    return run_binary_f32(argc, argv, "add");
   if (strcmp(argv[1], "relu") == 0)
     return run_relu(argc, argv);
+  if (strcmp(argv[1], "mul") == 0)
+    return run_binary_f32(argc, argv, "mul");
   if (strcmp(argv[1], "matmul") == 0)
     return run_matmul(argc, argv);
+  if (strcmp(argv[1], "rms_norm") == 0)
+    return run_rms_norm(argc, argv);
+  if (strcmp(argv[1], "softmax") == 0)
+    return run_softmax(argc, argv);
   if (strcmp(argv[1], "dot_i8") == 0)
     return run_dot_i8(argc, argv);
   if (strcmp(argv[1], "matvec_i8") == 0)

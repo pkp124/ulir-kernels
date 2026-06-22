@@ -116,6 +116,22 @@ def _quantization_value(descriptor: CaseDescriptor, key: str) -> Any:
     return descriptor.compare.quantization[key]
 
 
+def _rms_norm_reference(input_tensor: np.ndarray, weight: np.ndarray, eps: float) -> np.ndarray:
+    squared = (input_tensor * input_tensor).astype(np.float32)
+    sum_squares = np.sum(squared, axis=-1, keepdims=True, dtype=np.float32)
+    mean_squares = sum_squares / np.float32(input_tensor.shape[-1])
+    scale = (np.float32(1.0) / np.sqrt(mean_squares + np.float32(eps))).astype(np.float32)
+    return (input_tensor * scale * weight.reshape((1, -1))).astype(np.float32)
+
+
+def _softmax_reference(input_tensor: np.ndarray) -> np.ndarray:
+    max_values = np.max(input_tensor, axis=-1, keepdims=True)
+    shifted = input_tensor - max_values
+    exp_values = np.exp(shifted, dtype=np.float32)
+    sums = np.sum(exp_values, axis=-1, keepdims=True, dtype=np.float32)
+    return (exp_values / sums).astype(np.float32)
+
+
 def _i8_accumulate(lhs: np.ndarray, rhs: np.ndarray, *, lhs_zp: int, rhs_zp: int) -> np.ndarray:
     lhs_i32 = lhs.astype(np.int32) - lhs_zp
     rhs_i32 = rhs.astype(np.int32) - rhs_zp
@@ -127,7 +143,7 @@ def generate_case_arrays(descriptor: CaseDescriptor) -> dict[str, np.ndarray]:
     arrays: dict[str, np.ndarray] = {}
     distribution = descriptor.generator.distribution
 
-    if descriptor.kernel in {"relu", "matmul"}:
+    if descriptor.kernel in {"add", "relu", "mul", "matmul", "rms_norm", "softmax"}:
         for index, tensor in enumerate(descriptor.inputs):
             arrays[f"input_{tensor.name}"] = generate_f32_tensor(
                 tensor,
@@ -140,12 +156,30 @@ def generate_case_arrays(descriptor: CaseDescriptor) -> dict[str, np.ndarray]:
             arrays[f"expected_{descriptor.outputs[0].name}"] = np.maximum(input_tensor, 0).astype(
                 np.float32
             )
-        else:
+        elif descriptor.kernel == "add":
+            lhs = arrays[f"input_{descriptor.inputs[0].name}"]
+            rhs = arrays[f"input_{descriptor.inputs[1].name}"]
+            arrays[f"expected_{descriptor.outputs[0].name}"] = (lhs + rhs).astype(np.float32)
+        elif descriptor.kernel == "mul":
+            lhs = arrays[f"input_{descriptor.inputs[0].name}"]
+            rhs = arrays[f"input_{descriptor.inputs[1].name}"]
+            arrays[f"expected_{descriptor.outputs[0].name}"] = (lhs * rhs).astype(np.float32)
+        elif descriptor.kernel == "matmul":
             lhs = arrays[f"input_{descriptor.inputs[0].name}"]
             rhs = arrays[f"input_{descriptor.inputs[1].name}"]
             arrays[f"expected_{descriptor.outputs[0].name}"] = np.matmul(lhs, rhs).astype(
                 np.float32
             )
+        elif descriptor.kernel == "rms_norm":
+            input_tensor = arrays[f"input_{descriptor.inputs[0].name}"]
+            weight = arrays[f"input_{descriptor.inputs[1].name}"]
+            eps = float(descriptor.compare.quantization["epsilon"])
+            arrays[f"expected_{descriptor.outputs[0].name}"] = _rms_norm_reference(
+                input_tensor, weight, eps
+            )
+        else:
+            input_tensor = arrays[f"input_{descriptor.inputs[0].name}"]
+            arrays[f"expected_{descriptor.outputs[0].name}"] = _softmax_reference(input_tensor)
         return arrays
 
     if descriptor.kernel in {"dot_i8", "matvec_i8", "matmul_i8"}:

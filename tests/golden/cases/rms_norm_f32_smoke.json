@@ -1,0 +1,57 @@
+{
+  "compare": {
+    "atol": 0.00001,
+    "epsilon": 0.00001,
+    "mode": "allclose",
+    "rtol": 0.00001,
+    "strict_dtype": true,
+    "strict_shape": true
+  },
+  "generator": {
+    "distribution": {
+      "high": 2.0,
+      "kind": "uniform",
+      "low": -2.0
+    },
+    "function": "rms_norm",
+    "kind": "numpy",
+    "seed": 419
+  },
+  "inputs": [
+    {
+      "dtype": "float32",
+      "name": "X",
+      "shape": [
+        2,
+        5
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "W",
+      "shape": [
+        5
+      ]
+    }
+  ],
+  "kernel": "rms_norm",
+  "name": "rms_norm_f32_smoke",
+  "outputs": [
+    {
+      "dtype": "float32",
+      "name": "Y",
+      "shape": [
+        2,
+        5
+      ]
+    }
+  ],
+  "targets": [
+    "host_reference",
+    "riscv_rvv_256"
+  ],
+  "vlens": [
+    256,
+    512
+  ]
+}

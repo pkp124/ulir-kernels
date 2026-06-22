@@ -1,0 +1,57 @@
+{
+  "compare": {
+    "atol": 0.000001,
+    "mode": "allclose",
+    "rtol": 0.000001,
+    "strict_dtype": true,
+    "strict_shape": true
+  },
+  "generator": {
+    "distribution": {
+      "high": 3.0,
+      "kind": "uniform",
+      "low": -3.0
+    },
+    "function": "add",
+    "kind": "numpy",
+    "seed": 401
+  },
+  "inputs": [
+    {
+      "dtype": "float32",
+      "name": "X",
+      "shape": [
+        2,
+        3
+      ]
+    },
+    {
+      "dtype": "float32",
+      "name": "Z",
+      "shape": [
+        2,
+        3
+      ]
+    }
+  ],
+  "kernel": "add",
+  "name": "add_f32_smoke",
+  "outputs": [
+    {
+      "dtype": "float32",
+      "name": "Y",
+      "shape": [
+        2,
+        3
+      ]
+    }
+  ],
+  "targets": [
+    "host_reference",
+    "riscv_rvv_256"
+  ],
+  "vlens": [
+    256,
+    512
+  ]
+}

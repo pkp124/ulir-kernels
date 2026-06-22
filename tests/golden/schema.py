@@ -20,8 +20,12 @@ SUPPORTED_COMPARE_MODES = {
     "dequantized_allclose",
 }
 SUPPORTED_GENERATOR_FUNCTIONS = {
+    "add",
     "relu",
+    "mul",
     "matmul",
+    "rms_norm",
+    "softmax",
     "dot_i8",
     "matvec_i8",
     "matmul_i8",
@@ -259,7 +263,9 @@ class CaseDescriptor:
     def validate_semantics(self) -> None:
         if self.generator.function != self.kernel:
             raise GoldenSchemaError("generator.function must match kernel")
-        if self.kernel == "relu":
+        if self.kernel in {"add", "mul"}:
+            self._validate_binary_f32()
+        elif self.kernel == "relu":
             if len(self.inputs) != 1 or len(self.outputs) != 1:
                 raise GoldenSchemaError("relu cases require one input and one output")
             if self.inputs[0].shape != self.outputs[0].shape:
@@ -279,6 +285,10 @@ class CaseDescriptor:
                 raise GoldenSchemaError("matmul output shape must be [M, N]")
             if {lhs.dtype, rhs.dtype, out.dtype} != {"float32"}:
                 raise GoldenSchemaError("matmul smoke cases must use float32 tensors")
+        elif self.kernel == "rms_norm":
+            self._validate_rms_norm()
+        elif self.kernel == "softmax":
+            self._validate_softmax()
         elif self.kernel == "dot_i8":
             self._validate_dot_i8()
         elif self.kernel == "matvec_i8":
@@ -294,6 +304,47 @@ class CaseDescriptor:
         for vlen in self.vlens:
             if not isinstance(vlen, int) or vlen <= 0:
                 raise GoldenSchemaError("vlens must contain positive integers")
+
+    def _validate_binary_f32(self) -> None:
+        if len(self.inputs) != 2 or len(self.outputs) != 1:
+            raise GoldenSchemaError(f"{self.kernel} cases require two inputs and one output")
+        lhs, rhs = self.inputs
+        out = self.outputs[0]
+        if lhs.shape != rhs.shape or lhs.shape != out.shape:
+            raise GoldenSchemaError(f"{self.kernel} input and output shapes must match")
+        if {lhs.dtype, rhs.dtype, out.dtype} != {"float32"}:
+            raise GoldenSchemaError(f"{self.kernel} cases must use float32 tensors")
+        if self.compare.mode != "allclose":
+            raise GoldenSchemaError(f"{self.kernel} cases require allclose comparison")
+
+    def _validate_rms_norm(self) -> None:
+        if len(self.inputs) != 2 or len(self.outputs) != 1:
+            raise GoldenSchemaError("rms_norm cases require input, weight, and output")
+        input_tensor, weight = self.inputs
+        out = self.outputs[0]
+        if len(input_tensor.shape) != 2 or len(weight.shape) != 1:
+            raise GoldenSchemaError("rms_norm cases require input [outer, inner] and weight [inner]")
+        if out.shape != input_tensor.shape or weight.shape != (input_tensor.shape[1],):
+            raise GoldenSchemaError("rms_norm output/weight shapes must match input inner dimension")
+        if {input_tensor.dtype, weight.dtype, out.dtype} != {"float32"}:
+            raise GoldenSchemaError("rms_norm cases must use float32 tensors")
+        if self.compare.mode != "allclose":
+            raise GoldenSchemaError("rms_norm cases require allclose comparison")
+        eps = self.compare.quantization.get("epsilon")
+        if not isinstance(eps, int | float) or float(eps) <= 0.0:
+            raise GoldenSchemaError("rms_norm cases require positive compare.epsilon")
+
+    def _validate_softmax(self) -> None:
+        if len(self.inputs) != 1 or len(self.outputs) != 1:
+            raise GoldenSchemaError("softmax cases require one input and one output")
+        input_tensor = self.inputs[0]
+        out = self.outputs[0]
+        if len(input_tensor.shape) != 2 or out.shape != input_tensor.shape:
+            raise GoldenSchemaError("softmax cases require matching rank-2 tensors")
+        if input_tensor.dtype != "float32" or out.dtype != "float32":
+            raise GoldenSchemaError("softmax cases must use float32 tensors")
+        if self.compare.mode != "allclose":
+            raise GoldenSchemaError("softmax cases require allclose comparison")
 
     def _require_quant_policy(self, *, output_dtype: str) -> None:
         policy = self.compare.quantization
