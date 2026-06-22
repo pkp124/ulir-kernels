@@ -27,7 +27,7 @@ llama-style transformer block on RISC-V RVV.
 - [x] Lower add, mul, and SiLU to vectorizable linalg or loop forms.
 - [ ] Lower RMSNorm with f32 accumulation and explicit epsilon behavior.
 - [ ] Lower softmax using max-subtract-exp-sum-divide for numerical stability.
-- [ ] Add functional validator coverage for transformer helper kernels.
+- [x] Add functional validator coverage for transformer helper kernels.
 - [ ] Add QEMU tests for generated RVV helper kernels when toolchains exist.
 
 ## Dependencies
@@ -63,9 +63,9 @@ Add C API and NumPy validation commands as each helper kernel lands.
   C API smoke tests, and NumPy reference validation.
 
 ### 2026-06-22
-- Started `TASK-021` to add descriptor-backed host and RVV/QEMU CI coverage for
-  the transformer helper C APIs. RMSNorm and softmax compiler lowerings remain
-  separate M6 follow-ups.
+- Completed `TASK-021`; transformer helper C APIs now have descriptor-backed
+  golden bundles, host CTest coverage, and RVV/QEMU CI coverage at VLEN 256 and
+  512. RMSNorm and softmax compiler lowerings remain separate M6 follow-ups.
 
 ### 2026-06-06
 - Created from M6 roadmap tasks.
