@@ -50,6 +50,12 @@ Add C API and NumPy validation commands as each helper kernel lands.
 
 ## Log
 
+### 2026-06-24
+- Split the two remaining compiler-lowering criteria into PR-sized child tasks:
+  `TASK-022` (lower `ks.rms_norm`) and `TASK-023` (lower `ks.softmax`). The
+  QEMU helper-kernel validation criterion stays on this parent until those
+  lowerings generate RVV objects to validate.
+
 ### 2026-06-15
 - Started M6 by splitting the first compiler helper slice into `TASK-019` for
   `ks.add`/`ks.mul` dialect definitions, verifiers, and linalg lowering.
