@@ -28,6 +28,15 @@
 //          rsqrt(ssq[outer] / D + eps)
 //     3. elementwise (full rank): output[..., d] =
 //          input[..., d] * scale[outer] * weight[d]
+//
+//   ks.softmax %input {axis} : tensor<...A...xT>
+//   ──►
+//   Four linalg.generic ops over the softmax `axis` (numerically stable
+//   max-subtract-exp-sum-divide, with element-type accumulation):
+//     1. reduction:    m[outer]   = max_axis(input)
+//     2. elementwise:  e[..., a]  = exp(input[..., a] - m[outer])
+//     3. reduction:    s[outer]   = sum_axis(e)
+//     4. elementwise:  out[..., a] = e[..., a] / s[outer]
 //===----------------------------------------------------------------------===//
 
 #include "KernelSmith/Dialect/Kernel/KernelDialect.h"
@@ -40,6 +49,8 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+
+#include <limits>
 
 namespace kernelsmith {
 
@@ -118,6 +129,46 @@ static Value createEmptyTensorLike(OpBuilder &b, Location loc,
   }
   return b.create<tensor::EmptyOp>(
       loc, resultType.getShape(), resultType.getElementType(), dynamicSizes);
+}
+
+/// Indexing map for a tensor with `axis` removed: an R-dim domain projecting
+/// onto every dimension except `axis`. Used to broadcast/reduce along `axis`.
+static AffineMap getAxisRemovedMap(OpBuilder &b, int64_t rank, int64_t axis) {
+  SmallVector<AffineExpr> exprs;
+  exprs.reserve(rank - 1);
+  for (int64_t dim = 0; dim < rank; ++dim) {
+    if (dim != axis)
+      exprs.push_back(b.getAffineDimExpr(dim));
+  }
+  return AffineMap::get(rank, /*symbolCount=*/0, exprs, b.getContext());
+}
+
+/// Tensor type with `axis` removed from the shape.
+static RankedTensorType getAxisRemovedType(RankedTensorType type,
+                                           int64_t axis) {
+  SmallVector<int64_t> shape;
+  shape.reserve(type.getRank() - 1);
+  for (int64_t dim = 0; dim < type.getRank(); ++dim) {
+    if (dim != axis)
+      shape.push_back(type.getDimSize(dim));
+  }
+  return RankedTensorType::get(shape, type.getElementType());
+}
+
+/// Build an uninitialized `axis`-removed tensor, sourcing dynamic dimensions
+/// from the corresponding (axis-skipping) dimensions of `input`.
+static Value createAxisRemovedEmpty(OpBuilder &b, Location loc,
+                                    RankedTensorType reducedType, Value input,
+                                    int64_t axis) {
+  SmallVector<Value> dynamicSizes;
+  for (int64_t rd = 0; rd < reducedType.getRank(); ++rd) {
+    if (!reducedType.isDynamicDim(rd))
+      continue;
+    int64_t inputDim = rd < axis ? rd : rd + 1;
+    dynamicSizes.push_back(b.create<tensor::DimOp>(loc, input, inputDim));
+  }
+  return b.create<tensor::EmptyOp>(
+      loc, reducedType.getShape(), reducedType.getElementType(), dynamicSizes);
 }
 
 static Value createEmptyElementwiseTensor(OpBuilder &b, Location loc,
@@ -620,6 +671,94 @@ struct RMSNormToLinalgPattern : public OpRewritePattern<ks::RMSNormOp> {
   }
 };
 
+/// Lower ks.softmax to four linalg.generic ops implementing the numerically
+/// stable max-subtract-exp-sum-divide formulation over the softmax `axis`. The
+/// row max and exponent sum accumulate in the (floating-point) element type,
+/// matching the ks_softmax_f32 reference and the golden descriptors.
+struct SoftmaxToLinalgPattern : public OpRewritePattern<ks::SoftmaxOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(ks::SoftmaxOp op,
+                                PatternRewriter &rewriter) const override {
+    Location loc = op.getLoc();
+    Value input = op.getInput();
+    auto inputType = cast<RankedTensorType>(input.getType());
+    auto resultType = cast<RankedTensorType>(op.getType());
+    Type elementType = inputType.getElementType();
+    int64_t rank = inputType.getRank();
+    int64_t axis = op.getAxis();
+    if (axis < 0)
+      axis += rank;
+
+    AffineMap identityMap = rewriter.getMultiDimIdentityMap(rank);
+    AffineMap outerMap = getAxisRemovedMap(rewriter, rank, axis);
+    auto reducedType = getAxisRemovedType(inputType, axis);
+
+    SmallVector<utils::IteratorType> reduceIters(rank,
+                                                 utils::IteratorType::parallel);
+    reduceIters[axis] = utils::IteratorType::reduction;
+    SmallVector<utils::IteratorType> parallelIters(rank,
+                                                   utils::IteratorType::parallel);
+
+    // 1. m[outer] = max_axis(input), initialized to -inf.
+    Value negInf = rewriter.create<arith::ConstantOp>(
+        loc, rewriter.getFloatAttr(
+                 elementType, -std::numeric_limits<double>::infinity()));
+    Value maxEmpty =
+        createAxisRemovedEmpty(rewriter, loc, reducedType, input, axis);
+    Value maxInit =
+        rewriter.create<linalg::FillOp>(loc, negInf, maxEmpty).getResult(0);
+    auto maxOp = rewriter.create<linalg::GenericOp>(
+        loc, reducedType, ValueRange{input}, ValueRange{maxInit},
+        SmallVector<AffineMap>{identityMap, outerMap}, reduceIters,
+        [&](OpBuilder &b, Location loc, ValueRange args) {
+          Value m = b.create<arith::MaximumFOp>(loc, args[1], args[0]);
+          b.create<linalg::YieldOp>(loc, m);
+        });
+
+    // 2. e[..., a] = exp(input[..., a] - m[outer]).
+    Value expEmpty = createEmptyTensorLike(rewriter, loc, inputType, input);
+    auto expOp = rewriter.create<linalg::GenericOp>(
+        loc, inputType, ValueRange{input, maxOp.getResult(0)},
+        ValueRange{expEmpty},
+        SmallVector<AffineMap>{identityMap, outerMap, identityMap},
+        parallelIters, [&](OpBuilder &b, Location loc, ValueRange args) {
+          Value shifted = b.create<arith::SubFOp>(loc, args[0], args[1]);
+          Value e = b.create<math::ExpOp>(loc, shifted);
+          b.create<linalg::YieldOp>(loc, e);
+        });
+
+    // 3. s[outer] = sum_axis(e), initialized to zero.
+    Value zero = rewriter.create<arith::ConstantOp>(
+        loc, rewriter.getZeroAttr(elementType));
+    Value sumEmpty =
+        createAxisRemovedEmpty(rewriter, loc, reducedType, input, axis);
+    Value sumInit =
+        rewriter.create<linalg::FillOp>(loc, zero, sumEmpty).getResult(0);
+    auto sumOp = rewriter.create<linalg::GenericOp>(
+        loc, reducedType, ValueRange{expOp.getResult(0)}, ValueRange{sumInit},
+        SmallVector<AffineMap>{identityMap, outerMap}, reduceIters,
+        [&](OpBuilder &b, Location loc, ValueRange args) {
+          Value s = b.create<arith::AddFOp>(loc, args[1], args[0]);
+          b.create<linalg::YieldOp>(loc, s);
+        });
+
+    // 4. out[..., a] = e[..., a] / s[outer].
+    Value outEmpty = createEmptyTensorLike(rewriter, loc, resultType, input);
+    auto divOp = rewriter.create<linalg::GenericOp>(
+        loc, resultType, ValueRange{expOp.getResult(0), sumOp.getResult(0)},
+        ValueRange{outEmpty},
+        SmallVector<AffineMap>{identityMap, outerMap, identityMap},
+        parallelIters, [&](OpBuilder &b, Location loc, ValueRange args) {
+          Value out = b.create<arith::DivFOp>(loc, args[0], args[1]);
+          b.create<linalg::YieldOp>(loc, out);
+        });
+
+    rewriter.replaceOp(op, divOp.getResults());
+    return success();
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // Pass implementation
 //===----------------------------------------------------------------------===//
@@ -633,8 +772,8 @@ struct KSLowerToLinalgPass
     patterns.add<AddToLinalgPattern, DotI8ToLinalgPattern,
                  DotW4A8ToLinalgPattern, MatmulToLinalgPattern,
                  MatvecW4A8ToLinalgPattern, MulToLinalgPattern,
-                 MatvecI8ToLinalgPattern, RMSNormToLinalgPattern>(
-        &getContext());
+                 MatvecI8ToLinalgPattern, RMSNormToLinalgPattern,
+                 SoftmaxToLinalgPattern>(&getContext());
 
     if (failed(applyPatternsGreedily(getOperation(), std::move(patterns))))
       signalPassFailure();

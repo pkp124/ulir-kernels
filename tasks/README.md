@@ -96,8 +96,8 @@ Progress updates with dates.
 | TASK-019 | M6 | Add elementwise add/mul ops and linalg lowering | Complete | P1 |
 | TASK-020 | M6 | Add transformer helper C APIs | Complete | P1 |
 | TASK-021 | M6 | Add transformer helper golden CI coverage | Complete | P1 |
-| TASK-022 | M6 | Lower ks.rms_norm to vectorizable linalg/loop form | Not Started | P1 |
-| TASK-023 | M6 | Lower ks.softmax with numerically stable form | Not Started | P1 |
+| TASK-022 | M6 | Lower ks.rms_norm to vectorizable linalg/loop form | Complete | P1 |
+| TASK-023 | M6 | Lower ks.softmax with numerically stable form | Needs Review | P1 |
 
 ## Agent workflow
 
