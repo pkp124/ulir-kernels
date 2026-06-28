@@ -362,6 +362,92 @@ library after the transformer path is proven.
 
 ---
 
+## Milestone 10: Frontend Ingestion — KernelSmith as a Lowering Target
+
+**Status**: Planned
+
+**Goal**: Make the `ks` dialect and the linalg/vector path beneath it a
+consumable backend target for higher-level kernel frontends — TileLang-style
+tile DSLs, Torch-MLIR, IREE, and other linalg/StableHLO producers — so
+KernelSmith delivers RVV-quality codegen without owning an authoring language.
+
+**Why**: The kernel-DSL community has converged on MLIR progressive lowering as
+the shared substrate. KernelSmith's differentiation is RVV/edge/quantized
+codegen and a zero-dependency C ABI, not a new authoring surface. The
+highest-leverage way to align with the ecosystem is to *consume* its frontends
+rather than compete with them. KernelSmith stays a **backend**: frontends own
+the user-facing authoring experience; KernelSmith owns RVV lowering, packing,
+quantized layouts, and the static C ABI.
+
+**Design**: DES-0xx (planned) — ingestion boundary and supported-op contract
+
+**Deliverables**:
+- Documented ingestion contract: which inputs KernelSmith accepts (`ks` ops plus
+  a supported subset of `linalg` on tensors) and which it rejects
+- A `linalg` ingestion / raising path so external `linalg` producers reach the
+  RVV pipeline without first lowering through `ks` ops
+- TileLang-style tile-IR bridge investigation: map tile-level constructs onto
+  `ks` tiling/packing (or onto `linalg` + the existing `ks` passes)
+- Conformance lit tests: representative frontend output → RVV lowering
+- Design doc defining the ingestion boundary and op contract
+
+**Tasks**:
+1. Enumerate the input op contract (`ks` + supported `linalg`) and document it
+2. Add/verify a direct `linalg`-on-tensors entry point into the tile/pack/vectorize pipeline
+3. Prototype a TileLang-style tile-IR → `ks`/`linalg` bridge on one matmul kernel
+4. Add conformance lit tests for at least one external-frontend lowering path
+5. Write DES-0xx recording the ingestion boundary and supported-op contract
+
+---
+
+## Milestone 11: User-Expressible Schedules
+
+**Status**: Planned
+
+**Goal**: Give advanced users an optional, declarative way to express schedules
+(tile sizes, packing, loop order, unroll factors, vectorization width / LMUL
+hints) that drives the existing pass pipeline — without requiring MLIR knowledge
+and without replacing the default profile-driven path.
+
+**Why**: Algorithm/schedule separation (Halide → TVM TensorIR → TileLang) is the
+central idea of the modern kernel-DSL community. KernelSmith already separates
+compute (`ks` ops) from transforms (`--ks-tile`/`--ks-pack`/`--ks-vectorize`
+passes); today the schedule is *implicit* in the target-profile tables. Making
+it *explicit and user-overridable* is the natural alignment step and unlocks
+per-kernel tuning plus a concrete search space for autotuning (Milestone 9).
+
+**Positioning / non-goals**: This is a schedule *specification* layer, **not** a
+general imperative kernel-authoring DSL. The default C-library consumer still
+writes zero MLIR and zero schedules — schedules are opt-in for performance
+engineers and for the autotuner. KernelSmith does not become Triton/TIR; it
+gains an explicit schedule surface over the transforms it already has.
+
+**Design**: DES-0xx (planned) — schedule model vs TVM TensorIR / TileLang;
+records the "schedule spec, not authoring DSL" decision
+
+**Deliverables**:
+- Schedule recipe format (declarative; YAML/TOML or a thin Python API) keyed per
+  op/target, expressing: L2 tile sizes, register tile sizes, pack on/off +
+  layout, loop order, unroll factors, and vectorization width / LMUL hints
+- Schedule → pass-pipeline compiler: a recipe lowers to concrete
+  `--ks-tile`/`--ks-pack`/`--ks-vectorize` options, overriding profile defaults
+  only where the recipe specifies them
+- Schedule validation against the target profile (reject tile sizes exceeding
+  VLMAX, illegal pack factors, etc.) with clear diagnostics
+- Round-trip and negative lit/unit tests for schedule application
+- Integration hook for Milestone 9 autotuning: the schedule space is the search space
+- Design doc comparing the schedule model to TVM TensorIR / TileLang
+
+**Tasks**:
+1. Define the schedule recipe schema and its mapping to existing pass options
+2. Implement the recipe → pass-pipeline compiler (recipe overrides profile defaults)
+3. Add schedule validation against target profiles with actionable diagnostics
+4. Add round-trip and negative tests for schedule application
+5. Expose the schedule space to the autotuner harness (Milestone 9)
+6. Write DES-0xx comparing the model to TVM TensorIR / TileLang and recording the decision
+
+---
+
 ## Future Targets (Not Prioritized)
 
 These targets may be added after the core edge pipeline is proven:
