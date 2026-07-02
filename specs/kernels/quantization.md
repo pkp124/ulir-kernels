@@ -284,6 +284,12 @@ before adding output quantization policy.
 
 ### W4A8 Packed Weight Layout
 
+> This layout is ratified as the versioned native quantized contract
+> (`KS_QUANT_LAYOUT_VERSION = 1`) in
+> [DES-015](../../docs/design/DES-015-quantized-layout-abi-and-integration-conversion-paths.md),
+> which also specifies the offline conversion paths from GGML `Q4_0`/`Q8_0` and
+> to IRON/MLIR-AIE tile panels.
+
 W4A8 weights are signed int4 values stored in two's-complement form. In MLIR IR,
 packed byte tensors use signless `i8` storage so arithmetic lowering can use
 standard `arith` integer ops. The public C ABI stores the same bytes as

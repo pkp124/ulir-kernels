@@ -151,11 +151,19 @@ The integration should compare:
 
 ## Open Questions
 
-- [ ] Which first INT4 format should be used: simple symmetric W4A8 or a
-      GGML-compatible block format?
-- [ ] Should scales be per-channel, per-block, or both in the first ABI?
-- [ ] Should the first model file format be KernelSmith-specific or a restricted
-      importer from llama2.c checkpoints?
+The first three layout/format questions are resolved in
+[DES-015](DES-015-quantized-layout-abi-and-integration-conversion-paths.md):
+native symmetric per-group W4A8 (not a GGML block format), per-group weight
+scales with per-tensor activation scale in v1, and a KernelSmith-specific model
+container with a GGML weight importer added for the M8 showcase.
+
+- [x] Which first INT4 format should be used: simple symmetric W4A8 or a
+      GGML-compatible block format? (DES-015: native symmetric W4A8.)
+- [x] Should scales be per-channel, per-block, or both in the first ABI?
+      (DES-015: per-group weights, per-tensor activations in v1.)
+- [x] Should the first model file format be KernelSmith-specific or a restricted
+      importer from llama2.c checkpoints? (DES-015: KernelSmith-specific first;
+      GGML importer for the M8 integration showcase.)
 - [ ] What RVV board should serve as the first performance reference?
 
 ## Dependencies
