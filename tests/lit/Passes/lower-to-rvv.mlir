@@ -44,15 +44,19 @@ func.func @test_lower_linkage(%arg0: memref<8xf32>) -> f32 {
 
 // RUN: %ks-opt %s \
 // RUN:   --ks-lower-to-linalg \
-// RUN:   "--ks-tile=tile-size-m=128 tile-size-n=128 tile-size-k=256" \
+// RUN:   "--ks-tile=tile-size-m=16 tile-size-n=32 tile-size-k=32" \
 // RUN:   --ks-vectorize \
 // RUN:   --ks-lower-to-rvv \
-// RUN:   | %FileCheck %s --check-prefix=E2E
+// RUN:   -o %t
+// RUN: %mlir-translate --mlir-to-llvmir %t -o /dev/null
+// RUN: %FileCheck %s --check-prefix=E2E < %t
 
 // E2E-LABEL: llvm.func @test_rvv_matmul_e2e
 // E2E-NOT:   ks.matmul
 // E2E-NOT:   linalg.matmul
 // E2E-NOT:   vector.contract
+// E2E-NOT:   vector.multi_reduction
+// E2E-NOT:   vector.transfer
 // E2E-SAME:  (
 func.func @test_rvv_matmul_e2e(
     %A: memref<128x256xf32>,

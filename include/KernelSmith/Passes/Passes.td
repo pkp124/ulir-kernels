@@ -203,12 +203,16 @@ def KSLowerToRVVPass : Pass<"ks-lower-to-rvv", "mlir::ModuleOp"> {
     Pipeline (in order):
       1. one-shot-bufferize           — tensor -> memref (function-boundary only)
       2. convert-linalg-to-loops      — any remaining linalg.generic -> scf.for
-      3. lower-affine                  — affine.apply -> arith
-      4. convert-scf-to-cf            — scf.for -> cf.br
-      5. convert-vector-to-llvm       — vector.* -> llvm.*
-      6. finalize-memref-to-llvm      — memref.* -> llvm.*
-      7. convert-func-to-llvm         — func.func -> llvm.func
-      8. reconcile-unrealized-casts   — clean up cast chains
+      3. vector preparation           — bounded reductions/transfers -> lower-rank ops
+      4. expand-strided-metadata      — memref.subview -> metadata + affine
+      5. lower-affine                  — affine.apply -> arith
+      6. convert-scf-to-cf            — scf.for -> cf.br
+      7. convert-vector-to-llvm       — vector.* -> llvm.*
+      8. convert-math/ub-to-llvm      — math.*, ub.* -> llvm.*
+      9. finalize-memref-to-llvm      — memref.* -> llvm.*
+     10. convert-arith-to-llvm        — arith.* -> llvm.*
+     11. convert-func-to-llvm         — func.func -> llvm.func
+     12. reconcile-unrealized-casts   — clean up cast chains
 
     After this pass the IR is in LLVM dialect and can be translated to LLVM IR
     via mlir-translate and compiled to RVV assembly by llc:
@@ -216,7 +220,9 @@ def KSLowerToRVVPass : Pass<"ks-lower-to-rvv", "mlir::ModuleOp"> {
       llc -march=riscv64 -mattr=+v,+zve64d -o out.s
 
     The target triple and features must be set externally (e.g. via llc flags
-    or the compilation driver script scripts/compile-rvv.sh).
+    or the compilation driver script scripts/compile-rvv.sh). Multi-dimensional
+    reductions whose result exceeds the bounded lowering limit are rejected
+    with a tiling diagnostic instead of producing partially lowered IR.
   }];
   let options = [
     Option<"indexBitwidth", "index-bitwidth", "unsigned", "64",
@@ -227,6 +233,8 @@ def KSLowerToRVVPass : Pass<"ks-lower-to-rvv", "mlir::ModuleOp"> {
     "mlir::vector::VectorDialect",
     "mlir::memref::MemRefDialect",
     "mlir::arith::ArithDialect",
+    "mlir::math::MathDialect",
+    "mlir::ub::UBDialect",
     "mlir::cf::ControlFlowDialect",
     "mlir::func::FuncDialect"
   ];
