@@ -1,11 +1,18 @@
 // RUN: %ks-opt %s --ks-lower-to-linalg | %FileCheck %s
+// RUN: %ks-opt %s --ks-lower-to-linalg --ks-vectorize | %FileCheck %s --check-prefix=VECTOR
 // RUN: %ks-opt %s --ks-lower-to-linalg --ks-vectorize --ks-lower-to-rvv -o %t
 // RUN: %mlir-translate --mlir-to-llvmir %t -o /dev/null
 
 // The default trailing axis lowers to the numerically stable sequence:
 // max reduction, subtract-and-exp, sum reduction, and divide.
 // CHECK-LABEL: func @softmax_trailing_axis
+// VECTOR-LABEL: func @softmax_trailing_axis
+// VECTOR:       vector.multi_reduction <maximumf>
+// VECTOR:       math.exp %{{.*}} : vector<2x4xf32>
+// VECTOR:       vector.multi_reduction <add>
+// VECTOR:       arith.divf %{{.*}}, %{{.*}} : vector<2x4xf32>
 // CHECK-NOT:   ks.softmax
+// CHECK:       %[[ZERO:.*]] = arith.constant 0.000000e+00 : f32
 // CHECK:       %[[NINF:.*]] = arith.constant 0xFF800000 : f32
 // CHECK:       linalg.fill ins(%[[NINF]]
 // CHECK:       linalg.generic
@@ -15,7 +22,6 @@
 // CHECK-SAME:    iterator_types = ["parallel", "parallel"]
 // CHECK:         %[[SHIFTED:.*]] = arith.subf
 // CHECK:         math.exp %[[SHIFTED]]
-// CHECK:       %[[ZERO:.*]] = arith.constant 0.000000e+00 : f32
 // CHECK:       linalg.fill ins(%[[ZERO]]
 // CHECK:       linalg.generic
 // CHECK-SAME:    iterator_types = ["parallel", "reduction"]
@@ -51,6 +57,7 @@ func.func @softmax_middle_axis(
 // CHECK:       linalg.generic
 // CHECK-SAME:    iterator_types = ["reduction", "parallel"]
 // CHECK:         arith.maximumf
+// CHECK:       math.exp
 // CHECK:       linalg.generic
 // CHECK-SAME:    iterator_types = ["reduction", "parallel"]
 // CHECK:         arith.addf
