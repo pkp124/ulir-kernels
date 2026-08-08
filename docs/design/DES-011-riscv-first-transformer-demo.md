@@ -151,19 +151,18 @@ The integration should compare:
 
 ## Open Questions
 
-The first three layout/format questions are resolved in
-[DES-015](DES-015-quantized-layout-abi-and-integration-conversion-paths.md):
-native symmetric per-group W4A8 (not a GGML block format), per-group weight
-scales with per-tensor activation scale in v1, and a KernelSmith-specific model
-container with a GGML weight importer added for the M8 showcase.
+Draft [DES-015](DES-015-quantized-layout-abi-and-integration-conversion-paths.md)
+proposes native symmetric per-group W4A8, per-group positive weight scales,
+per-tensor activation scale, and a KernelSmith-specific model container.
+Its GGML path decodes and requantizes weights; it is not a lossless repack.
 
-- [x] Which first INT4 format should be used: simple symmetric W4A8 or a
-      GGML-compatible block format? (DES-015: native symmetric W4A8.)
-- [x] Should scales be per-channel, per-block, or both in the first ABI?
-      (DES-015: per-group weights, per-tensor activations in v1.)
-- [x] Should the first model file format be KernelSmith-specific or a restricted
-      importer from llama2.c checkpoints? (DES-015: KernelSmith-specific first;
-      GGML importer for the M8 integration showcase.)
+- [ ] Which first INT4 format should be used: simple symmetric W4A8 or a
+      GGML-compatible block format? (DES-015 proposes native symmetric W4A8.)
+- [ ] Should scales be per-channel, per-block, or both in the first ABI?
+      (DES-015 proposes per-group weights and per-tensor activations.)
+- [ ] Should the first model file format be KernelSmith-specific or a restricted
+      importer from llama2.c checkpoints? (DES-015 proposes KernelSmith-specific
+      first, with a requantizing GGML importer for M8.)
 - [ ] What RVV board should serve as the first performance reference?
 
 ## Dependencies
