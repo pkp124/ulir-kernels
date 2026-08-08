@@ -178,6 +178,25 @@ jobs:
           file build-rvv/bin/riscv-golden-runner
           echo "descriptor runner artifacts built successfully"
 
+      - name: Build generated RMSNorm RVV test
+        run: |
+          MLIR_TRANSLATE=mlir-translate LLC=llc \
+            ./scripts/compile-rvv.sh \
+            tests/riscv/generated_rms_norm.mlir \
+            build-rvv/generated_rms_norm.o
+
+          riscv64-linux-gnu-gcc \
+            -static \
+            build-rvv/generated_rms_norm.o \
+            -o build-rvv/bin/generated-rms-norm
+
+          if ! riscv64-linux-gnu-objdump \
+            -d build-rvv/bin/generated-rms-norm \
+            | grep -Eq '[[:space:]]vset(i)?vli[[:space:]]'; then
+            echo "ERROR: generated RMSNorm binary contains no RVV setup instruction" >&2
+            exit 1
+          fi
+
       - name: Upload RVV runner artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -230,6 +249,12 @@ jobs:
 
       - name: Prepare binaries
         run: chmod +x rvv-bin/*
+
+      - name: "Run generated RMSNorm (VLEN=${{ matrix.vlen }})"
+        run: |
+          python tests/riscv_runner.py \
+            --binary rvv-bin/generated-rms-norm \
+            --vlens ${{ matrix.vlen }}
 
       - name: "Verify golden cases (VLEN=${{ matrix.vlen }})"
         timeout-minutes: 5

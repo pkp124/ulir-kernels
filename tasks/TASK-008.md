@@ -57,6 +57,8 @@ Add C API and NumPy validation commands as each helper kernel lands.
 - Completed `TASK-023`; `ks.softmax` now lowers over arbitrary positive or
   negative axes using max-subtract-exp-sum-divide, promotes narrow inputs to
   f32 intermediates, vectorizes for static shapes, and reaches LLVM IR.
+- Split the final generated-helper QEMU criterion into `TASK-024`, using the
+  merged RMSNorm lowering so validation can proceed independently of softmax.
 
 ### 2026-06-24
 - Split the two remaining compiler-lowering criteria into PR-sized child tasks:
