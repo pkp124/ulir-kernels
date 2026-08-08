@@ -1,7 +1,7 @@
 # TASK-024: Validate Generated Transformer Helper on RVV QEMU
 
 ## Status
-[~] In Progress
+[x] Complete
 
 ## Priority
 P1 (High)
@@ -24,15 +24,15 @@ merged in `TASK-022`.
 
 ## Acceptance Criteria
 
-- [ ] Add a self-checking `ks.rms_norm` MLIR program with non-trivial expected
+- [x] Add a self-checking `ks.rms_norm` MLIR program with non-trivial expected
       outputs.
-- [ ] Compile it through `scripts/compile-rvv.sh` and link a static RISC-V ELF.
-- [ ] Confirm the generated ELF contains RVV instructions rather than only
+- [x] Compile it through `scripts/compile-rvv.sh` and link a static RISC-V ELF.
+- [x] Confirm the generated ELF contains RVV instructions rather than only
       scalar code.
-- [ ] Run the generated helper under QEMU at VLEN 256 and 512 in the RVV CI
+- [x] Run the generated helper under QEMU at VLEN 256 and 512 in the RVV CI
       workflow.
-- [ ] Reproduce the generated-helper QEMU test locally.
-- [ ] Run full CTest and Python lint/format before completion.
+- [x] Reproduce the generated-helper QEMU test locally.
+- [x] Run full CTest and Python lint/format before completion.
 
 ## Dependencies
 
@@ -66,3 +66,10 @@ ruff format --check .
 
 ### 2026-08-08
 - Created from the final open acceptance criterion in `TASK-008`.
+- Added a self-checking RMSNorm program and RVV CI build/run steps. The
+  generated executable is rejected if it lacks an RVV `vsetvli`/`vsetivli`
+  instruction.
+- Locally compiled and linked the generated helper, confirmed RVV arithmetic
+  and square-root instructions in its disassembly, and passed QEMU execution at
+  VLEN 256 and 512.
+- Verified all 21 CTest targets and Ruff lint and format checks.
