@@ -1,7 +1,7 @@
 # TASK-023: Lower ks.softmax with Numerically Stable Form
 
 ## Status
-[~] In Progress
+[x] Complete
 
 ## Priority
 P1 (High)
@@ -23,16 +23,16 @@ accumulation for the exponent sum, matching the reference semantics validated in
 
 ## Acceptance Criteria
 
-- [ ] Lower `ks.softmax` in `--ks-lower-to-linalg` to linalg/loop form
+- [x] Lower `ks.softmax` in `--ks-lower-to-linalg` to linalg/loop form
       implementing max-subtract-exp-sum-divide along the softmax axis.
-- [ ] Use f32 accumulation for the row max and exponent-sum reductions.
-- [ ] Respect the op's reduction axis attribute (if defined) or document the
+- [x] Use f32 accumulation for the row max and exponent-sum reductions.
+- [x] Respect the op's reduction axis attribute (if defined) or document the
       fixed-axis assumption.
-- [ ] Add a pass-transformation lit test asserting `ks.softmax` is removed and
+- [x] Add a pass-transformation lit test asserting `ks.softmax` is removed and
       the max/exp/sum/div sequence appears.
-- [ ] Confirm the lowered form vectorizes through `--ks-vectorize` and reaches
+- [x] Confirm the lowered form vectorizes through `--ks-vectorize` and reaches
       LLVM via `--ks-lower-to-rvv` (lit coverage or documented pipeline run).
-- [ ] Run build, full CTest, and Python lint/format before completion.
+- [x] Run build, full CTest, and Python lint/format before completion.
 
 ## Dependencies
 
@@ -66,6 +66,13 @@ ruff format --check .
 ### 2026-08-08
 - Started the compiler lowering after `TASK-022` and the RVV-to-LLVM translation
   path merged.
+- Added arbitrary-axis max-subtract-exp-sum-divide lowering with f32
+  intermediates for f16/bf16 inputs and dynamic-shape support.
+- Added lit coverage for trailing, middle, negative, dynamic, and f16 cases;
+  static softmax explicitly vectorizes to max/add reductions and reaches
+  translatable LLVM dialect IR.
+- Verified the build, all 42 lit tests, all 21 CTest targets, and Ruff lint and
+  format checks.
 
 ### 2026-06-24
 - Created as the softmax compiler-lowering follow-up split from `TASK-008` per
