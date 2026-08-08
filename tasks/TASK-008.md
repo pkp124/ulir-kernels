@@ -1,7 +1,7 @@
 # TASK-008: Transformer Minimum Kernel Set
 
 ## Status
-[~] In Progress
+[x] Complete
 
 ## Priority
 P1 (High)
@@ -28,7 +28,7 @@ llama-style transformer block on RISC-V RVV.
 - [x] Lower RMSNorm with f32 accumulation and explicit epsilon behavior.
 - [x] Lower softmax using max-subtract-exp-sum-divide for numerical stability.
 - [x] Add functional validator coverage for transformer helper kernels.
-- [ ] Add QEMU tests for generated RVV helper kernels when toolchains exist.
+- [x] Add QEMU tests for generated RVV helper kernels when toolchains exist.
 
 ## Dependencies
 
@@ -59,6 +59,8 @@ Add C API and NumPy validation commands as each helper kernel lands.
   f32 intermediates, vectorizes for static shapes, and reaches LLVM IR.
 - Split the final generated-helper QEMU criterion into `TASK-024`, using the
   merged RMSNorm lowering so validation can proceed independently of softmax.
+- Completed `TASK-024`; a self-checking generated RMSNorm executable contains
+  RVV instructions and passes QEMU at VLEN 256 and 512.
 
 ### 2026-06-24
 - Split the two remaining compiler-lowering criteria into PR-sized child tasks:

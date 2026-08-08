@@ -92,13 +92,13 @@ Progress updates with dates.
 | TASK-016 | M5 | Implement INT8 dot/GEMV lowering | Complete | P1 |
 | TASK-017 | M5 | Implement W4A8 fused dot/GEMV lowering | Complete | P1 |
 | TASK-018 | M5 | Integrate generated INT8 RVV objects with the C API | Complete | P1 |
-| TASK-008 | M6 | Transformer minimum kernel set | In Progress | P1 |
+| TASK-008 | M6 | Transformer minimum kernel set | Complete | P1 |
 | TASK-019 | M6 | Add elementwise add/mul ops and linalg lowering | Complete | P1 |
 | TASK-020 | M6 | Add transformer helper C APIs | Complete | P1 |
 | TASK-021 | M6 | Add transformer helper golden CI coverage | Complete | P1 |
 | TASK-022 | M6 | Lower ks.rms_norm to vectorizable linalg/loop form | Complete | P1 |
 | TASK-023 | M6 | Lower ks.softmax with numerically stable form | Complete | P1 |
-| TASK-024 | M6 | Validate generated transformer helper on RVV QEMU | In Progress | P1 |
+| TASK-024 | M6 | Validate generated transformer helper on RVV QEMU | Complete | P1 |
 
 ## Agent workflow
 
