@@ -516,9 +516,10 @@ struct MatvecI8ToLinalgPattern : public OpRewritePattern<ks::MatvecI8Op> {
 };
 
 /// Lower ks.rms_norm to three linalg.generic ops normalizing over the trailing
-/// dimension. The mean-of-squares reduction accumulates in the (floating-point)
-/// element type, and epsilon is added before the reciprocal square root,
-/// matching the ks_rms_norm_f32 reference and the golden descriptors.
+/// dimension. Narrow floating-point inputs are promoted to f32 for the
+/// mean-of-squares reduction and scaling. Epsilon is added before the
+/// reciprocal square root, matching the ks_rms_norm_f32 reference and the
+/// golden descriptors.
 struct RMSNormToLinalgPattern : public OpRewritePattern<ks::RMSNormOp> {
   using OpRewritePattern::OpRewritePattern;
 
@@ -531,12 +532,15 @@ struct RMSNormToLinalgPattern : public OpRewritePattern<ks::RMSNormOp> {
     auto inputType = cast<RankedTensorType>(input.getType());
     auto resultType = cast<RankedTensorType>(op.getType());
     Type elementType = inputType.getElementType();
+    Type accumulatorType = elementType;
+    if (cast<FloatType>(elementType).getWidth() < 32)
+      accumulatorType = rewriter.getF32Type();
     int64_t rank = inputType.getRank();
     int64_t lastDim = rank - 1;
 
     // Reduced tensor shape = input shape with the trailing dimension dropped.
     auto reducedType = RankedTensorType::get(
-        inputType.getShape().drop_back(), elementType);
+        inputType.getShape().drop_back(), accumulatorType);
 
     // Identity map over all `rank` dims and a map that drops the trailing
     // (reduction) dim, projecting onto the reduced/"outer" tensor.
@@ -560,7 +564,12 @@ struct RMSNormToLinalgPattern : public OpRewritePattern<ks::RMSNormOp> {
         loc, reducedType, ValueRange{input}, ValueRange{ssqInit},
         SmallVector<AffineMap>{identityMap, outerMap}, reduceIters,
         [&](OpBuilder &b, Location loc, ValueRange args) {
-          Value square = b.create<arith::MulFOp>(loc, args[0], args[0]);
+          Value inputValue = args[0];
+          if (elementType != accumulatorType)
+            inputValue =
+                b.create<arith::ExtFOp>(loc, accumulatorType, inputValue);
+          Value square =
+              b.create<arith::MulFOp>(loc, inputValue, inputValue);
           Value sum = b.create<arith::AddFOp>(loc, args[1], square);
           b.create<linalg::YieldOp>(loc, sum);
         });
@@ -571,15 +580,16 @@ struct RMSNormToLinalgPattern : public OpRewritePattern<ks::RMSNormOp> {
       Value dim = rewriter.create<tensor::DimOp>(loc, input, lastDim);
       Value dimI64 = rewriter.create<arith::IndexCastOp>(
           loc, rewriter.getI64Type(), dim);
-      innerCount = rewriter.create<arith::SIToFPOp>(loc, elementType, dimI64);
+      innerCount =
+          rewriter.create<arith::SIToFPOp>(loc, accumulatorType, dimI64);
     } else {
       innerCount = rewriter.create<arith::ConstantOp>(
           loc, rewriter.getFloatAttr(
-                   elementType,
+                   accumulatorType,
                    static_cast<double>(inputType.getDimSize(lastDim))));
     }
     Value epsValue = rewriter.create<arith::ConstantOp>(
-        loc, rewriter.getFloatAttr(elementType,
+        loc, rewriter.getFloatAttr(accumulatorType,
                                    op.getEpsAttr().getValueAsDouble()));
 
     // 2. scale[outer] = rsqrt(ssq[outer] / inner + eps).
@@ -610,8 +620,18 @@ struct RMSNormToLinalgPattern : public OpRewritePattern<ks::RMSNormOp> {
         ValueRange{outInit},
         SmallVector<AffineMap>{identityMap, outerMap, weightMap, identityMap},
         applyIters, [&](OpBuilder &b, Location loc, ValueRange args) {
-          Value scaled = b.create<arith::MulFOp>(loc, args[0], args[1]);
-          Value result = b.create<arith::MulFOp>(loc, scaled, args[2]);
+          Value inputValue = args[0];
+          Value weightValue = args[2];
+          if (elementType != accumulatorType) {
+            inputValue =
+                b.create<arith::ExtFOp>(loc, accumulatorType, inputValue);
+            weightValue =
+                b.create<arith::ExtFOp>(loc, accumulatorType, weightValue);
+          }
+          Value scaled = b.create<arith::MulFOp>(loc, inputValue, args[1]);
+          Value result = b.create<arith::MulFOp>(loc, scaled, weightValue);
+          if (elementType != accumulatorType)
+            result = b.create<arith::TruncFOp>(loc, elementType, result);
           b.create<linalg::YieldOp>(loc, result);
         });
 

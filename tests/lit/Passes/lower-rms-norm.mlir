@@ -66,3 +66,24 @@ func.func @test_rms_norm_dynamic(%input: tensor<2x?xf32>,
       : tensor<2x?xf32>, tensor<?xf32> -> tensor<2x?xf32>
   return %out : tensor<2x?xf32>
 }
+
+// -----
+
+// Narrow floating-point inputs are promoted to f32 for reduction and scaling,
+// then truncated back to the declared result element type.
+// CHECK-LABEL: func @test_rms_norm_f16
+// CHECK-NOT:   ks.rms_norm
+// CHECK:       linalg.generic
+// CHECK:         %[[X32:.*]] = arith.extf %{{.*}} : f16 to f32
+// CHECK:         %[[SQ32:.*]] = arith.mulf %[[X32]], %[[X32]] : f32
+// CHECK:         arith.addf %{{.*}}, %[[SQ32]] : f32
+// CHECK:       math.rsqrt
+// CHECK:       linalg.generic
+// CHECK:         arith.extf %{{.*}} : f16 to f32
+// CHECK:         arith.truncf %{{.*}} : f32 to f16
+func.func @test_rms_norm_f16(%input: tensor<2x4xf16>,
+                             %weight: tensor<4xf16>) -> tensor<2x4xf16> {
+  %out = ks.rms_norm %input, %weight {eps = 1.000000e-05 : f32}
+      : tensor<2x4xf16>, tensor<4xf16> -> tensor<2x4xf16>
+  return %out : tensor<2x4xf16>
+}
