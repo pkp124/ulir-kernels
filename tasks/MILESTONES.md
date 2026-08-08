@@ -22,13 +22,14 @@ milestone should show status, task links, blockers, and the next concrete work.
 | M3 — Generic MatMul Lowering | Partial | `TASK-004` | Track generated matmul replacement separately if prioritized. |
 | M4 — RISC-V RVV Target | Done | `TASK-005`, `TASK-006`, `TASK-009`, `TASK-010`, `TASK-011`, `TASK-012` | Keep RVV validation reports green as new kernels land. |
 | M5 — RISC-V Quantization Foundation | Done | `TASK-007`, `TASK-013`, `TASK-014`, `TASK-015`, `TASK-016`, `TASK-017`, `TASK-018` | Keep quantized RVV validation reports green as transformer kernels land. |
-| M6 — Transformer Minimum Kernel Set | Active | `TASK-008`, `TASK-019`, `TASK-020`, `TASK-021`, `TASK-022`, `TASK-023` | Close the remaining `TASK-008` QEMU generated-helper validation criterion. |
+| M6 — Transformer Minimum Kernel Set | Active | `TASK-008`, `TASK-019`, `TASK-020`, `TASK-021`, `TASK-022`, `TASK-023`, `TASK-024` | Complete generated-helper QEMU validation (`TASK-024`). |
 | M7 — Minimal RISC-V Transformer Demo | Planned | Not created | Create tasks after M5/M6 interfaces stabilize. |
 
 ## Active focus
 
-1. Close the remaining `TASK-008` QEMU generated-helper validation criterion;
-   the RMSNorm and softmax compiler lowerings are complete.
+1. Complete `TASK-024` to close the remaining `TASK-008` generated-helper QEMU
+   validation criterion; the RMSNorm and softmax compiler lowerings are
+   complete.
 
 ## Maintenance rules
 
