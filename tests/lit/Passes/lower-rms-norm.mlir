@@ -1,4 +1,6 @@
 // RUN: %ks-opt %s --ks-lower-to-linalg | %FileCheck %s
+// RUN: %ks-opt %s --ks-lower-to-linalg --ks-vectorize --ks-lower-to-rvv -o %t
+// RUN: %mlir-translate --mlir-to-llvmir %t -o /dev/null
 
 // CHECK-LABEL: func @test_rms_norm_2d
 // CHECK-NOT:   ks.rms_norm

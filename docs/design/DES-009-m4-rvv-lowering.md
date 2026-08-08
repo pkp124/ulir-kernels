@@ -146,15 +146,22 @@ Full lowering from vector/tensor/scf to LLVM dialect via a nested PassManager:
 |-----------|-----------|
 | one-shot-bufferize | tensor → memref (function-boundary buffers) |
 | convert-linalg-to-loops | remaining `linalg.generic` → `scf.for` |
+| vector preparation | bounded `vector.multi_reduction` and multidimensional transfers → LLVM-ready vector/SCF ops |
+| expand-strided-metadata | tiled `memref.subview` → explicit metadata and affine operations |
 | lower-affine | `affine.apply` → `arith` |
 | convert-scf-to-cf | `scf.for/if` → `cf.br` (flat CFG) |
 | convert-vector-to-llvm | `vector.*` → `llvm.*` with SIMD semantics |
+| convert-math/ub-to-llvm | normalization math and vector poison padding → `llvm.*` |
 | finalize-memref-to-llvm | `memref.*` → `llvm.*` (GEPs) |
 | convert-arith-to-llvm | `arith.*` → `llvm.*` |
 | convert-func-to-llvm | `func.func` → `llvm.func` |
 | reconcile-unrealized-casts | clean up cast chains |
 
-After this stage, `mlir-translate --mlir-to-llvmir` produces LLVM IR.
+Vector multi-reduction preparation is bounded to 512 result elements, matching
+the `16x32` RVV register tile. Larger untiled reductions are rejected with a
+diagnostic instead of leaving partially converted vector operations in the
+output. After this stage, the pass verifies that only LLVM operations remain,
+and `mlir-translate --mlir-to-llvmir` produces LLVM IR.
 
 #### Stage 7: `llc` (external)
 ```bash
