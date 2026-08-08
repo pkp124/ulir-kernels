@@ -358,16 +358,10 @@ from tests.qemu_runner import QEMURunner
 runner = QEMURunner()
 
 # Run with specific VLEN
-ret_code, stdout, stderr = runner.run_with_vlen(
-    binary_path="build/bin/test_matmul",
-    vlen=256
-)
+ret_code, stdout, stderr = runner.run_with_vlen(binary_path="build/bin/test_matmul", vlen=256)
 
 # Run with multiple VLEN values
-results = runner.run_multi_vlen(
-    binary_path="build/bin/test_matmul",
-    vlens=[128, 256, 512]
-)
+results = runner.run_multi_vlen(binary_path="build/bin/test_matmul", vlens=[128, 256, 512])
 
 # Check consistency
 consistent = runner.validate_consistent_results(results)

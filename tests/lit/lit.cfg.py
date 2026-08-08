@@ -24,11 +24,12 @@ config.test_exec_root = os.path.join(tools_dir, "..", "test")
 config.substitutions.append(("%ks-opt", os.path.join(tools_dir, "ks-opt")))
 
 # Find FileCheck
+llvm_tools = getattr(config, "llvm_tools_dir", "/usr/lib/llvm-21/bin")
 filecheck = lit.util.which("FileCheck")
 if not filecheck:
-    llvm_tools = getattr(config, "llvm_tools_dir", "/usr/lib/llvm-21/bin")
     filecheck = os.path.join(llvm_tools, "FileCheck")
 config.substitutions.append(("%FileCheck", filecheck))
+config.substitutions.append(("%mlir-translate", os.path.join(llvm_tools, "mlir-translate")))
 
 # Add tools to PATH
 path = config.environment.get("PATH", "")

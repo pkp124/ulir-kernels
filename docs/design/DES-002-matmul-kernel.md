@@ -520,6 +520,7 @@ make test-data
 from tests.functional_validator import FunctionalValidator
 import numpy as np
 
+
 def test_matmul_correctness():
     validator = FunctionalValidator(verbose=True)
 

@@ -19,6 +19,15 @@
 //   linalg.generic reduction with signed i32 accumulation:
 //     acc += (extsi(input[k]) - input_zero_point) *
 //            (extsi(weight[k]) - weight_zero_point)
+//
+//   ks.rms_norm %input, %weight {eps} : tensor<...xDxT>, tensor<DxT> -> ...
+//   ──►
+//   Three linalg.generic ops, normalizing over the trailing dimension D:
+//     1. reduction: ssq[outer] = sum_D(input * input)  (f32 accumulation)
+//     2. elementwise (rank-1 reduced): scale[outer] =
+//          rsqrt(ssq[outer] / D + eps)
+//     3. elementwise (full rank): output[..., d] =
+//          input[..., d] * scale[outer] * weight[d]
 //===----------------------------------------------------------------------===//
 
 #include "KernelSmith/Dialect/Kernel/KernelDialect.h"
@@ -27,6 +36,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -93,6 +103,21 @@ static Value createZeroFilledTensorLike(OpBuilder &b, Location loc,
   Value zero = b.create<arith::ConstantOp>(
       loc, b.getZeroAttr(resultType.getElementType()));
   return b.create<linalg::FillOp>(loc, zero, empty).getResult(0);
+}
+
+/// Build an uninitialized tensor of `resultType`, sourcing dynamic dimensions
+/// from the matching leading dimensions of `shapeLike`. Used when every result
+/// element is written (no accumulation), so no zero-fill is needed.
+static Value createEmptyTensorLike(OpBuilder &b, Location loc,
+                                   RankedTensorType resultType,
+                                   Value shapeLike) {
+  SmallVector<Value> dynamicSizes;
+  for (int64_t dim = 0; dim < resultType.getRank(); ++dim) {
+    if (resultType.isDynamicDim(dim))
+      dynamicSizes.push_back(b.create<tensor::DimOp>(loc, shapeLike, dim));
+  }
+  return b.create<tensor::EmptyOp>(
+      loc, resultType.getShape(), resultType.getElementType(), dynamicSizes);
 }
 
 static Value createEmptyElementwiseTensor(OpBuilder &b, Location loc,
@@ -490,6 +515,131 @@ struct MatvecI8ToLinalgPattern : public OpRewritePattern<ks::MatvecI8Op> {
   }
 };
 
+/// Lower ks.rms_norm to three linalg.generic ops normalizing over the trailing
+/// dimension. Narrow floating-point inputs are promoted to f32 for the
+/// mean-of-squares reduction and scaling. Epsilon is added before the
+/// reciprocal square root, matching the ks_rms_norm_f32 reference and the
+/// golden descriptors.
+struct RMSNormToLinalgPattern : public OpRewritePattern<ks::RMSNormOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(ks::RMSNormOp op,
+                                PatternRewriter &rewriter) const override {
+    Location loc = op.getLoc();
+    MLIRContext *context = rewriter.getContext();
+    Value input = op.getInput();
+    Value weight = op.getWeight();
+    auto inputType = cast<RankedTensorType>(input.getType());
+    auto resultType = cast<RankedTensorType>(op.getType());
+    Type elementType = inputType.getElementType();
+    Type accumulatorType = elementType;
+    if (cast<FloatType>(elementType).getWidth() < 32)
+      accumulatorType = rewriter.getF32Type();
+    int64_t rank = inputType.getRank();
+    int64_t lastDim = rank - 1;
+
+    // Reduced tensor shape = input shape with the trailing dimension dropped.
+    auto reducedType = RankedTensorType::get(
+        inputType.getShape().drop_back(), accumulatorType);
+
+    // Identity map over all `rank` dims and a map that drops the trailing
+    // (reduction) dim, projecting onto the reduced/"outer" tensor.
+    AffineMap identityMap = rewriter.getMultiDimIdentityMap(rank);
+    SmallVector<AffineExpr> outerExprs;
+    outerExprs.reserve(rank - 1);
+    for (int64_t dim = 0; dim < rank - 1; ++dim)
+      outerExprs.push_back(rewriter.getAffineDimExpr(dim));
+    AffineMap outerMap =
+        AffineMap::get(rank, /*symbolCount=*/0, outerExprs, context);
+    AffineMap reducedIdentityMap =
+        rewriter.getMultiDimIdentityMap(rank - 1);
+
+    // 1. Sum of squares reduction: ssq[outer] = sum_lastDim(input * input).
+    SmallVector<utils::IteratorType> reduceIters(rank,
+                                                 utils::IteratorType::parallel);
+    reduceIters[lastDim] = utils::IteratorType::reduction;
+    Value ssqInit =
+        createZeroFilledTensorLike(rewriter, loc, reducedType, input);
+    auto ssqOp = rewriter.create<linalg::GenericOp>(
+        loc, reducedType, ValueRange{input}, ValueRange{ssqInit},
+        SmallVector<AffineMap>{identityMap, outerMap}, reduceIters,
+        [&](OpBuilder &b, Location loc, ValueRange args) {
+          Value inputValue = args[0];
+          if (elementType != accumulatorType)
+            inputValue =
+                b.create<arith::ExtFOp>(loc, accumulatorType, inputValue);
+          Value square =
+              b.create<arith::MulFOp>(loc, inputValue, inputValue);
+          Value sum = b.create<arith::AddFOp>(loc, args[1], square);
+          b.create<linalg::YieldOp>(loc, sum);
+        });
+
+    // Number of normalized elements (the trailing dim) as a float scalar.
+    Value innerCount;
+    if (inputType.isDynamicDim(lastDim)) {
+      Value dim = rewriter.create<tensor::DimOp>(loc, input, lastDim);
+      Value dimI64 = rewriter.create<arith::IndexCastOp>(
+          loc, rewriter.getI64Type(), dim);
+      innerCount =
+          rewriter.create<arith::SIToFPOp>(loc, accumulatorType, dimI64);
+    } else {
+      innerCount = rewriter.create<arith::ConstantOp>(
+          loc, rewriter.getFloatAttr(
+                   accumulatorType,
+                   static_cast<double>(inputType.getDimSize(lastDim))));
+    }
+    Value epsValue = rewriter.create<arith::ConstantOp>(
+        loc, rewriter.getFloatAttr(accumulatorType,
+                                   op.getEpsAttr().getValueAsDouble()));
+
+    // 2. scale[outer] = rsqrt(ssq[outer] / inner + eps).
+    SmallVector<utils::IteratorType> reducedParallelIters(
+        rank - 1, utils::IteratorType::parallel);
+    Value scaleInit =
+        createEmptyTensorLike(rewriter, loc, reducedType, input);
+    auto scaleOp = rewriter.create<linalg::GenericOp>(
+        loc, reducedType, ValueRange{ssqOp.getResult(0)},
+        ValueRange{scaleInit},
+        SmallVector<AffineMap>{reducedIdentityMap, reducedIdentityMap},
+        reducedParallelIters,
+        [&](OpBuilder &b, Location loc, ValueRange args) {
+          Value mean = b.create<arith::DivFOp>(loc, args[0], innerCount);
+          Value meanEps = b.create<arith::AddFOp>(loc, mean, epsValue);
+          Value scale = b.create<math::RsqrtOp>(loc, meanEps);
+          b.create<linalg::YieldOp>(loc, scale);
+        });
+
+    // 3. output[..., d] = input[..., d] * scale[outer] * weight[d].
+    AffineMap weightMap = AffineMap::get(
+        rank, /*symbolCount=*/0, rewriter.getAffineDimExpr(lastDim), context);
+    SmallVector<utils::IteratorType> applyIters(rank,
+                                                utils::IteratorType::parallel);
+    Value outInit = createEmptyTensorLike(rewriter, loc, resultType, input);
+    auto applyOp = rewriter.create<linalg::GenericOp>(
+        loc, resultType, ValueRange{input, scaleOp.getResult(0), weight},
+        ValueRange{outInit},
+        SmallVector<AffineMap>{identityMap, outerMap, weightMap, identityMap},
+        applyIters, [&](OpBuilder &b, Location loc, ValueRange args) {
+          Value inputValue = args[0];
+          Value weightValue = args[2];
+          if (elementType != accumulatorType) {
+            inputValue =
+                b.create<arith::ExtFOp>(loc, accumulatorType, inputValue);
+            weightValue =
+                b.create<arith::ExtFOp>(loc, accumulatorType, weightValue);
+          }
+          Value scaled = b.create<arith::MulFOp>(loc, inputValue, args[1]);
+          Value result = b.create<arith::MulFOp>(loc, scaled, weightValue);
+          if (elementType != accumulatorType)
+            result = b.create<arith::TruncFOp>(loc, elementType, result);
+          b.create<linalg::YieldOp>(loc, result);
+        });
+
+    rewriter.replaceOp(op, applyOp.getResults());
+    return success();
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // Pass implementation
 //===----------------------------------------------------------------------===//
@@ -503,7 +653,8 @@ struct KSLowerToLinalgPass
     patterns.add<AddToLinalgPattern, DotI8ToLinalgPattern,
                  DotW4A8ToLinalgPattern, MatmulToLinalgPattern,
                  MatvecW4A8ToLinalgPattern, MulToLinalgPattern,
-                 MatvecI8ToLinalgPattern>(&getContext());
+                 MatvecI8ToLinalgPattern, RMSNormToLinalgPattern>(
+        &getContext());
 
     if (failed(applyPatternsGreedily(getOperation(), std::move(patterns))))
       signalPassFailure();
