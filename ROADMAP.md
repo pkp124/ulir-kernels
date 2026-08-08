@@ -382,7 +382,7 @@ These targets may be added after the core edge pipeline is proven:
 |----|-------|-------|
 | [DES-006](docs/design/DES-006-kernel-library-architecture.md) | Kernel Library Architecture | C API, memory mgmt, tiling, packing, target profiles |
 | [DES-011](docs/design/DES-011-riscv-first-transformer-demo.md) | RISC-V First Transformer Demo Strategy | Minimal llama2.c-style demo first; llama.cpp/GGML integration later |
-| [DES-015](docs/design/DES-015-quantized-layout-abi-and-integration-conversion-paths.md) | Quantized Layout ABI and Integration Conversion Paths | Native W4A8/INT8 layout as versioned contract; GGML and IRON conversion paths |
+| [DES-015](docs/design/DES-015-quantized-layout-abi-and-integration-conversion-paths.md) | Quantized Layout ABI and Integration Conversion Paths | Proposed native layout versioning; requantized GGML import; future IRON investigation |
 | [DES-012](docs/design/DES-012-riscv-simulation-verification.md) | RISC-V Simulation Verification | QEMU-first generated-kernel verification with Spike/gem5/Renode follow-ons |
 | [DES-002](docs/design/DES-002-matmul-kernel.md) | MatMul Kernel (TDD) | MLIR pipeline design (partially superseded by DES-006) |
 | [DES-001](docs/design/DES-001-vector-operations-lowering.md) | Vector → RVV Lowering | RVV-specific intrinsic mapping |
