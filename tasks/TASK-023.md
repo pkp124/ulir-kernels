@@ -1,7 +1,7 @@
 # TASK-023: Lower ks.softmax with Numerically Stable Form
 
 ## Status
-[ ] Not Started
+[~] In Progress
 
 ## Priority
 P1 (High)
@@ -62,6 +62,10 @@ ruff format --check .
   `TASK-008` QEMU helper-kernel criterion.
 
 ## Log
+
+### 2026-08-08
+- Started the compiler lowering after `TASK-022` and the RVV-to-LLVM translation
+  path merged.
 
 ### 2026-06-24
 - Created as the softmax compiler-lowering follow-up split from `TASK-008` per
