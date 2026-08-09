@@ -192,7 +192,7 @@ jobs:
 
           if ! riscv64-linux-gnu-objdump \
             -d --disassemble=main build-rvv/bin/generated-rms-norm \
-            | grep -Eq '[[:space:]]vset(i)?vli[[:space:]]'; then
+            | grep -E '[[:space:]]vset(i)?vli[[:space:]]' >/dev/null; then
             echo "ERROR: generated RMSNorm binary contains no RVV setup instruction" >&2
             exit 1
           fi
