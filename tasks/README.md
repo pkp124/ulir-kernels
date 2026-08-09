@@ -99,6 +99,16 @@ Progress updates with dates.
 | TASK-022 | M6 | Lower ks.rms_norm to vectorizable linalg/loop form | Complete | P1 |
 | TASK-023 | M6 | Lower ks.softmax with numerically stable form | Complete | P1 |
 | TASK-024 | M6 | Validate generated transformer helper on RVV QEMU | Complete | P1 |
+| TASK-025 | M7 | Adopt known-runtime-first transformer strategy | In Progress | P0 |
+| TASK-026 | M7 | Pin llama.cpp runtime and model baseline | Not Started | P0 |
+| TASK-027 | M7 | Route a host runtime operation through KernelSmith | Not Started | P0 |
+| TASK-028 | M8 | Ratify and version the native quantized layout | Not Started | P0 |
+| TASK-029 | M8 | Convert GGML Q4_0 weights to native W4A8 | Not Started | P0 |
+| TASK-030 | M8 | Integrate W4A8 RVV objects behind the C API | Not Started | P0 |
+| TASK-031 | M8 | Route llama.cpp quantized decode through KernelSmith | Not Started | P0 |
+| TASK-032 | M8 | Validate the quantized runtime under QEMU user-mode | Not Started | P0 |
+| TASK-033 | M9 | Bring up a configurable QEMU RVV system node | Not Started | P1 |
+| TASK-034 | M9 | Map the runtime workload to gem5 full-system | Not Started | P1 |
 
 ## Agent workflow
 

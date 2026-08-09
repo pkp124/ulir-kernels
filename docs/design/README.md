@@ -56,8 +56,13 @@ Examples:
 | ID | Title | Status | Scope | File |
 |----|-------|--------|-------|------|
 | [DES-006](DES-006-kernel-library-architecture.md) | **Kernel Library Architecture** | Draft | C API, memory mgmt, tiling, packing, target profiles | `DES-006-kernel-library-architecture.md` |
+| [DES-009](DES-009-m4-rvv-lowering.md) | **M4 RVV Lowering** | Draft | RVV lowering pipeline and vector preparation | `DES-009-m4-rvv-lowering.md` |
 | [DES-010](DES-010-pack-workspace-materialization.md) | **Pack Workspace Materialization** | Implemented | Explicit workspace-backed B packing | `DES-010-pack-workspace-materialization.md` |
-| [DES-011](DES-011-riscv-first-transformer-demo.md) | **RISC-V First Transformer Demo Strategy** | Draft | Minimal llama2.c-style demo first; llama.cpp/GGML integration later | `DES-011-riscv-first-transformer-demo.md` |
+| [DES-011](DES-011-riscv-first-transformer-demo.md) | **RISC-V First Transformer Demo Strategy** | Superseded in part | Original custom-runner-first strategy; kernel boundaries retained | `DES-011-riscv-first-transformer-demo.md` |
+| [DES-012](DES-012-riscv-simulation-verification.md) | **RISC-V Simulation Verification** | Accepted | QEMU user-mode first; system-mode and gem5 follow-ons | `DES-012-riscv-simulation-verification.md` |
+| [DES-014](DES-014-int8-dot-and-gemv-lowering.md) | **INT8 Dot and GEMV Lowering** | Draft | Quantized lowering and generated-object integration | `DES-014-int8-dot-and-gemv-lowering.md` |
+| [DES-015](DES-015-quantized-layout-abi-and-integration-conversion-paths.md) | **Quantized Layout ABI and Integration Conversion Paths** | Draft | Proposed native layout versioning and GGML requantization | `DES-015-quantized-layout-abi-and-integration-conversion-paths.md` |
+| [DES-016](DES-016-known-runtime-first-transformer-integration.md) | **Known-Runtime-First Transformer Integration** | Under Review | llama.cpp smoke, quantized RVV path, then system simulation | `DES-016-known-runtime-first-transformer-integration.md` |
 | [DES-001](DES-001-vector-operations-lowering.md) | Vector Operations Lowering to RISC-V RVV | Draft | RVV intrinsic mapping | `DES-001-vector-operations-lowering.md` |
 | [DES-002](DES-002-matmul-kernel.md) | MatMul Kernel (TDD Example) | Draft | MLIR pipeline (partially superseded by DES-006) | `DES-002-matmul-kernel.md` |
 | [DES-003](DES-003-conv2d-kernel.md) | Conv2D Kernel Implementation | Draft | Conv2D lowering | `DES-003-conv2d-kernel.md` |
@@ -75,8 +80,10 @@ reference implementations first, then incrementally replace with MLIR-generated 
 - Public C headers and static library remain the product surface
 - MLIR stays internal build-time tooling
 - RISC-V RVV is the first optimized target
-- Minimal llama2.c-style transformer demo comes before llama.cpp/GGML integration
-- References: `DES-006-kernel-library-architecture.md`, `DES-011-riscv-first-transformer-demo.md`
+- A bounded llama.cpp host smoke precedes quantized RVV integration
+- QEMU system-mode and gem5 follow the stable runtime workload
+- References: `DES-006-kernel-library-architecture.md`,
+  `DES-016-known-runtime-first-transformer-integration.md`
 
 ## TDD Development Approach
 

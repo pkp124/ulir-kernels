@@ -4,10 +4,16 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Draft |
+| **Status** | Superseded in part by DES-016 |
 | **Author** | KernelSmith Team |
 | **Created** | 2026-06-06 |
-| **Related** | DES-006, DES-009, DES-010, ROADMAP.md |
+| **Related** | DES-006, DES-009, DES-010, DES-016, ROADMAP.md |
+
+> **Sequencing update (2026-08-09):** DES-016 supersedes this document's
+> custom-runner-first ordering. The kernel set, static-library boundaries, and
+> QEMU correctness principles remain relevant, but the first demo now uses a
+> bounded llama.cpp integration smoke before quantized RVV and system
+> simulation work.
 
 ## Context
 
