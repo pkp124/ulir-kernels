@@ -1,7 +1,7 @@
 # TASK-025: Adopt Known-Runtime-First Transformer Strategy
 
 ## Status
-[~] In Progress
+[?] Needs Review
 
 ## Priority
 P0
@@ -21,17 +21,17 @@ milestones with explicit claim boundaries.
 
 ## Acceptance Criteria
 
-- [ ] Add a design document that records the runtime-first decision and
+- [x] Add a design document that records the runtime-first decision and
       supersedes the custom-runner-first sequencing in `DES-011`.
-- [ ] Define a bounded feasibility gate before selecting a permanent llama.cpp
+- [x] Define a bounded feasibility gate before selecting a permanent llama.cpp
       backend or internal hook.
-- [ ] Keep the first runtime smoke independent of unresolved GGML-to-KernelSmith
+- [x] Keep the first runtime smoke independent of unresolved GGML-to-KernelSmith
       quantization conversion.
-- [ ] Move quantized decode integration and configurable system simulation into
+- [x] Move quantized decode integration and configurable system simulation into
       later milestones.
-- [ ] Create PR-sized child tasks with dependencies and verification criteria.
-- [ ] Reconcile stale roadmap and design-document indexes.
-- [ ] Run full CTest and Python lint/format checks.
+- [x] Create PR-sized child tasks with dependencies and verification criteria.
+- [x] Reconcile stale roadmap and design-document indexes.
+- [x] Run full CTest and Python lint/format checks.
 
 ## Dependencies
 
@@ -59,3 +59,8 @@ ruff format --check .
 
 ### 2026-08-09
 - Started after M6 completion and review of the custom-runner-first roadmap.
+- Added DES-016 and split the plan into host runtime smoke, quantized RVV
+  integration, and system simulation milestones.
+- Added `TASK-026` through `TASK-034` with explicit dependencies and claim
+  boundaries.
+- Verified all 21 CTest tests pass; ruff lint and format checks pass.

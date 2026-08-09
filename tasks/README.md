@@ -99,7 +99,7 @@ Progress updates with dates.
 | TASK-022 | M6 | Lower ks.rms_norm to vectorizable linalg/loop form | Complete | P1 |
 | TASK-023 | M6 | Lower ks.softmax with numerically stable form | Complete | P1 |
 | TASK-024 | M6 | Validate generated transformer helper on RVV QEMU | Complete | P1 |
-| TASK-025 | M7 | Adopt known-runtime-first transformer strategy | In Progress | P0 |
+| TASK-025 | M7 | Adopt known-runtime-first transformer strategy | Needs Review | P0 |
 | TASK-026 | M7 | Pin llama.cpp runtime and model baseline | Not Started | P0 |
 | TASK-027 | M7 | Route a host runtime operation through KernelSmith | Not Started | P0 |
 | TASK-028 | M8 | Ratify and version the native quantized layout | Not Started | P0 |
