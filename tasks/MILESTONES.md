@@ -23,12 +23,16 @@ milestone should show status, task links, blockers, and the next concrete work.
 | M4 — RISC-V RVV Target | Done | `TASK-005`, `TASK-006`, `TASK-009`, `TASK-010`, `TASK-011`, `TASK-012` | Keep RVV validation reports green as new kernels land. |
 | M5 — RISC-V Quantization Foundation | Done | `TASK-007`, `TASK-013`, `TASK-014`, `TASK-015`, `TASK-016`, `TASK-017`, `TASK-018` | Keep quantized RVV validation reports green as transformer kernels land. |
 | M6 — Transformer Minimum Kernel Set | Done | `TASK-008`, `TASK-019`, `TASK-020`, `TASK-021`, `TASK-022`, `TASK-023`, `TASK-024` | Keep transformer helper validation green as M7 integration begins. |
-| M7 — Minimal RISC-V Transformer Demo | Planned | Not created | Create tasks after M5/M6 interfaces stabilize. |
+| M7 — Known-Runtime Transformer Integration Smoke | Active | `TASK-025`, `TASK-026`, `TASK-027` | Review DES-016, then pin the llama.cpp/model baseline in `TASK-026`. |
+| M8 — Quantized RVV Runtime Integration | Planned | `TASK-028`, `TASK-029`, `TASK-030`, `TASK-031`, `TASK-032` | Start after the host runtime seam passes `TASK-027`. |
+| M9 — Configurable RISC-V System Simulation | Planned | `TASK-033`, `TASK-034` | Start with one QEMU system node after M8 user-mode validation. |
+| M10 — RISC-V Operator Coverage and Hardening | Planned | Not created | Resume broad operator work after the transformer/runtime path is proven. |
 
 ## Active focus
 
-1. Create M7 tasks for the minimal RISC-V transformer demo now that M6 is
-   complete.
+1. Review `DES-016` and the runtime-first roadmap in `TASK-025`.
+2. Run `TASK-026` as a bounded llama.cpp/model feasibility gate before choosing
+   a permanent integration seam.
 
 ## Maintenance rules
 

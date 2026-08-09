@@ -23,9 +23,10 @@ stable headers and caller-provided workspace. Framework integrations such as
 llama.cpp/GGML, ExecuTorch, TFLite Micro, or IREE are downstream consumers of
 the C kernels.
 
-The first end-to-end proof is a minimal llama2.c-style RISC-V transformer
-runner. A full llama.cpp/GGML integration is a follow-on credibility demo after
-the generated RVV kernel ABI, quantized layouts, and workspace model are stable.
+The first end-to-end proof is a narrow llama.cpp integration that routes a
+reviewed f32 operation through the public KernelSmith C API. Quantized W4A8/RVV
+integration follows after that seam is proven, and configurable QEMU
+system-mode/gem5 simulation follows the stable runtime workload.
 
 ---
 
@@ -106,7 +107,7 @@ Proves the pass infrastructure works end-to-end.
 
 ## Milestone 3: MLIR Lowering — MatMul (Generic Target)
 
-**Status**: Current / partial. `--ks-lower-to-linalg`, `--ks-tile`, and
+**Status**: Partial. `--ks-lower-to-linalg`, `--ks-tile`, and
 `--ks-alloc-check` are implemented and tested. Bufferization, generated object
 integration, and C library replacement remain open.
 
@@ -178,6 +179,9 @@ insufficient for high-performance VLA code.
 
 ## Milestone 5: RISC-V Quantization Foundation
 
+**Status**: Done for the decode-oriented dot/GEMV foundation. Quantized GEMM
+remains future work.
+
 **Goal**: Establish the quantized arithmetic and ABI needed for RISC-V edge
 inference, with batch-1 transformer decode as the first optimization target.
 
@@ -194,24 +198,26 @@ bound.
   - `ks_matvec_i8`
   - `ks_dot_w4a8`
   - `ks_matvec_w4a8`
-- `ks_matmul_i8` for small-batch/prefill and non-transformer workloads
-- Fused RVV lowering for unpack/dequantize + dot/GEMV/GEMM
+- Fused lowering for INT8 and W4A8 dot/GEMV
 - Block or per-channel scale layout documented in the public ABI
-- NumPy references for i8 and W4A8 dot/GEMV/GEMM
+- NumPy references for i8 and W4A8 dot/GEMV
+- Generated INT8 RVV objects integrated behind the C API
 
 **Tasks**:
 1. ✓ Add `ks.quantize` and `ks.dequantize` ops (TableGen + verifier + lit tests)
-2. Add accumulator/quantization metadata needed for i8 and W4A8 lowering
-3. Define C APIs and packed layouts for i8 and W4A8 dot/GEMV
-4. Implement INT8 lowering: i8 -> i32 accumulate -> requantize where needed
-5. Implement W4A8 fused unpack/dequantize + i32/f32 accumulation for RVV
-6. Add RVV i8/W4A8 tile parameters and pack factors to target profiles
-7. Add NumPy validation for quantized dot/GEMV/GEMM
-8. Add lit tests for quantized lowering and diagnostics
+2. ✓ Add accumulator/quantization metadata needed for i8 and W4A8 lowering
+3. ✓ Define C APIs and packed layouts for i8 and W4A8 dot/GEMV
+4. ✓ Implement INT8 lowering: i8 -> i32 accumulation
+5. ✓ Implement W4A8 fused unpack/dequantize and f32 accumulation lowering
+6. ✓ Add RVV i8/W4A8 tile parameters and pack factors to target profiles
+7. ✓ Add NumPy validation for quantized dot/GEMV
+8. ✓ Add lit tests for quantized lowering and diagnostics
 
 ---
 
 ## Milestone 6: Transformer Minimum Kernel Set
+
+**Status**: Done.
 
 **Goal**: Add the small set of non-matmul kernels needed for a minimal
 llama-style transformer block on RISC-V RVV.
@@ -231,114 +237,111 @@ needs normalization, softmax, residual add, activation, and quantized GEMV/dot.
 - QEMU correctness for the transformer helper kernels where toolchains exist
 
 **Tasks**:
-1. Add `ks.add` and `ks.mul` ops with broadcasting rules, verifiers, and lit tests
-2. Add C APIs for `ks_add_f32`, `ks_mul_f32`, `ks_rms_norm_f32`, and `ks_softmax_f32`
-3. Lower add/mul/silu to vectorizable linalg or loop forms
-4. Lower RMSNorm with f32 accumulation and explicit epsilon behavior
-5. Lower softmax using max-subtract-exp-sum-divide for numerical stability
-6. Add functional validator coverage for transformer helper kernels
-7. Add QEMU tests for generated RVV helper kernels
+1. ✓ Add `ks.add` and `ks.mul` ops with broadcasting rules, verifiers, and lit tests
+2. ✓ Add C APIs for `ks_add_f32`, `ks_mul_f32`, `ks_rms_norm_f32`, and `ks_softmax_f32`
+3. ✓ Lower add/mul/silu to vectorizable linalg or loop forms
+4. ✓ Lower RMSNorm with f32 accumulation and explicit epsilon behavior
+5. ✓ Lower softmax using max-subtract-exp-sum-divide for numerical stability
+6. ✓ Add functional validator coverage for transformer helper kernels
+7. ✓ Add QEMU tests for generated RVV helper kernels
 
 ---
 
-## Milestone 7: Minimal RISC-V Transformer Demo
+## Milestone 7: Known-Runtime Transformer Integration Smoke
 
-**Goal**: Demonstrate a quantized llama-style transformer running end-to-end on
-RISC-V RVV using KernelSmith-generated kernels.
+**Goal**: Run a pinned transformer model in llama.cpp while routing one
+observable f32 operation through the existing KernelSmith public C API.
 
-**Why this demo first**: A minimal llama2.c-style runner is small, auditable,
-QEMU-friendly, and aligned with KernelSmith's static C library objective. It
-proves the C ABI, workspace model, quantized layouts, and RVV generated kernels
-without taking on the full llama.cpp/GGML runtime surface.
+**Why this first**: This is the fastest route that proves an established runtime
+can consume KernelSmith. It separates runtime integration risk from unresolved
+GGML-to-KernelSmith quantization conversion and RVV optimization.
 
-**Design**: [DES-011](docs/design/DES-011-riscv-first-transformer-demo.md)
+**Design**:
+[DES-016](docs/design/DES-016-known-runtime-first-transformer-integration.md)
 
 **Deliverables**:
-- Minimal `examples/runner.c` inspired by llama2.c
-- KernelSmith-specific quantized model format for the demo
-- `scripts/quantize_model.py` for W4A8 conversion
-- `scripts/demo_rvv.sh` for cross-compilation and QEMU execution
-- Deterministic prompt validation
-- Correctness and benchmark comparison against scalar generic kernels
-
-**Integration points**:
-
-```
-runner component       -> KernelSmith C API
---------------------      --------------------------------------------
-attention/FFN matvec   -> ks_matvec_w4a8() / ks_dot_w4a8()
-prefill matmul         -> ks_matmul_w4a8()
-rmsnorm                -> ks_rms_norm_f32()
-softmax                -> ks_softmax_f32()
-silu activation        -> ks_silu_f32()
-residual add           -> ks_add_f32()
-```
-
-**Demo model**: TinyStories-class model, quantized to W4A8 with group/block
-scales. The model should be small enough for QEMU correctness runs and useful
-enough to produce recognizable text on RVV hardware.
+- Pinned llama.cpp revision and licensed, checksummed CI-sized model
+- Reproducible unmodified host baseline with deterministic greedy output
+- Build-time opt-in for one reviewed KernelSmith f32 operation
+- Non-zero KernelSmith invocation report and operation-level comparison
+- Deterministic token parity between baseline and KS-enabled configurations
+- Recommendation for a permanent backend or narrower CPU adapter
 
 **Tasks**:
-1. Define the demo model container and W4A8 packing format
-2. Add quantization script for weights and scale metadata
-3. Implement the minimal runner with static workspace planning
-4. Replace decode-path compute with KernelSmith C API calls
-5. Add deterministic prompt/token validation
-6. Add QEMU run script and benchmark output
-7. Document limitations and follow-on llama.cpp/GGML integration path
+1. `TASK-025`: adopt and review the known-runtime-first strategy
+2. `TASK-026`: pin the runtime/model baseline and identify candidate seams
+3. `TASK-027`: route one f32 operation through KernelSmith on the host
 
-**Demo invocation**:
-
-```bash
-# Quantize model (on host)
-python scripts/quantize_model.py \
-  --input tinystories-15m.bin --output tinystories-15m.ksmodel \
-  --scheme w4a8 --group-size 64
-
-# Cross-compile runner + libkernelsmith for RVV
-riscv64-unknown-linux-gnu-gcc -o ks-run examples/runner.c \
-  -Lbuild-rvv/lib -lkernelsmith -march=rv64gcv
-
-# Generate text on QEMU
-qemu-riscv64 -cpu rv64,v=true,vlen=256 \
-  ./ks-run tinystories-15m.ksmodel \
-  -p "Once upon a time" -n 128
-```
-
-**Validation**: Compare deterministic greedy output against a Python or scalar C
-reference using the same quantized model. Track tokens/sec separately for QEMU
-and real RVV hardware; QEMU is primarily a correctness target.
+**Claim boundary**: This milestone proves runtime consumption only. It does not
+claim quantized compatibility or RVV acceleration.
 
 ---
 
-## Milestone 8: llama.cpp / GGML Integration Proof
+## Milestone 8: Quantized RVV Runtime Integration
 
-**Goal**: Demonstrate that KernelSmith's generated RVV kernels can be consumed
-by a widely recognized LLM runtime without making llama.cpp the primary product.
+**Goal**: Route a llama.cpp quantized decode dot/GEMV path through the native
+KernelSmith W4A8 ABI and execute the RVV implementation under QEMU user-mode.
 
-**Why after the minimal runner**: llama.cpp/GGML brings model loading, GGUF
-formats, threading, many quantization formats, and upstream churn. Integrating
-too early would obscure whether KernelSmith's own kernel ABI and codegen are
-correct. After the small runner proves the kernels, llama.cpp provides an
-industry baseline and ecosystem credibility.
+**Why after the host smoke**: Runtime integration must be proven before adding
+lossy format conversion, target-specific objects, and RISC-V cross-build
+failures.
+
+**Design**:
+[DES-015](docs/design/DES-015-quantized-layout-abi-and-integration-conversion-paths.md),
+[DES-016](docs/design/DES-016-known-runtime-first-transformer-integration.md)
 
 **Deliverables**:
-- Focused integration branch or example that replaces selected GGML RVV kernels
-- Mapping between KernelSmith W4A8/i8 layouts and GGML-compatible call shapes
-- Benchmarks against llama.cpp scalar and existing RVV baselines
-- Documentation of what remains outside KernelSmith's scope
+- Ratified and versioned native quantized layout
+- Tested GGML `Q4_0` decode and requantization into native W4A8
+- W4A8 RVV object selection behind `ks_dot_w4a8` / `ks_matvec_w4a8`
+- Quantized llama.cpp decode adapter with invocation and conversion metadata
+- Host numerical/token comparison against the pinned baseline
+- RISC-V QEMU user-mode validation at VLEN 256 and 512
+- Machine-readable correctness, error, and benchmark reports
 
 **Tasks**:
-1. Identify GGML quantized dot/GEMV/GEMM entry points that match KernelSmith kernels
-2. Add layout conversion or direct packing support where needed
-3. Replace a small set of RVV kernels behind build flags
-4. Benchmark prompt processing and decode throughput
-5. Compare accuracy/perplexity against the unmodified runtime
-6. Document upstreamability gaps and API changes needed for stable integration
+1. `TASK-028`: ratify and version the native quantized layout
+2. `TASK-029`: convert GGML `Q4_0` weights to native W4A8
+3. `TASK-030`: integrate W4A8 RVV objects behind the public C API
+4. `TASK-031`: route llama.cpp quantized decode through KernelSmith
+5. `TASK-032`: validate the quantized runtime under QEMU user-mode
+
+**Claim boundary**: Conversion is lossy and is not native GGML format
+compatibility. QEMU timing is simulation data, not hardware performance.
 
 ---
 
-## Milestone 9: RISC-V Operator Coverage and Hardening
+## Milestone 9: Configurable RISC-V System Simulation
+
+**Goal**: Run the stable runtime workload in a configurable single-node RVV
+system, first with QEMU system-mode and then with gem5 full-system.
+
+**Why after runtime correctness**: Boot, image, device, and microarchitectural
+modeling failures should not be mixed with runtime or quantization integration
+failures.
+
+**Design**:
+[DES-012](docs/design/DES-012-riscv-simulation-verification.md),
+[DES-016](docs/design/DES-016-known-runtime-first-transformer-integration.md)
+
+**Deliverables**:
+- Simulator-neutral system configuration for hart count, ISA, VLEN/ELEN,
+  memory, caches, and devices
+- One configurable RV64GCV QEMU system node running the M8 workload
+- Capability diagnostics for simulator-specific unsupported fields
+- gem5 full-system adapter running the same image and workload
+- Functional cross-simulator comparison and stable gem5 statistics report
+
+**Tasks**:
+1. `TASK-033`: define the configuration and bring up one QEMU RVV system node
+2. `TASK-034`: map the workload and configuration to gem5 full-system
+
+Additional harts, accelerators, and heterogeneous nodes follow after the
+single-node path is stable.
+
+---
+
+## Milestone 10: RISC-V Operator Coverage and Hardening
 
 **Goal**: Broaden RISC-V edge model coverage and harden the generated-kernel
 library after the transformer path is proven.
@@ -381,7 +384,8 @@ These targets may be added after the core edge pipeline is proven:
 | ID | Title | Scope |
 |----|-------|-------|
 | [DES-006](docs/design/DES-006-kernel-library-architecture.md) | Kernel Library Architecture | C API, memory mgmt, tiling, packing, target profiles |
-| [DES-011](docs/design/DES-011-riscv-first-transformer-demo.md) | RISC-V First Transformer Demo Strategy | Minimal llama2.c-style demo first; llama.cpp/GGML integration later |
+| [DES-011](docs/design/DES-011-riscv-first-transformer-demo.md) | RISC-V First Transformer Demo Strategy | Original custom-runner-first strategy; sequencing superseded by DES-016 |
+| [DES-016](docs/design/DES-016-known-runtime-first-transformer-integration.md) | Known-Runtime-First Transformer Integration | llama.cpp host smoke, quantized RVV integration, then system simulation |
 | [DES-015](docs/design/DES-015-quantized-layout-abi-and-integration-conversion-paths.md) | Quantized Layout ABI and Integration Conversion Paths | Proposed native layout versioning; requantized GGML import; future IRON investigation |
 | [DES-012](docs/design/DES-012-riscv-simulation-verification.md) | RISC-V Simulation Verification | QEMU-first generated-kernel verification with Spike/gem5/Renode follow-ons |
 | [DES-002](docs/design/DES-002-matmul-kernel.md) | MatMul Kernel (TDD) | MLIR pipeline design (partially superseded by DES-006) |

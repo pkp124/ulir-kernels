@@ -908,20 +908,23 @@ dot/GEMV for batch-1 transformer decode before large GEMM.
 - [ ] Tighten TableGen type constraints (replace AnyTensor)
 - [ ] Test all type variants (f32, i8, W4A8)
 
-### Stage 5: Minimal RISC-V Transformer Demo
+### Stage 5: Known-Runtime Transformer Integration Smoke
 
-Prove the generated quantized RVV kernels in a small llama2.c-style runner.
+Prove that a pinned llama.cpp runtime can consume the stable C API before
+coupling runtime integration to quantized-layout conversion.
 
-- [ ] Add `examples/runner.c`
-- [ ] Add W4A8 model quantization script
-- [ ] Add QEMU demo script
-- [ ] Validate deterministic prompt output against a reference
+- [ ] Pin a llama.cpp revision and licensed, checksummed CI-sized model
+- [ ] Establish deterministic unmodified host output
+- [ ] Route one reviewed f32 operation through `libkernelsmith`
+- [ ] Prove invocation and deterministic token parity
 
 ### Stage 6: Ecosystem and Secondary Target Follow-Ons
 
 Use the proven C kernels in broader environments.
 
-- [ ] Add focused llama.cpp/GGML integration proof for selected RVV kernels
+- [ ] Add tested GGML-to-KernelSmith W4A8 conversion
+- [ ] Route selected llama.cpp decode kernels through generated RVV objects
+- [ ] Validate the runtime in QEMU user-mode before system-mode and gem5
 - [ ] Write `target/aarch64_neon.h` profile
 - [ ] Profile-driven Arm NEON tile sizes
 - [ ] Cross-compile and test natively or on target device
@@ -933,6 +936,7 @@ Use the proven C kernels in broader environments.
 - [DES-001: Vector Operations Lowering](DES-001-vector-operations-lowering.md)
 - [DES-002: MatMul Kernel (TDD)](DES-002-matmul-kernel.md) — pipeline design, partially superseded
 - [DES-011: RISC-V First Transformer Demo Strategy](DES-011-riscv-first-transformer-demo.md)
+- [DES-016: Known-Runtime-First Transformer Integration](DES-016-known-runtime-first-transformer-integration.md)
 - ~~DES-005~~ — deleted, was superseded by this document
 - [MatMul Specification](../../specs/kernels/matmul.md)
 - [RVV Target Specification](../../specs/targets/riscv-rvv.md)

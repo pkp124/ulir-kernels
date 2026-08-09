@@ -177,14 +177,17 @@ func.func @test_error(%arg0: tensor<64xf32>, %arg1: tensor<128x256xf32>) {
 ## Current Status
 
 ### Implemented
-- KS dialect with 13 operations (matmul, batch_matmul, conv2d, attention, relu, gelu, silu, softmax, layer_norm, rms_norm, reduce_sum, reduce_max)
-- Verifiers for 9 ops (matmul, batch_matmul, conv2d, attention, softmax, layer_norm, rms_norm, reduce_sum, reduce_max)
+- KS dialect operations for structured compute, activations, normalization,
+  reductions, elementwise arithmetic, and quantization
+- Verifiers for structured, normalization, reduction, elementwise, and
+  quantization operations
 - TileType custom type
 - `ks-opt` CLI tool with all M1–M4 passes registered
 - `--ks-lower-activations` pass: lowers relu/gelu/silu to linalg.generic + arith/math ops
-- C kernel library (`lib/kernelsmith/`): `ks_matmul_f32`, `ks_relu_f32`, `ks_gelu_f32`, `ks_silu_f32`
-- Lit tests: parse/print round-trip, verifier negative tests (31 error cases), pass transformation
-- C API tests: matmul and activation smoke tests with NumPy validation
+- C kernel library (`lib/kernelsmith/`) with f32 matmul/activations,
+  transformer helpers, and INT8/W4A8 dot/GEMV APIs
+- Lit tests for parse/print, verifier diagnostics, and pass transformations
+- C API smoke tests and NumPy/golden validation
 - C++ unit test: dialect loading
 - CI: lint (ruff) + native build + container build (Docker) + GHCR publish
 - Python test infrastructure (test_data_generator, functional_validator, qemu_runner)
@@ -201,15 +204,19 @@ func.func @test_error(%arg0: tensor<64xf32>, %arg1: tensor<128x256xf32>) {
   - Lit tests for pack, vectorize, lower-to-rvv passes
   - QEMU runner updated for multi-VLEN correctness and benchmark testing
   - Design doc DES-009 (M4 RVV lowering pipeline)
+- **M5/M6**:
+  - Quantize/dequantize, INT8, W4A8, add, mul, RMSNorm, and softmax support
+  - Generated INT8 RVV objects integrated behind the public C API
+  - QEMU correctness at VLEN 256 and 512, including generated RMSNorm
 
 ### Not Yet Implemented
 - Canonicalization patterns (MatmulOp stub exists but is empty)
 - Verifiers for 3 activation ops (relu, gelu, silu — hasVerifier=0 in TableGen)
 - Strengthened verifiers for layer_norm and rms_norm (currently minimal)
-- Quantization ops (quantize, dequantize) and INT8/INT4 support
-- Edge-critical ops (depthwise_conv2d, element-wise add/mul, pooling)
+- Quantized GEMM and W4A8 generated-object integration
+- Known-runtime transformer integration
+- Edge-critical ops (depthwise_conv2d and pooling)
 - ARM NEON target profile
-- QEMU correctness tests (require cross-compiler + qemu-riscv64 in CI)
 
 See `ROADMAP.md` for milestones (edge-first: RVV primary, ARM NEON secondary, quantization early).
 
