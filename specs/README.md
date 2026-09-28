@@ -12,19 +12,21 @@ Specifications serve as:
 
 ## Structure
 
-```
+```text
 specs/
-├── kernels/          # Kernel operation specifications
-│   ├── matmul.md
-│   ├── conv2d.md
-│   ├── attention.md
-│   ├── quantization.md
-│   └── ...
-├── targets/          # Target architecture specifications
-│   ├── riscv-rvv.md
-│   └── ...
-└── README.md         # This file
+├── kernels/
+│   ├── matmul.md         ks.matmul. Lowers through the RVV pipeline.
+│   ├── conv2d.md         ks.conv2d. Parse and verify only.
+│   ├── attention.md      ks.attention. Parse and verify only.
+│   └── quantization.md   quantize, dequantize, INT8, and W4A8 dot/GEMV.
+└── targets/
+    ├── riscv-rvv.md      Primary hardware target.
+    └── system-description.md
 ```
+
+The [README kernel table](../README.md#supported-kernels) is the short status
+list. These specs are the contracts. If a spec and the code disagree, fix the
+spec in the same change as the code.
 
 ## Specification Template
 

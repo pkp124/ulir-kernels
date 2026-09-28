@@ -15,7 +15,8 @@
 #   ks.matmul → linalg → tile (L2) → pack → tile (reg) → vectorize → llvm → .o
 #
 # Target: riscv64 with RVV V1.0, ZVE64D, ZVL256B (VLEN=256 baseline).
-# Generated .o files link against libkernelsmith.a (see docs/guides/cross-compile.md).
+# Link the resulting object with libkernelsmith.a. See
+# docs/guides/getting-started.md for the C library and this script.
 
 set -euo pipefail
 
