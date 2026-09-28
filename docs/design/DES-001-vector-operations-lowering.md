@@ -10,6 +10,10 @@
 | **Phase** | Phase 2 - Foundation |
 | **Priority** | Critical |
 
+> **Current status (2026-09-28):** Historical draft. The RVV pipeline that
+> shipped is [DES-009](DES-009-m4-rvv-lowering.md). Use that document for the
+> pass sequence and validation story.
+
 ---
 
 ## Context

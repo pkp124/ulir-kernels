@@ -4,12 +4,18 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Approved |
+| **Status** | Approved (partial) |
 | **Author** | KernelSmith Team |
 | **Created** | 2026-02-17 |
 | **Milestone** | M3 — MLIR Lowering: MatMul (Generic Target) |
 | **Implements** | `--ks-lower-to-linalg`, `--ks-tile` |
 | **Depends On** | DES-006 (library architecture), M2 (pass infrastructure) |
+
+> **Current status (2026-09-28):** `--ks-lower-to-linalg`, `--ks-tile`, and
+> `--ks-alloc-check` are implemented and lit-tested. The opening problem
+> statement below is historical. The generic-target generated object has not
+> replaced handwritten `ks_matmul_f32`. That swap remains open and is deferred
+> behind M7.
 
 ---
 

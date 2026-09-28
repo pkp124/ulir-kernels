@@ -67,13 +67,9 @@ def KS_TileType : KS_Type<"Tile", "tile"> {
 
 ## Test Files
 
-```
-tests/lit/Dialect/Kernel/
-├── basic.mlir          # Basic parsing/printing
-├── relu.mlir           # ReLU operation tests
-├── softmax.mlir        # Softmax operation tests
-└── invalid.mlir        # Verifier error tests
-```
+Parse and verifier tests live in `tests/lit/Dialect/Kernel/`. Pass tests live
+in `tests/lit/Passes/`. `basic.mlir` covers relu, gelu, and softmax printing.
+Invalid cases use `*-invalid.mlir` and `quantization-invalid.mlir`.
 
 ## Dependencies
 
@@ -82,10 +78,14 @@ tests/lit/Dialect/Kernel/
 ## Verification
 
 ```bash
-make test-lit TESTS=tests/lit/Dialect/Kernel/
+cmake --build build --target check-kernelsmith-lit
 ```
 
 ## Log
+
+### 2026-09-28
+- Pointed verification at `check-kernelsmith-lit`. The old `make test-lit`
+  target is not in the Makefile.
 
 ### 2026-06-06
 - Updated stale checklist to match completed dialect infrastructure.

@@ -10,6 +10,12 @@ KernelSmith is an MLIR/LLVM 21+ compiler framework and C kernel library for
 optimized ML inference kernels on edge targets. The primary backend is RISC-V
 RVV; ARM NEON and quantized kernels are planned/ongoing.
 
+Current execution status is `tasks/MILESTONES.md`. M0, M1, and M4 through M6
+are done. M2 and M3 passes exist, and the default C archive still contains
+handwritten matmul and activation kernels. Active work is M7 (`DES-016`,
+`TASK-025` under review, then `TASK-026`). The kernel table in `README.md` is
+the user-facing list of parse, verify, lowering, and C API coverage.
+
 Current high-level pipeline:
 
 ```text

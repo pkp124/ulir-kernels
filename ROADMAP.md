@@ -13,7 +13,26 @@
 > but are not the first strategic wedge.
 >
 > **Architecture reference**: [DES-006](docs/design/DES-006-kernel-library-architecture.md)
-> **Demo strategy**: [DES-011](docs/design/DES-011-riscv-first-transformer-demo.md)
+> **Demo strategy**: [DES-016](docs/design/DES-016-known-runtime-first-transformer-integration.md)
+> supersedes the sequencing in [DES-011](docs/design/DES-011-riscv-first-transformer-demo.md)
+
+## Where the project is
+
+M0, M1, M4, M5, and M6 are done. M2 and M3 have working passes
+(`--ks-lower-activations`, `--ks-lower-to-linalg`, `--ks-tile`,
+`--ks-alloc-check`). The handwritten matmul and activation objects in
+`libkernelsmith.a` have not been replaced by generated objects. That swap is
+open and is not the active milestone.
+
+**Active work is M7.** [DES-016](docs/design/DES-016-known-runtime-first-transformer-integration.md)
+and [TASK-025](tasks/TASK-025.md) specify a llama.cpp host smoke that routes
+one f32 operation through the public C API. The design is under review.
+[TASK-026](tasks/TASK-026.md) (pin the runtime and a CI-sized model) has not
+started.
+
+The dialect has 20 operations. The [README kernel table](README.md#supported-kernels)
+is the list of what parses, verifies, lowers, and has a C API. Day-to-day
+status is [tasks/MILESTONES.md](tasks/MILESTONES.md).
 
 ## Product Positioning
 
@@ -34,7 +53,9 @@ system-mode/gem5 simulation follows the stable runtime workload.
 
 **Status**: Done
 
-- KS dialect with 13 operations defined in TableGen
+- KS dialect, initially 13 operations in TableGen. Later milestones added
+  elementwise, quantization, and transformer ops. The dialect now has 20
+  operations; the current table is in [README.md](README.md#supported-kernels)
 - Verifiers for 9 operations (matmul, batch_matmul, conv2d, attention,
   softmax, layer_norm, rms_norm, reduce_sum, reduce_max)
 - `ks-opt` CLI tool (parse/print + pass driver)
@@ -380,6 +401,8 @@ These targets may be added after the core edge pipeline is proven:
 ---
 
 ## Design Documents
+
+The full index, with status, is [docs/design/README.md](docs/design/README.md).
 
 | ID | Title | Scope |
 |----|-------|-------|

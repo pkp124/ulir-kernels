@@ -35,10 +35,11 @@ Draft → Under Review → Approved → Implemented
 ## Creating a Design Document
 
 ```bash
-make new-design ID=001 TITLE="Feature Name"
+./scripts/new-design.sh 017 "Feature Name"
 ```
 
-This creates `docs/design/DES-001-feature-name.md` from the template.
+This creates `docs/design/DES-017-feature-name.md` from the template. IDs
+already in use run through DES-016.
 
 ## Naming Convention
 
@@ -53,21 +54,28 @@ Examples:
 
 ## Design Documents Index
 
-| ID | Title | Status | Scope | File |
-|----|-------|--------|-------|------|
-| [DES-006](DES-006-kernel-library-architecture.md) | **Kernel Library Architecture** | Draft | C API, memory mgmt, tiling, packing, target profiles | `DES-006-kernel-library-architecture.md` |
-| [DES-009](DES-009-m4-rvv-lowering.md) | **M4 RVV Lowering** | Draft | RVV lowering pipeline and vector preparation | `DES-009-m4-rvv-lowering.md` |
-| [DES-010](DES-010-pack-workspace-materialization.md) | **Pack Workspace Materialization** | Implemented | Explicit workspace-backed B packing | `DES-010-pack-workspace-materialization.md` |
-| [DES-011](DES-011-riscv-first-transformer-demo.md) | **RISC-V First Transformer Demo Strategy** | Superseded in part | Original custom-runner-first strategy; kernel boundaries retained | `DES-011-riscv-first-transformer-demo.md` |
-| [DES-012](DES-012-riscv-simulation-verification.md) | **RISC-V Simulation Verification** | Accepted | QEMU user-mode first; system-mode and gem5 follow-ons | `DES-012-riscv-simulation-verification.md` |
-| [DES-014](DES-014-int8-dot-and-gemv-lowering.md) | **INT8 Dot and GEMV Lowering** | Draft | Quantized lowering and generated-object integration | `DES-014-int8-dot-and-gemv-lowering.md` |
-| [DES-015](DES-015-quantized-layout-abi-and-integration-conversion-paths.md) | **Quantized Layout ABI and Integration Conversion Paths** | Draft | Proposed native layout versioning and GGML requantization | `DES-015-quantized-layout-abi-and-integration-conversion-paths.md` |
-| [DES-016](DES-016-known-runtime-first-transformer-integration.md) | **Known-Runtime-First Transformer Integration** | Under Review | llama.cpp smoke, quantized RVV path, then system simulation | `DES-016-known-runtime-first-transformer-integration.md` |
-| [DES-001](DES-001-vector-operations-lowering.md) | Vector Operations Lowering to RISC-V RVV | Draft | RVV intrinsic mapping | `DES-001-vector-operations-lowering.md` |
-| [DES-002](DES-002-matmul-kernel.md) | MatMul Kernel (TDD Example) | Draft | MLIR pipeline (partially superseded by DES-006) | `DES-002-matmul-kernel.md` |
-| [DES-003](DES-003-conv2d-kernel.md) | Conv2D Kernel Implementation | Draft | Conv2D lowering | `DES-003-conv2d-kernel.md` |
-| [DES-004](DES-004-attention-kernel.md) | Attention Kernel Implementation | Draft | Attention lowering | `DES-004-attention-kernel.md` |
-| ~~DES-005~~ | ~~Library Packaging (v1)~~ | Deleted | Superseded by DES-006, removed from repo | — |
+Status here matches the metadata in each file as of 2026-09-28. Historical
+drafts stay in the tree because later docs cite them. Read the current-status
+note at the top of those files before treating the body as a plan.
+
+| ID | Title | Status | Scope |
+|----|-------|--------|-------|
+| [DES-001](DES-001-vector-operations-lowering.md) | Vector operations to RVV | Historical draft | Early intrinsic sketch. The shipped path is DES-009. |
+| [DES-002](DES-002-matmul-kernel.md) | MatMul kernel (TDD example) | Historical draft | Early pipeline sketch. Follow DES-006, DES-008, and DES-009. |
+| [DES-003](DES-003-conv2d-kernel.md) | Conv2D | Draft | Lowering is M10 work. The op parses and verifies. |
+| [DES-004](DES-004-attention-kernel.md) | Attention | Draft | Lowering is later work. The op parses and verifies. |
+| [DES-006](DES-006-kernel-library-architecture.md) | Kernel library architecture | Adopted | C API, workspace, tiling, packing, target profiles. |
+| [DES-007](DES-007-milestone-verification-strategy.md) | Milestone verification strategy | Historical | M0 verifier-gap notes. Current tests are in the testing guide. |
+| [DES-008](DES-008-m3-linalg-matmul-lowering.md) | M3 matmul to linalg | Approved (partial) | `--ks-lower-to-linalg` and `--ks-tile` landed. Generated object swap is open. |
+| [DES-009](DES-009-m4-rvv-lowering.md) | M4 RVV lowering | Implemented | Pack, vectorize, lower-to-rvv, QEMU validation. |
+| [DES-010](DES-010-pack-workspace-materialization.md) | Pack workspace materialization | Implemented | Explicit workspace-backed B packing. |
+| [DES-011](DES-011-riscv-first-transformer-demo.md) | RISC-V transformer demo | Superseded in part | Kernel boundaries kept. Sequencing replaced by DES-016. |
+| [DES-012](DES-012-riscv-simulation-verification.md) | RISC-V simulation verification | Accepted | QEMU user-mode is in use. System-mode and gem5 are M9. |
+| [DES-013](DES-013-golden-reference-verification-infrastructure.md) | Golden reference verification | Implemented | Host and QEMU comparators. Open questions in the doc remain open. |
+| [DES-014](DES-014-int8-dot-and-gemv-lowering.md) | INT8 dot and GEMV | Implemented | Dialect lowering and generated INT8 RVV objects behind the C API. |
+| [DES-015](DES-015-quantized-layout-abi-and-integration-conversion-paths.md) | Quantized layout ABI | Draft | Proposed for M8. The layout version is not ratified. |
+| [DES-016](DES-016-known-runtime-first-transformer-integration.md) | Known-runtime transformer integration | Under Review | Active M7 design: llama.cpp smoke, then quantized RVV, then simulation. |
+| ~~DES-005~~ | ~~Library packaging (v1)~~ | Deleted | Removed. DES-006 replaced it. |
 
 ## Development Milestones
 
@@ -85,45 +93,20 @@ reference implementations first, then incrementally replace with MLIR-generated 
 - References: `DES-006-kernel-library-architecture.md`,
   `DES-016-known-runtime-first-transformer-integration.md`
 
-## TDD Development Approach
+## Tests before implementation
 
-Each design document includes a complete TDD cycle:
-
-```
-RED Phase: Write comprehensive tests
-  ├─ Lit tests (MLIR parsing, lowering, verification)
-  ├─ Unit tests (C++ functionality)
-  ├─ Functional tests (correctness validation)
-  └─ Tests fail ✗
-
-GREEN Phase: Implement to pass tests
-  ├─ Create operation definitions
-  ├─ Implement lowering passes
-  └─ Tests pass ✓
-
-REFACTOR Phase: Optimize without breaking tests
-  ├─ Profile performance
-  ├─ Optimize hot paths
-  └─ Tests still pass ✓
-
-VALIDATION Phase: Multi-VLEN testing
-  ├─ Test on QEMU (VLEN=128, 256, 512)
-  ├─ Functional correctness verification
-  ├─ Performance measurement
-  └─ All tests pass ✓
-```
+Write the lit test or C test that describes the behavior, then implement it.
+The commands and file locations are in the
+[testing guide](../guides/testing-guide.md). RVV numerical checks use QEMU at
+VLEN 256 and 512.
 
 ## Review Process
 
-See `.agents/workflows/design-review.md` for the full review process.
-
-Quick summary:
-1. Create design doc (Author)
-2. Self-review against checklist
-3. Mark as "Under Review"
-4. Critical review (Reviewer)
-5. Address feedback
-6. Get approval
-7. Implement following TDD approach
-8. Update design doc with implementation learnings
-9. Mark as "Implemented"
+1. Create the design doc.
+2. Self-review against the checklist in `docs/design/TEMPLATE.md`.
+3. Set the status to Under Review and link the related task.
+4. Address review feedback and set the status to Approved before coding a
+   new pass, target, or public API.
+5. Implement with lit or C tests from the testing guide.
+6. When the acceptance criteria pass, set the status to Implemented and check
+   the plan items in the same change.

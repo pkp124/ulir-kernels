@@ -14,6 +14,8 @@ This directory is the execution tracker for the product roadmap.
 
 When status changes, update the task file and `tasks/MILESTONES.md` in the same
 PR. Update `ROADMAP.md` only when product scope or milestone content changes.
+Update the kernel table in `README.md` when an operation gains a verifier, a
+lowering, or a C API.
 
 ## Status values
 

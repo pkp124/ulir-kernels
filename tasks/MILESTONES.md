@@ -34,6 +34,13 @@ milestone should show status, task links, blockers, and the next concrete work.
 2. Run `TASK-026` as a bounded llama.cpp/model feasibility gate before choosing
    a permanent integration seam.
 
+M2 and M3 stay partial until handwritten matmul and activation objects are
+replaced. That work is deferred behind the M7 host seam. There is no task file
+for it yet.
+
+User-facing status is the kernel table in `README.md`. This dashboard is the
+execution status. They were aligned on 2026-09-28.
+
 ## Maintenance rules
 
 - Add one task file for each independent PR-sized work packet.
