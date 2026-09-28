@@ -18,6 +18,21 @@
 This installs/checks system dependencies, creates `.venv`, configures CMake,
 builds the project, and runs CTest.
 
+## Where to look first
+
+| Question | Document |
+|---|---|
+| What can I call or lower today? | [README.md](README.md) |
+| How do I build and run an example? | [docs/guides/getting-started.md](docs/guides/getting-started.md) |
+| How do I add an operation? | [docs/guides/adding-kernels.md](docs/guides/adding-kernels.md) |
+| How do I run tests? | [docs/guides/testing-guide.md](docs/guides/testing-guide.md) |
+| What milestone is active? | [tasks/MILESTONES.md](tasks/MILESTONES.md) |
+| What is the product sequence? | [ROADMAP.md](ROADMAP.md) |
+
+Active work is M7, the llama.cpp host smoke. M2 and M3 passes exist; replacing
+the handwritten matmul and activation objects is still open and is not the
+current task.
+
 ## Development loop
 
 ```bash
@@ -26,13 +41,10 @@ cmake --build build --parallel
 ctest --test-dir build --output-on-failure
 ```
 
-Or use the Makefile shims:
-
-```bash
-make build
-make test
-make verify
-```
+Makefile targets: `make build`, `make test`, `make lit`, `make unit`,
+`make capi`, `make lint`, and `make verify`. New kernels, passes, and design
+docs are scripts, not make targets: `./scripts/new-kernel.sh`,
+`./scripts/new-pass.sh`, and `./scripts/new-design.sh`.
 
 ## Required process
 

@@ -4,10 +4,15 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Draft |
+| **Status** | Implemented |
 | **Author** | KernelSmith team |
 | **Created** | 2026-06-14 |
-| **Related** | TASK-013, TASK-014, TASK-015, TASK-016, specs/kernels/quantization.md |
+| **Related** | TASK-013, TASK-014, TASK-015, TASK-016, TASK-018, specs/kernels/quantization.md |
+
+> **Current status (2026-09-28):** `ks.dot_i8` and `ks.matvec_i8` lower to
+> linalg, and generated INT8 RVV objects can be linked behind the C API
+> (`TASK-018`). The problem statement below describes the gap this design
+> closed. W4A8 object replacement remains `TASK-030`.
 
 ## Context
 
@@ -208,7 +213,7 @@ linalg.generic parallel row / reduction column i32 accumulation
 - [x] Add quantized RISC-V functional validation for the INT8 C API runner.
 - [x] Add profile-selected external INT8 object hooks for `riscv_rvv_256`
       builds.
-- [ ] Wire real generated quantized RVV objects into the public C API build path
+- [x] Wire real generated quantized RVV objects into the public C API build path
       (`TASK-018`).
 
 ---

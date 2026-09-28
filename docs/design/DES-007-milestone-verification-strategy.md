@@ -9,6 +9,10 @@
 | **Created** | 2026-02-10 |
 | **Priority** | Critical |
 
+> **Current status (2026-09-28):** This file records the early verifier gap.
+> The dialect now has 20 operations. Verifiers cover them except relu, gelu,
+> and silu. Run tests with the [testing guide](../guides/testing-guide.md).
+
 ## Context
 
 ### Problem Statement

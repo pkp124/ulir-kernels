@@ -95,10 +95,15 @@ See: `specs/kernels/matmul.md`
 ## Verification
 
 ```bash
-make test-lit TESTS=tests/lit/Dialect/Kernel/matmul.mlir
+cmake --build build --target check-kernelsmith-lit
+./build/bin/ks-opt tests/lit/Dialect/Kernel/matmul.mlir
 ```
 
 ## Log
+
+### 2026-09-28
+- Replaced `make test-lit`, which is not a Makefile target, with the lit
+  target and a direct `ks-opt` print of the matmul test.
 
 ### 2026-06-06
 - Updated stale checklist to match completed matmul and batch matmul dialect

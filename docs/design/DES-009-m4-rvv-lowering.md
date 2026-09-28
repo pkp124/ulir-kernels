@@ -3,10 +3,14 @@
 | Field    | Value |
 |----------|-------|
 | ID       | DES-009 |
-| Status   | Draft |
+| Status   | Implemented |
 | Date     | 2026-03-16 |
 | Authors  | KernelSmith team |
 | Related  | DES-001, DES-008, ROADMAP.md §Milestone 4 |
+
+> **Current status (2026-09-28):** M4 is done. Pack, vectorize, lower-to-rvv,
+> `scripts/compile-rvv.sh`, and QEMU golden checks landed. DES-001 is an
+> earlier sketch of the same lowering.
 
 ## Overview
 

@@ -1,196 +1,131 @@
 # Getting Started
 
-This guide walks you through setting up the project and generating your first kernel.
+This guide builds KernelSmith and runs one C kernel and one MLIR lowering.
 
 ## Prerequisites
 
-### Required
+Required:
 
-- **LLVM/MLIR 21+**: With MLIR enabled
-- **CMake 3.20+**: Build system
-- **Python 3.10+**: For Python bindings and scripts
-- **C++17 compiler**: GCC 10+ or Clang 13+
+- LLVM/MLIR 21 or newer, with the MLIR tools installed
+- CMake 3.20 or newer
+- Ninja
+- Python 3.10 or newer
+- A C++17 compiler (GCC 10+ or Clang 13+)
 
-### Optional
+Optional:
 
-- **Ninja**: Faster builds
-- **QEMU**: For RISC-V testing
-- **Spike**: RISC-V ISA simulator
+- Docker, for `./scripts/docker-verify.sh`
+- `qemu-riscv64` and `riscv64-linux-gnu-gcc`, for RVV tests
 
-## Installation
+On Ubuntu, `./scripts/setup.sh` adds the LLVM 21 apt repository and installs
+`mlir-21-tools`, `libmlir-21-dev`, and `llvm-21-dev`.
 
-### 1. Clone the Repository
+## Build
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/pkp124/ulir-kernels.git
 cd ulir-kernels
+./scripts/setup.sh
 ```
 
-### 2. Install LLVM/MLIR
-
-If you don't have LLVM with MLIR:
-
-```bash
-# Option 1: Package manager (Ubuntu/Debian)
-sudo apt install llvm-18 llvm-18-dev mlir-18-tools libmlir-18-dev
-
-# Option 2: Build from source
-git clone https://github.com/llvm/llvm-project.git
-cd llvm-project
-cmake -S llvm -B build -G Ninja \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DLLVM_ENABLE_PROJECTS="mlir" \
-  -DLLVM_TARGETS_TO_BUILD="host;RISCV" \
-  -DLLVM_ENABLE_ASSERTIONS=ON
-cmake --build build
-```
-
-### 3. Run Setup
+Setup creates `.venv`, configures `build/`, compiles, and runs CTest. Later
+changes use the shorter loop:
 
 ```bash
-make setup
-```
-
-This will:
-- Check for required dependencies
-- Create Python virtual environment
-- Install Python packages
-- Configure the build
-
-### 4. Build
-
-```bash
+source .venv/bin/activate
 make build
-```
-
-### 5. Verify
-
-```bash
 make test
 ```
 
-## Your First Kernel
+Makefile targets: `setup`, `build`, `build-debug`, `test`, `lit`, `unit`,
+`capi`, `lint`, `verify`, and `clean`.
 
-### 1. Create a Kernel File
+## Use the C library
 
-Create `examples/first_kernel.mlir`:
-
-```mlir
-// A simple ReLU activation kernel
-func.func @relu_kernel(%input: tensor<1024xf32>) -> tensor<1024xf32> {
-  %output = ks.relu %input : tensor<1024xf32>
-  return %output : tensor<1024xf32>
-}
-```
-
-### 2. Lower to Vector IR
+Public headers live in `include/kernelsmith/`. The reference implementation
+lives in `lib/kernelsmith/`. `examples/relu.c` calls `ks_relu_f32`:
 
 ```bash
-./build/bin/ks-opt examples/first_kernel.mlir \
-  --ks-lower-activations \
-  -o examples/first_kernel_vector.mlir
+cc -std=c99 examples/relu.c \
+  -I include -include target/generic.h \
+  lib/kernelsmith/ks_common.c \
+  lib/kernelsmith/ks_activations.c \
+  -lm -o /tmp/ks_relu
+/tmp/ks_relu
 ```
 
-Output:
-```mlir
-func.func @relu_kernel(%input: tensor<1024xf32>) -> tensor<1024xf32> {
-  %c0 = arith.constant 0 : index
-  %c1024 = arith.constant 1024 : index
-  %vl = arith.constant 32 : index
-  %zero = arith.constant dense<0.0> : vector<32xf32>
-  
-  %output = scf.for %i = %c0 to %c1024 step %vl iter_args(%out = %init) {
-    %v = vector.load %input[%i] : vector<32xf32>
-    %relu = arith.maxf %v, %zero : vector<32xf32>
-    vector.store %relu, %out[%i] : vector<32xf32>
-    scf.yield %out
-  }
-  return %output : tensor<1024xf32>
-}
-```
+`-include target/generic.h` supplies the macros the C sources expect. The
+CMake library target does this for you and writes
+`build/lib/kernelsmith/libkernelsmith.a`. Link that archive, and include the
+headers, when you embed KernelSmith in another program. Choose a different
+profile by configuring CMake with `-DKS_TARGET_PROFILE=riscv_rvv_256`.
 
-### 3. Lower to RISC-V RVV
+Functions return `KS_OK` (`0`) on success. `KS_ERR_INVALID_ARG` means a null
+pointer or an illegal dimension. See `include/kernelsmith/ks_common.h`.
+
+## Lower an MLIR example
+
+Examples are in `examples/`. `ks-opt` prints the module when you omit `-o`.
+
+Activations:
 
 ```bash
-./build/bin/ks-opt examples/first_kernel_vector.mlir \
-  --ks-lower-to-rvv \
-  --convert-to-llvm \
-  -o examples/first_kernel_llvm.mlir
+build/bin/ks-opt examples/relu.mlir --ks-lower-activations
 ```
 
-### 4. Generate Assembly
+`ks.relu` becomes `linalg.generic` with `arith.maximumf`. `ks.gelu` uses
+`math.erf`. `ks.silu` uses `math.exp`.
+
+Matmul, one stage at a time:
 
 ```bash
-mlir-translate --mlir-to-llvmir examples/first_kernel_llvm.mlir | \
-llc -march=riscv64 -mattr=+v -o examples/first_kernel.s
+build/bin/ks-opt examples/matmul.mlir --ks-lower-to-linalg
+build/bin/ks-opt examples/matmul.mlir --ks-lower-to-linalg --ks-tile
 ```
 
-## Development Workflow
+The first command produces `linalg.fill` and `linalg.matmul`. The second wraps
+that matmul in `scf.for` tile loops.
 
-### Using Make Commands
+The RVV object path for matmul is `scripts/compile-rvv.sh`. It runs
+lower-to-linalg, two tile passes, pack, vectorize, and lower-to-rvv, then
+`mlir-translate` and `llc`. LLVM tools on some machines are named
+`mlir-translate-21` and `llc-21`; point the script at them with
+`MLIR_TRANSLATE` and `LLC`.
 
 ```bash
-# See all available commands
-make help
-
-# Build with debug symbols
-make build-debug
-
-# Run specific tests
-make test-unit
-make test-lit
-
-# Full verification before committing
-make verify
+export MLIR_TRANSLATE=mlir-translate-21
+export LLC=llc-21
+./scripts/compile-rvv.sh examples/matmul.mlir /tmp/matmul.s
 ```
 
-### Creating New Kernels
+Use `-float-abi=hard` with `llc-21`. The script already does. The matmul
+script is specific to `ks.matmul`. Activations use `--ks-lower-activations`
+before any RVV lowering.
+
+## Add a kernel or a pass
+
+Scaffolding scripts write a spec, a lit test, and a starting file. They are
+not Makefile targets.
 
 ```bash
-# Use the scaffolding script
-make new-kernel NAME=my_kernel
-
-# This creates:
-# - specs/kernels/my_kernel.md (specification)
-# - tests/lit/Dialect/Kernel/my_kernel.mlir (tests)
-# - tasks/KERNEL-MY_KERNEL.md (task tracking)
+./scripts/new-kernel.sh my_kernel
+./scripts/new-pass.sh optimize-something
+./scripts/new-design.sh 017 "Short Title"
 ```
 
-### Creating New Passes
+Read [Adding Kernels](adding-kernels.md) before filling those files in. The
+dialect prefix is `ks.`, and operation definitions live in
+`include/KernelSmith/Dialect/Kernel/KernelOps.td`.
 
-```bash
-make new-pass NAME=optimize-something
+## Scope of the samples
 
-# This creates:
-# - src/passes/OptimizeSomething.cpp
-# - tests/lit/Transforms/optimize-something.mlir
-```
+The supported user API is the C library. Conv2d, attention, batch matmul,
+layer norm, quantize/dequantize, and the reductions parse and verify. Their
+lowering passes are still future work, tracked from M10 in the roadmap.
 
-## Using Python Bindings
+## Next
 
-> **Note**: Python bindings are not yet implemented. This shows the planned API.
-
-```python
-import kernelsmith
-
-# Load an MLIR module
-module = kernelsmith.load("kernel.mlir")
-
-# Apply transformations
-module = kernelsmith.tile(module, tile_sizes=[64, 64, 32])
-module = kernelsmith.vectorize(module)
-module = kernelsmith.lower_to_rvv(module)
-
-# Generate code
-code = kernelsmith.compile(module, target="riscv64+v")
-
-# Save or execute
-kernelsmith.save(code, "kernel.o")
-```
-
-## Next Steps
-
-- Read the [Architecture Overview](../architecture/overview.md)
-- Explore [kernel specifications](../../specs/kernels/)
-- Try the [examples](../../examples/)
-- Learn about [adding new kernels](adding-kernels.md)
+- [Architecture overview](../architecture/overview.md)
+- [Testing guide](testing-guide.md)
+- [Kernel specs](../../specs/kernels/)
+- [Roadmap](../../ROADMAP.md)

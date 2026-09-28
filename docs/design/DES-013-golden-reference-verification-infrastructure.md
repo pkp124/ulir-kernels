@@ -4,10 +4,14 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Draft |
+| **Status** | Implemented |
 | **Author** | KernelSmith Team |
 | **Created** | 2026-06-07 |
 | **Related** | DES-007, DES-009, DES-012, TASK-006, TASK-010, TASK-011, TASK-012 |
+
+> **Current status (2026-09-28):** TASK-010, TASK-011, and TASK-012 are
+> complete, including INT8 and W4A8 smoke cases. The open questions later in
+> this file are still open. How to add a case is in the testing guide.
 
 ## Context
 
@@ -323,27 +327,28 @@ behavior from creeping into INT8/W4A8 work.
 ## Implementation Plan
 
 ### Phase 1: Golden Data Contract (`TASK-010`)
-- [ ] Define descriptor schema and manifest format.
-- [ ] Add deterministic NumPy generators for matmul and ReLU.
-- [ ] Add comparator library with exact, allclose, and quantized modes.
-- [ ] Add unit tests for schema, manifest, hashes, and comparator failures.
+- [x] Define descriptor schema and manifest format.
+- [x] Add deterministic NumPy generators for matmul and ReLU.
+- [x] Add comparator library with exact, allclose, and quantized modes.
+- [x] Add unit tests for schema, manifest, hashes, and comparator failures.
 
 ### Phase 2: Host Reference Execution (`TASK-011`)
-- [ ] Add host harness path that consumes descriptor inputs.
-- [ ] Dump host outputs in the shared artifact format.
-- [ ] Compare host outputs against golden references in CTest/CI.
+- [x] Add host harness path that consumes descriptor inputs.
+- [x] Dump host outputs in the shared artifact format.
+- [x] Compare host outputs against golden references in CTest/CI.
 
 ### Phase 3: RISC-V Golden Verification (`TASK-012`)
-- [ ] Update RISC-V runner/harness contract to consume descriptor inputs.
-- [ ] Run RVV outputs under QEMU at VLEN 256 and 512.
-- [ ] Compare RVV outputs against golden references.
-- [ ] Compare RVV outputs against host outputs where useful.
+- [x] Update RISC-V runner/harness contract to consume descriptor inputs.
+- [x] Run RVV outputs under QEMU at VLEN 256 and 512.
+- [x] Compare RVV outputs against golden references.
+- [x] Compare RVV outputs against host outputs where useful.
 
 ### Phase 4: Quantized Expansion
-- [ ] Add quantized descriptor fields for scale, zero point, rounding, and
+- [x] Add quantized descriptor fields for scale, zero point, rounding, and
       saturation.
-- [ ] Add INT8/W4A8 NumPy reference cases for dot/GEMV/GEMM.
-- [ ] Gate M5 quantized lowering on exact or policy-defined comparison results.
+- [x] Add INT8/W4A8 NumPy reference cases for dot/GEMV, plus an INT8 matmul
+      smoke case.
+- [x] M5 quantized lowering is gated on those golden comparisons.
 
 ---
 

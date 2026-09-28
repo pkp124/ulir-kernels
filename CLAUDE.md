@@ -176,49 +176,38 @@ func.func @test_error(%arg0: tensor<64xf32>, %arg1: tensor<128x256xf32>) {
 
 ## Current Status
 
+Read `tasks/MILESTONES.md` before choosing work. The user-facing kernel table
+is in `README.md`. As of 2026-09-28:
+
+### Active
+- **M7 — known-runtime transformer smoke.** `DES-016` is under review
+  (`TASK-025`). `TASK-026` (pin llama.cpp and a CI-sized model) has not started.
+- M2 and M3 passes exist. Handwritten matmul and activation objects in
+  `libkernelsmith.a` are still the linked implementations.
+
 ### Implemented
-- KS dialect operations for structured compute, activations, normalization,
-  reductions, elementwise arithmetic, and quantization
-- Verifiers for structured, normalization, reduction, elementwise, and
-  quantization operations
-- TileType custom type
-- `ks-opt` CLI tool with all M1–M4 passes registered
-- `--ks-lower-activations` pass: lowers relu/gelu/silu to linalg.generic + arith/math ops
-- C kernel library (`lib/kernelsmith/`) with f32 matmul/activations,
-  transformer helpers, and INT8/W4A8 dot/GEMV APIs
-- Lit tests for parse/print, verifier diagnostics, and pass transformations
-- C API smoke tests and NumPy/golden validation
-- C++ unit test: dialect loading
-- CI: lint (ruff) + native build + container build (Docker) + GHCR publish
-- Python test infrastructure (test_data_generator, functional_validator, qemu_runner)
-- LLVM/MLIR 21 (bumped from 20)
-- `--ks-lower-to-linalg` pass: lowers ks.matmul → linalg.fill + linalg.matmul (static + dynamic shapes)
-- `--ks-tile` pass: tiles linalg.matmul → nested scf.for loops (profile-driven tile sizes)
-- Design doc DES-008 (M3 matmul lowering to linalg, generic target)
-- **M4 (RISC-V RVV Target)**:
-  - `target/riscv_rvv_256.h` — RVV target profile (VLEN=256, LMUL=4, f32)
-  - `--ks-pack` pass: packs B operand into `[N/NR, K, NR]` column-panel layout
-  - `--ks-vectorize` pass: linalg → vector dialect (`vector.contract` + transfer ops)
-  - `--ks-lower-to-rvv` pass: full pipeline to LLVM dialect (bufferize→scf→cf→vector→LLVM)
-  - `scripts/compile-rvv.sh` — driver for ks-opt + mlir-translate + llc
-  - Lit tests for pack, vectorize, lower-to-rvv passes
-  - QEMU runner updated for multi-VLEN correctness and benchmark testing
-  - Design doc DES-009 (M4 RVV lowering pipeline)
-- **M5/M6**:
-  - Quantize/dequantize, INT8, W4A8, add, mul, RMSNorm, and softmax support
-  - Generated INT8 RVV objects integrated behind the public C API
-  - QEMU correctness at VLEN 256 and 512, including generated RMSNorm
+- 20 `ks.` operations: structured compute, activations, normalization,
+  reductions, elementwise arithmetic, and quantization (dot/GEMV, not GEMM)
+- Verifiers for those operations except `ks.relu`, `ks.gelu`, and `ks.silu`
+- C kernel library with f32 matmul, activations, add/mul, RMSNorm, softmax,
+  and INT8/W4A8 dot/GEMV
+- Lowering: activations; matmul through tile, pack, vectorize, and RVV;
+  add/mul; RMSNorm; softmax; INT8 and W4A8 dot/GEMV to linalg
+- Generated INT8 RVV objects can be linked behind `ks_dot_i8` / `ks_matvec_i8`
+- Golden host checks and QEMU user-mode checks at VLEN 256 and 512
+- Passes: `--ks-lower-activations`, `--ks-lower-to-linalg`, `--ks-tile`,
+  `--ks-pack`, `--ks-materialize-pack-workspace`, `--ks-vectorize`,
+  `--ks-lower-to-rvv`, `--ks-alloc-check`
 
 ### Not Yet Implemented
-- Canonicalization patterns (MatmulOp stub exists but is empty)
-- Verifiers for 3 activation ops (relu, gelu, silu — hasVerifier=0 in TableGen)
-- Strengthened verifiers for layer_norm and rms_norm (currently minimal)
-- Quantized GEMM and W4A8 generated-object integration
-- Known-runtime transformer integration
-- Edge-critical ops (depthwise_conv2d and pooling)
+- Canonicalization patterns (`MatmulOp::getCanonicalizationPatterns` is empty)
+- Verifiers for relu, gelu, and silu (`hasVerifier` is unset)
+- Quantized GEMM, and W4A8 generated-object integration (`TASK-030`)
+- llama.cpp integration (`TASK-026` onward)
+- `ks.depthwise_conv2d`, pooling, conv2d lowering, attention lowering
 - ARM NEON target profile
 
-See `ROADMAP.md` for milestones (edge-first: RVV primary, ARM NEON secondary, quantization early).
+See `ROADMAP.md` for the milestone sequence.
 
 ## Key Specifications
 

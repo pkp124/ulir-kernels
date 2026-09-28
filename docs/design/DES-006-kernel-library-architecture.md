@@ -4,11 +4,17 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Draft |
+| **Status** | Adopted |
 | **Author** | KernelSmith Team |
 | **Created** | 2026-02-09 |
 | **Supersedes** | DES-005 (library packaging), partially DES-002 (matmul pipeline) |
 | **Priority** | Critical |
+
+> **Current status (2026-09-28):** This architecture is the product shape.
+> `libkernelsmith.a` and the public headers exist. RISC-V RVV is the optimized
+> target in use. Handwritten reference kernels still provide f32 matmul and
+> the activations. Generated-object replacement for those two is open (M2 and
+> M3) and is deferred behind the M7 runtime smoke.
 
 ---
 

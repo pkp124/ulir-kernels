@@ -1,196 +1,115 @@
 # Architecture Overview
 
-This document describes the high-level architecture of KernelSmith, an MLIR-based
-compiler framework for edge AI inference kernels.
+KernelSmith compiles high-level kernel operations into a static C library for
+edge devices. RISC-V RVV is the first optimized target. Callers link
+`libkernelsmith.a`, pass their own buffers, and do not need MLIR.
 
-## Design Goals
+## Goals
 
-1. **Edge-first**: Optimized for resource-constrained hardware (RISC-V SoCs, ARM phones/SBCs)
-2. **Quantization-native**: INT8/INT4 support as a core feature
-3. **Performance**: Generated code competitive with hand-tuned implementations
-4. **Zero dependencies**: No runtime, no malloc, no OS calls — RTOS compatible
-5. **Testability**: Every component can be tested in isolation
+- Edge inference first: small RISC-V SoCs, then ARM NEON
+- Quantized dot and GEMV in the public ABI
+- No library-internal malloc; workspace is caller-provided
+- Each lowering stage has its own FileCheck tests
 
-## Compilation Pipeline
+## Pipeline
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     High-Level IR                                │
-│  ┌─────────────────────────────────────────────────────────┐    │
-│  │  Kernel Dialect                                          │    │
-│  │  - kernel.matmul, kernel.conv2d, kernel.attention        │    │
-│  │  - High-level semantics, no tiling decisions            │    │
-│  └─────────────────────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼ Tiling Pass
-┌─────────────────────────────────────────────────────────────────┐
-│                     Tiled IR                                     │
-│  ┌─────────────────────────────────────────────────────────┐    │
-│  │  Linalg + SCF                                            │    │
-│  │  - scf.for loops with tiled operations                  │    │
-│  │  - Tile sizes chosen for target architecture            │    │
-│  └─────────────────────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼ Vectorization Pass
-┌─────────────────────────────────────────────────────────────────┐
-│                     Vector IR                                    │
-│  ┌─────────────────────────────────────────────────────────┐    │
-│  │  Vector Dialect                                          │    │
-│  │  - vector.load, vector.store, vector.fma                │    │
-│  │  - Architecture-agnostic vector operations              │    │
-│  └─────────────────────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼ Target Lowering Pass
-┌─────────────────────────────────────────────────────────────────┐
-│                     Target-Specific IR                           │
-│  ┌─────────────────────────────────────────────────────────┐    │
-│  │  RVV Intrinsics (primary) / ARM NEON (secondary)          │    │
-│  │  - RVV: custom --ks-lower-to-rvv pass                   │    │
-│  │  - NEON: LLVM autovectorization + profile tuning         │    │
-│  └─────────────────────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼ LLVM Lowering
-┌─────────────────────────────────────────────────────────────────┐
-│                     LLVM IR                                      │
-│  ┌─────────────────────────────────────────────────────────┐    │
-│  │  LLVM Dialect → LLVM IR → Target Assembly                │    │
-│  └─────────────────────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────────────────────┘
+```text
+ks.matmul / ks.relu / ks.rms_norm / ks.dot_i8 / ...
+        |
+        |  --ks-lower-to-linalg    (structured, elementwise, norm, quantized)
+        |  --ks-lower-activations  (relu, gelu, silu)
+        v
+linalg.matmul / linalg.generic
+        |
+        |  --ks-tile               (scf.for tiles; matmul)
+        |  --ks-pack               (B panel layout [N/NR, K, NR])
+        |  --ks-materialize-pack-workspace
+        v
+tiled and packed linalg
+        |
+        |  --ks-vectorize
+        v
+vector.transfer_read / vector.contract / vector.transfer_write
+        |
+        |  --ks-lower-to-rvv       (bufferize, loops, vector, LLVM dialect)
+        v
+LLVM IR  ->  llc -march=riscv64 -mattr=+v  ->  RVV object
 ```
 
-## Core Components
+Tile sizes and the pack factor come from the selected target profile in
+`target/`. The RVV profile is `target/riscv_rvv_256.h` (VLEN baseline 256,
+LMUL 4, f32). Code stays vector-length agnostic: VLEN is a runtime value, not
+a hardcoded register width.
 
-### 1. Kernel Dialect
+`--ks-lower-to-rvv` is the RVV path. ARM NEON is planned as LLVM
+autovectorization driven by a future target profile. There is no NEON profile
+in `target/` yet. `target/generic.h` is portable scalar C.
+`target/x86_avx2.h` exists as a profile header.
 
-The `kernel` dialect provides high-level operations for AI workloads:
+## Dialect
+
+The dialect prefix is `ks`. Definitions are TableGen in
+`include/KernelSmith/Dialect/Kernel/KernelOps.td`. Implementations are
+`lib/Dialect/Kernel/KernelOps.cpp`.
 
 ```mlir
-// Matrix multiplication
-%C = kernel.matmul %A, %B : tensor<M×K×f32>, tensor<K×N×f32> -> tensor<M×N×f32>
+%C = ks.matmul %A, %B : tensor<64x128xf32>, tensor<128x256xf32>
+                        -> tensor<64x256xf32>
 
-// 2D Convolution
-%out = kernel.conv2d %input, %filter {strides = [1,1], padding = [1,1,1,1]}
-       : tensor<N×H×W×C×f32>, tensor<KH×KW×C×OC×f32> -> tensor<N×OH×OW×OC×f32>
+%Y = ks.relu %X : tensor<1024xf32>
 
-// Attention
-%out = kernel.scaled_dot_product_attention %Q, %K, %V
-       : tensor<B×L×D×f32>, tensor<B×L×D×f32>, tensor<B×L×D×f32> -> tensor<B×L×D×f32>
+%A = ks.dot_i8 %X, %W {input_zero_point = 0 : i64, weight_zero_point = 0 : i64}
+     : tensor<128xi8>, tensor<128xi8> -> tensor<i32>
 ```
 
-Key characteristics:
-- **Pure operations**: No side effects, easy to reason about
-- **Shape inference**: Output shapes derived from inputs
-- **Verification**: Strong type checking and shape validation
+Operations are pure. Verifiers check rank, element type, and shape
+relationships. Three activations (`ks.relu`, `ks.gelu`, `ks.silu`) still rely
+on type constraints only.
 
-### 2. Transformation Passes
+Which operations lower, and which have C entry points, is the table in the
+[README](../../README.md#supported-kernels). Convolution, attention, batch
+matmul, layer norm, quantize/dequantize, and the reductions currently stop at
+parse and verify.
 
-#### Tiling Pass
-Converts high-level operations into tiled loops:
+## C library
 
-```mlir
-// Before: kernel.matmul %A, %B
-// After:
-scf.for %i = 0 to M step tile_M {
-  scf.for %j = 0 to N step tile_N {
-    scf.for %k = 0 to K step tile_K {
-      // Tiled matmul on tile_M × tile_K × tile_N
-    }
-  }
-}
-```
+`lib/kernelsmith/` is C99. Headers are `include/kernelsmith/`. The library
+returns `KS_OK` or a negative `KS_ERR_*` code and does not allocate. A target
+profile is force-included at compile time, so the same sources build a generic
+library or an RVV library.
 
-Tiling decisions based on:
-- Target vector register size
-- Cache hierarchy (L1, L2)
-- Memory bandwidth
+Today the f32 matmul and activation symbols are handwritten. The compiler can
+lower those operations, and the generated objects are not yet the ones inside
+the default archive. INT8 dot and GEMV can link generated RVV objects through
+`KS_INT8_RVV_OBJECTS`. W4A8 symbols are still the reference kernels.
 
-#### Vectorization Pass
-Converts scalar operations to vector operations:
+The library design is [DES-006](../design/DES-006-kernel-library-architecture.md).
+The RVV pipeline is [DES-009](../design/DES-009-m4-rvv-lowering.md).
 
-```mlir
-// Before: linalg.matmul
-// After:
-%a = vector.load %A[%i, %k] : vector<VL×f32>
-%b = vector.broadcast %B[%k, %j] : f32 -> vector<VL×f32>
-%c = vector.fma %a, %b, %acc : vector<VL×f32>
-```
+## Passes
 
-### 3. Target Backends
+| Flag | Role |
+|---|---|
+| `--ks-lower-activations` | `ks.relu`, `ks.gelu`, `ks.silu` to `linalg.generic` |
+| `--ks-lower-to-linalg` | matmul, add, mul, RMSNorm, softmax, INT8 and W4A8 dot/GEMV |
+| `--ks-tile` | Tile `linalg.matmul` with profile tile sizes |
+| `--ks-pack` | Pack matmul B into column panels |
+| `--ks-materialize-pack-workspace` | Put the packed B buffer in caller workspace |
+| `--ks-vectorize` | Linalg to vector contract and transfer ops |
+| `--ks-lower-to-rvv` | Vector and buffer IR to the LLVM dialect for RVV |
+| `--ks-alloc-check` | Error if a generated kernel still contains `memref.alloc` |
 
-Each target implements:
-1. **Type conversion**: MLIR types → target types
-2. **Operation lowering**: vector ops → target intrinsics
-3. **Optimization patterns**: Target-specific optimizations
+Pass declarations are `include/KernelSmith/Passes/Passes.td`. Implementations
+are `lib/Passes/`.
 
-#### RISC-V RVV Backend
+## How to extend it
 
-```mlir
-// vector.load → vle32.v
-// vector.store → vse32.v
-// vector.fma → vfmacc.vv
-```
+A new kernel starts as a `ks.` operation, lowers to linalg, and only then
+participates in tiling and vectorization. A new fixed-width SIMD target adds
+a profile header and uses LLVM autovectorization. A vector-length-agnostic
+target follows the RVV pattern: an explicit lowering pass plus a profile.
+Profile fields are specified in
+[specs/targets/system-description.md](../../specs/targets/system-description.md).
 
-Key considerations:
-- **Scalable vectors**: VLEN not known at compile time
-- **LMUL configuration**: Register grouping for larger vectors
-- **Masking**: Handle non-power-of-2 dimensions
-
-### 4. C Kernel Library
-
-KernelSmith ships as a static C library, not a runtime:
-- `libkernelsmith.a` — precompiled kernels behind stable C99 headers
-- Caller-provided workspace buffers (no internal malloc)
-- Target profile headers drive tile sizes at build time
-- See [DES-006](../design/DES-006-kernel-library-architecture.md) for details
-
-## Design Decisions
-
-### Why MLIR?
-
-1. **Multi-level IR**: Natural fit for progressive lowering
-2. **Dialects**: Extensible, can mix different abstractions
-3. **Infrastructure**: TableGen, passes, pattern rewriting
-4. **LLVM integration**: Direct path to optimized code
-
-### Why Tiled + Vectorized Approach?
-
-1. **Cache efficiency**: Tiling keeps data in cache
-2. **Register utilization**: Vectorization uses SIMD registers
-3. **Target flexibility**: Same tiling, different vector widths
-
-### Why Specification-Driven?
-
-1. **Clarity**: Clear contracts before implementation
-2. **Testing**: Spec defines expected behavior
-3. **Documentation**: Specs are living documentation
-
-## Extension Points
-
-### Adding a New Kernel
-
-1. Define operation in `kernel` dialect
-2. Add lowering pattern to Linalg/Vector
-3. Existing target backends work automatically
-
-### Adding a New Target
-
-1. Write target profile header (`target/<name>.h`) with cache/SIMD/tile parameters
-2. For VLA architectures (RVV, SVE): create custom lowering pass
-3. For fixed-width SIMD (NEON, AVX): LLVM autovectorization + profile tuning
-4. See `specs/targets/system-description.md` for profile format
-
-## Performance Model
-
-For each kernel, we track:
-- **Arithmetic intensity**: FLOPS / bytes moved
-- **Memory access pattern**: Sequential, strided, random
-- **Parallelism**: Available at each loop level
-
-This informs:
-- Tiling decisions
-- Prefetching strategies
-- Parallelization approach
+The step-by-step contributor path is
+[Adding a Kernel](../guides/adding-kernels.md).

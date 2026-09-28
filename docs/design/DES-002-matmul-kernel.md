@@ -11,6 +11,10 @@
 | **Priority** | Critical |
 | **TDD Pattern** | Yes - Example for other kernels |
 
+> **Current status (2026-09-28):** Historical TDD sketch. The library shape is
+> DES-006, generic matmul lowering is DES-008, and the RVV path is DES-009.
+> `ks.matmul` lowers through those passes today.
+
 ---
 
 ## Context
